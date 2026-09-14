@@ -117,4 +117,26 @@ rules:
       - "绝不搞测试刷量：禁止为简单 UI 渲染、纯展示 Widget、纯 getter/setter 编写毫无意义的形式主义测试"
       - "绝不写脆弱易碎的测试：禁止写样式稍作调整就频繁挂掉的低价值测试"
       - "绝不为了盲目追求覆盖率数字而增加庞大维护负担"
+
+  # 8. 扩展槽位规范 (Extensible Slots)
+  extensible_slots:
+    summary: "对齐 Pi 官方 extension_ui 机制，在 GUI 核心布局中预留标准动态扩展槽位"
+    slots:
+      above_editor: "输入框上方插槽 (对应 setWidget: aboveEditor，用于任务进度、待办卡片等)"
+      below_editor: "输入框下方插槽 (对应 setWidget: belowEditor，用于快捷建议、辅助提示)"
+      status_bar: "底部状态栏动态徽章区 (对应 setStatus: statusKey，用于分支、Token、插件状态)"
+      dialog_overlay: "全局阻断交互模态槽 (对接 select, confirm, input, editor 等 RPC 弹窗)"
+      notification_toast: "全局通知浮层 (对接 notify: info/warning/error)"
+      tool_card_registry: "时间线工具卡片注册表 (支持自定义工具渲染器，开放第三方扩展)"
+      sidebar_panel: "侧边抽屉扩展槽 (支持挂载 Diff 查看器、文件树、插件管理面板)"
+    how_to:
+      - "布局中预留 SlotContainer：在输入框上下、状态栏、全局遮罩层放置标准的槽位容器"
+      - "由 RPC 事件驱动分发：监听 Pi RPC 输出的 extension_ui_request，自动路由至对应槽位刷新"
+      - "工具卡片解耦：通过 Map 注册表管理 ToolCardBuilder，第三方工具即插即用"
+    when_to:
+      - "设计并实现主界面骨架、输入框区域、底部状态栏、全局弹窗系统和时间线消息渲染器时严格执行"
+    forbidden:
+      - "绝在主页面布局中把结构写死而不预留动态挂载槽位"
+      - "绝把扩展逻辑与主界面核心视图硬编码揉杂在一起"
+      - "绝忽略或吞掉 Pi RPC 派发上来的 extension_ui_request 事件"
 ```
