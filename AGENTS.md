@@ -1,5 +1,4 @@
-﻿# 项目规范与 Agent 准则 (AGENTS.md)
-> 本文件为项目最高规范：采用少量 Markdown 说明混合主 YAML 结构，通篇使用平实大白话，杜绝晦涩概念与形式主义。
+# 项目规范与 Agent 准则 (AGENTS.md)
 
 ```yaml
 version: "1.0.0"
