@@ -1,0 +1,2 @@
+# Development-only SVG rasterizer; never bundled with the Flutter application.
+resvg-py==0.5.0

@@ -1,0 +1,369 @@
+{
+  "@@locale": "en",
+  "appName": "Pi",
+  "newConversation": "New Conversation",
+  "projects": "Projects",
+  "settings": "Settings",
+  "noSessions": "No conversations yet",
+  "inputPlaceholder": "Ask Pi anything, or assign a coding task...",
+  "selectModel": "Select Model",
+  "sendMessage": "Send",
+  "environmentLocal": "Local RPC (Connected)",
+  "agentMain": "Main Agent",
+  "windowMinimize": "Minimize",
+  "windowMaximize": "Maximize",
+  "windowRestore": "Restore",
+  "windowClose": "Close",
+  "currentWorkspace": "Current Project",
+  "thinkingIntensity": "Thinking Intensity",
+  "thinkingNone": "Off",
+  "thinkingLow": "Low",
+  "thinkingMedium": "Medium",
+  "thinkingHigh": "High",
+  "thinkingXHigh": "X-High",
+  "thinkingMax": "Max",
+  "defaultGroup": "Default",
+  "recommendedModels": "Recommended Models",
+  "reset": "Reset",
+  "back": "Back",
+  "thinkingMinimal": "Minimal",
+  "modelSearchHint": "Search models…",
+  "clearSearch": "Clear search",
+  "modelsLoading": "Reading models from Pi…",
+  "modelsEmpty": "Pi has no available models. Configure a provider in Pi, then refresh.",
+  "modelSearchEmpty": "No matching models",
+  "modelLoadFailed": "Could not read models. Check that Pi is installed and available on PATH, then retry.",
+  "modelChangeFailed": "Pi could not confirm the model change. Refresh and try again.",
+  "modelThinkingFailed": "Pi could not confirm the thinking level. Refresh and try again.",
+  "piDisconnected": "Disconnected from Pi. Refresh to reconnect.",
+  "piNotConnected": "Pi not connected",
+  "modelNoSelection": "Select a model",
+  "modelRefresh": "Refresh from Pi",
+  "modelUpdating": "Waiting for Pi…",
+  "thinkingUnavailable": "Pi did not return thinking levels. Update Pi and refresh.",
+  "thinkingNotSupported": "This model does not support thinking.",
+  "modelPickerDismiss": "Close model picker",
+  "modelAndThinking": "{model} · {level}",
+  "availableModelCount": "Available models ({count})",
+  "extensionUnsupported": "This Pi extension UI request is not supported yet.",
+  "confirm": "Confirm",
+  "cancel": "Cancel",
+  "close": "Close",
+  "@modelAndThinking": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      },
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "@availableModelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "piExtensionInvalidRequest": "A Pi extension sent a request that could not be displayed. Pi is still connected.",
+  "piReconnecting": "Reconnecting to Pi…",
+  "chatYou": "You",
+  "chatAssistantNumber": "#{number}",
+  "@chatAssistantNumber": {
+    "description": "Session-local ordinal of each assistant message, not each user turn.",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "chatReady": "Ready",
+  "chatWorking": "Working…",
+  "chatRetrying": "Pi is retrying after a temporary service error…",
+  "chatCompacting": "Compacting context…",
+  "chatStopping": "Stopping…",
+  "chatStop": "Stop",
+  "chatLoading": "Loading conversation…",
+  "chatWelcome": "Start with a question",
+  "chatWelcomeHint": "Ask about code, investigate a problem, or let Pi edit this project.",
+  "chatInputHint": "Enter to send · Shift+Enter for a new line",
+  "chatBusyHint": "Draft your next message while Pi finishes this task.",
+  "chatThinking": "Thinking",
+  "chatCopy": "Copy",
+  "chatCopied": "Copied",
+  "chatCopyFailed": "Could not copy. Please try again.",
+  "chatCode": "Code",
+  "chatOutput": "Output",
+  "chatArguments": "Arguments",
+  "chatPreviewLimited": "Preview shortened. Copy to get the full content.",
+  "chatShowMore": "Show more",
+  "chatShowLess": "Show less",
+  "chatToolPreparing": "Preparing",
+  "chatToolRunning": "Running",
+  "chatToolDone": "Completed",
+  "chatToolFailed": "Failed",
+  "chatToolInterrupted": "Interrupted",
+  "chatNoOutput": "This tool returned no text output.",
+  "chatChanges": "File changes",
+  "chatChangesEmpty": "No file changes in this conversation yet.",
+  "chatChangesScope": "Successful file-tool edits in this conversation, not a net Git diff. Changes made through shell commands are not tracked here.",
+  "chatSelectChange": "Select a file to inspect its edits",
+  "chatViewDiff": "View changes",
+  "chatDiff": "Diff",
+  "chatNoChanges": "Content unchanged",
+  "chatEmptyFile": "Empty file",
+  "chatFileCreated": "New file",
+  "chatToolFileStats": "{lines} lines · {size}",
+  "@chatToolFileStats": {
+    "placeholders": {
+      "lines": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "chatToolTimeout": "Timeout {seconds}s",
+  "@chatToolTimeout": {
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "chatWrittenContent": "Written content",
+  "chatNoBaseline": "Pi did not return the previous content. This is the content written, not a before/after diff.",
+  "chatDiffUnavailable": "Pi did not return a diff for this edit.",
+  "chatLatest": "Jump to latest",
+  "chatLoadFailed": "Could not load the conversation. Check the Pi connection and refresh.",
+  "chatSendFailed": "Pi did not accept this message. Your draft is kept. Check the model configuration and retry.",
+  "chatReplyFailed": "The reply did not finish. Check the model service and quota, then send a message to continue.",
+  "chatUncertain": "Pi has not confirmed the request. Sending is paused to avoid duplicate execution. Wait for confirmation or refresh the status.",
+  "chatStopFailed": "Pi has not confirmed it stopped. Try stopping again shortly.",
+  "chatSessionCancelled": "A Pi extension cancelled the session change. Your conversation is kept.",
+  "chatInvalidEvent": "A Pi event could not be displayed. The conversation will continue. Refresh after the task to sync.",
+  "chatAborted": "Reply stopped",
+  "chatLengthLimit": "The model reached its output limit. Send a message to continue.",
+  "chatImageUnavailable": "Could not display this image. It may be missing, damaged or too large.",
+  "chatUnsupportedContent": "This content block is not supported yet",
+  "chatOpenLinkFailed": "Could not open the link. Check that the file exists and has a default app. Executables, network shares and custom schemes are not supported.",
+  "chatRemoteImage": "Image not loaded automatically",
+  "chatQueued": "Queued messages",
+  "chatRefresh": "Sync conversation",
+  "chatSessionHistoryHint": "Pi conversations for this working directory, newest first.",
+  "chatRead": "Read",
+  "chatEdit": "Edit",
+  "chatWrite": "Write",
+  "chatBash": "Terminal",
+  "chatFileCount": "File changes ({count})",
+  "@chatFileCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatEditCount": "{count} edits",
+  "@chatEditCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatEditNumber": "Edit {count}",
+  "@chatEditNumber": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceChoose": "Choose workspace",
+  "workspaceOpen": "Open folder",
+  "workspaceCreate": "New workspace",
+  "workspaceName": "Folder name",
+  "workspaceParent": "Choose parent folder",
+  "workspaceCreateHint": "Create an empty folder here without initializing Git.",
+  "workspaceRecent": "Recent workspaces",
+  "workspaceLoading": "Loading workspace…",
+  "workspaceRefresh": "Refresh workspace and history",
+  "workspaceBusy": "Wait for the current operation to finish, or stop the running task.",
+  "workspaceLoadFailed": "Could not load the workspace. Check Node.js and your npm installation of Pi, then refresh.",
+  "workspacePathFailed": "This folder is unavailable. It may have moved or been deleted. Choose it again.",
+  "workspaceNameInvalid": "Invalid name. Use a folder name without path separators.",
+  "workspacePathExists": "The destination already exists. Choose another name or open it instead.",
+  "workspaceCreateFailed": "Could not create the folder. Check write permissions at the destination.",
+  "workspaceSwitchFailed": "Could not start Pi in that folder. Recovery of the previous workspace was attempted. Check the folder and Pi configuration.",
+  "workspaceUnknown": "The backend has not confirmed the operation. Do not create or switch again; wait for confirmation and refresh.",
+  "workspaceCreatedKept": "The folder was created and kept, but switching did not finish. Reopen it from recent workspaces:",
+  "workspacePersistenceFailed": "Recent workspaces could not be saved. You may need to select this folder again next time.",
+  "sessionSearch": "Search conversation history…",
+  "sessionNoMatch": "No matching conversations",
+  "sessionHistoryFailed": "Could not load conversation history. Refresh to retry.",
+  "sessionHistoryLoading": "Loading conversation history…",
+  "worktreeManage": "Choose worktree",
+  "worktreeCreate": "New worktree",
+  "worktreeBranch": "New branch name",
+  "worktreeBase": "Starting branch",
+  "worktreeHead": "Current commit (HEAD)",
+  "worktreeDetached": "Detached HEAD",
+  "worktreeLocked": "Locked",
+  "worktreeUnavailable": "Directory unavailable",
+  "worktreeNotGit": "This folder is not a Git repository. Chat is still available.",
+  "worktreeNoCommit": "This repository has no commits. Make an initial commit before creating a worktree.",
+  "worktreeDirty": "This folder has uncommitted changes. They will not be copied into the new worktree.",
+  "worktreeCreateHint": "Create a separate checkout and new branch from the selected commit. The source is unchanged; uncommitted and ignored files are not copied. Switch to the new folder after creation.",
+  "worktreeLocation": "New checkouts will be stored in",
+  "worktreeGitFailed": "Git failed. Check that Git is installed and the folder is writable, then refresh and retry.",
+  "worktreeBranchInvalid": "Invalid branch name. Choose another name.",
+  "worktreeBranchExists": "This branch exists. Use a new branch name for the new worktree.",
+  "worktreeBaseInvalid": "The starting branch changed or is unavailable. Refresh and select it again.",
+  "workspaceOpenSelected": "Open workspace",
+  "sessionMessageCount": "{count} messages",
+  "@sessionMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "worktreeRemove": "Remove worktree",
+  "worktreeRemoveConfirm": "Remove only the working directory below. Keep the Git branch and Pi sessions. Uncommitted, untracked or ignored files block removal.",
+  "worktreeInUse": "The main checkout and the current worktree cannot be removed. Switch to another directory first.",
+  "worktreeDirtyBlocked": "This worktree contains uncommitted, untracked or ignored files. It was not removed. Save or clean them up first.",
+  "worktreeLockedBlocked": "This worktree is locked and was not removed. Review and unlock it in Git first.",
+  "workspaceCreateOpen": "Create and open",
+  "chatImage": "Image",
+  "chatAddImages": "Add images",
+  "chatRemoveImage": "Remove image",
+  "chatPreviewImage": "Click to enlarge image",
+  "chatImageLoading": "Reading image…",
+  "chatOpenFile": "Open with default app",
+  "chatLoadRemoteImage": "Click to load remote image",
+  "chatImagePickFailed": "Could not read the images. Check the files and select them again.",
+  "chatImageFormat": "Choose PNG, JPEG, GIF or WebP images.",
+  "chatImageTooLarge": "Images are too large. Limit: 10 MB each, 20 MB total and 40 megapixels.",
+  "chatImageTooMany": "Add up to 8 images per message.",
+  "chatImageModel": "This model does not support images. Switch models or remove the images.",
+  "chatAddAttachment": "Add attachment",
+  "chatAddFiles": "Add files",
+  "chatRemoveAttachment": "Remove attachment",
+  "chatPasteImage": "Pasted image",
+  "chatPasteFailed": "Could not read clipboard attachments. Copy again or use the plus menu. Relaunch the window after updating the app.",
+  "chatFilePickFailed": "Could not add the file. Check that it exists and is readable. Folders and network shares are not supported.",
+  "chatFileTooLarge": "Files can be up to 20 MB each and 50 MB in total.",
+  "chatFileTooMany": "You can attach up to 8 files per message.",
+  "chatFileAttachmentHint": "Pi reads cached copies as needed. PDF and Office documents need suitable tools on the backend.",
+  "chatAttachmentSize": "{size} MB",
+  "chatLightboxClose": "Close image (Esc)",
+  "chatLightboxHint": "Scroll to zoom, drag to pan; double-click to zoom or reset.",
+  "@chatAttachmentSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBack": "Back to app",
+  "settingsSearch": "Search settings…",
+  "settingsNoResults": "No matching settings",
+  "appearanceTitle": "Appearance",
+  "appearanceSubtitle": "Adjust colors, glass, text size and interface scale. Changes apply immediately and save automatically.",
+  "appearanceTheme": "Theme and colors",
+  "appearanceMode": "Appearance mode",
+  "appearanceModeHint": "Follow the system, or always use light or dark mode.",
+  "appearanceSystem": "System",
+  "appearanceLight": "Light",
+  "appearanceDark": "Dark",
+  "appearanceSource": "Color source",
+  "appearanceSourceHint": "Material 3 generates matching surfaces, text and accents from a seed color.",
+  "appearanceOriginal": "Default palette",
+  "appearanceWindows": "Windows accent",
+  "appearanceCustomSeed": "Custom seed",
+  "appearanceSeed": "Seed color",
+  "appearanceSeedHint": "Generate a full palette rather than painting every surface the same color.",
+  "appearanceSystemHint": "Reads the Windows accent and refreshes when you return to the app. Enable automatic accent selection in Windows to follow your wallpaper.",
+  "appearanceSystemUnavailable": "System accent is unavailable; using the default seed. Relaunch after updating the app, or retry.",
+  "appearanceRefresh": "Refresh",
+  "appearanceSizing": "Text and interface size",
+  "appearanceFont": "Base font size",
+  "appearanceFontHint": "Changes text only, including headings and code. System text scaling is preserved. Default: 13.",
+  "appearanceScale": "UI scale",
+  "appearanceScaleHint": "Scales text, controls, icons and spacing together, on top of system display scaling. Default: 100%.",
+  "appearanceColors": "Surface colors",
+  "appearanceColorsHint": "Override colors for the current mode. Light and dark are saved separately. Changing the source keeps your overrides.",
+  "appearanceEditingLight": "Editing light colors",
+  "appearanceEditingDark": "Editing dark colors",
+  "appearanceAdvanced": "Advanced colors",
+  "appearanceAdvancedHint": "Text, borders and status colors",
+  "appearancePrimary": "Accent",
+  "appearanceCanvas": "Main background",
+  "appearanceSidebar": "Title bar and sidebar",
+  "appearanceComposer": "Composer",
+  "appearanceCard": "Cards",
+  "appearanceCode": "Code blocks",
+  "appearanceUserMessage": "User messages",
+  "appearanceElevated": "Popovers and menus",
+  "appearanceTextPrimary": "Primary text",
+  "appearanceTextSecondary": "Secondary text",
+  "appearanceTextMuted": "Muted text",
+  "appearanceBorder": "Borders",
+  "appearanceSuccess": "Success / Diff additions",
+  "appearanceWarning": "Warning",
+  "appearanceError": "Error / Diff removals",
+  "appearanceAutomatic": "Automatic",
+  "appearanceOverridden": "Custom",
+  "appearanceResetColor": "Reset to automatic",
+  "appearanceResetColors": "Reset colors for this mode",
+  "appearanceResetColorsHint": "Clear overrides for the current mode only. Keep text size, scale and the other mode.",
+  "appearanceResetAll": "Restore default appearance",
+  "appearanceResetAllHint": "Restore the default palette, base font size 13 and UI scale 100%. Turn off glass, reset both opacities, and clear custom colors in both modes.",
+  "appearanceSaving": "Saving…",
+  "appearanceSaveFailed": "Changes are applied but could not be saved. Retry or check write access to the app data directory.",
+  "appearanceLoadFailed": "Saved appearance could not be read. Using defaults for now. Relaunch to retry; editing will save new values.",
+  "appearanceRetry": "Retry saving",
+  "appearancePreview": "Preview",
+  "appearancePreviewText": "Text, cards and code follow your appearance settings.",
+  "appearancePreviewCode": "const greeting = \"Hello, Pi\";",
+  "appearanceChooseColor": "Choose color",
+  "appearanceHex": " #RRGGBB",
+  "appearanceHexInvalid": "Enter a 6-digit hex color, such as #0075DE.",
+  "appearanceApply": "Apply color",
+  "appearanceHue": "Hue",
+  "appearanceSaturation": "Saturation",
+  "appearanceValue": "Value",
+  "appearanceContrastWarning": "This color has low contrast with the current text or background and may be hard to read.",
+  "appearancePercent": "{value}%",
+  "appearanceFontValue": "{value}",
+  "@appearancePercent": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "@appearanceFontValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "appearanceGlass": "Desktop glass",
+  "appearanceGlassHint": "Blur the desktop and windows behind this app, with separate settings for each region. Windows controls the blur radius. Light and dark modes share these settings. Requires Windows 11 22H2 or newer.",
+  "appearanceGlassSidebar": "Title bar and sidebar glass",
+  "appearanceGlassSidebarHint": "Applies to the title bar, left navigation and resize strip together.",
+  "appearanceGlassCanvas": "Main area glass",
+  "appearanceGlassCanvasHint": "Applies to the chat and settings backgrounds. Text, the composer and cards stay clear.",
+  "appearanceGlassSidebarOpacity": "Title bar and sidebar tint opacity",
+  "appearanceGlassCanvasOpacity": "Main area tint opacity",
+  "appearanceGlassOpacityHint": "Lower is more transparent; 100% is solid. Increase if text is hard to read. Change the tint under Surface colors.",
+  "appearanceGlassOn": "On",
+  "appearanceGlassOff": "Off",
+  "appearanceGlassSystemDisabled": "Windows is not allowing transparency. Showing solid colors. Check Transparency effects, contrast themes and battery saver.",
+  "appearanceGlassUnsupported": "This system does not support the material. Showing solid colors. Windows 11 22H2 or newer is required.",
+  "appearanceGlassUnavailable": "Native glass is unavailable. Showing solid colors. Update and reopen the app to retry; hot reload cannot load native changes."
+}

@@ -27,8 +27,8 @@ lerna-debug.log*
 
 # Environment files
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.env
 
 # Editor & OS files
@@ -40,8 +40,25 @@ Thumbs.db
 *.sln
 *.sw?
 .idea/
+*.iml
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Flutter / Dart ignores
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Local agent state and Python tooling
+.pi/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/

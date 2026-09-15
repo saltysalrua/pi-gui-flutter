@@ -1,0 +1,8 @@
+-xc++
+-std=c++17
+-I../flutter/ephemeral/cpp_client_wrapper/include
+-I../flutter/ephemeral
+-I..
+-DUNICODE
+-D_UNICODE
+-DNOMINMAX

@@ -1,0 +1,369 @@
+{
+  "@@locale": "zh",
+  "appName": "Pi",
+  "newConversation": "新对话",
+  "projects": "项目列表",
+  "settings": "设置",
+  "noSessions": "暂无历史对话",
+  "inputPlaceholder": "给 Pi 输入需求，或指派代码任务...",
+  "selectModel": "切换模型",
+  "sendMessage": "发送",
+  "environmentLocal": "Local RPC (已连接)",
+  "agentMain": "Main Agent",
+  "windowMinimize": "最小化",
+  "windowMaximize": "最大化",
+  "windowRestore": "还原",
+  "windowClose": "关闭",
+  "currentWorkspace": "当前项目",
+  "thinkingIntensity": "思考强度",
+  "thinkingNone": "关闭",
+  "thinkingLow": "低",
+  "thinkingMedium": "中",
+  "thinkingHigh": "高",
+  "thinkingXHigh": "超高",
+  "thinkingMax": "最高",
+  "defaultGroup": "默认",
+  "recommendedModels": "推荐模型集",
+  "reset": "重置",
+  "back": "返回",
+  "thinkingMinimal": "极低",
+  "modelSearchHint": "搜索模型…",
+  "clearSearch": "清空搜索",
+  "modelsLoading": "正在从 Pi 读取模型…",
+  "modelsEmpty": "Pi 没有可用模型。请在 Pi 中配置提供商后刷新。",
+  "modelSearchEmpty": "没有找到匹配的模型",
+  "modelLoadFailed": "无法读取模型。请确认已安装 Pi，且 PATH 中可以找到 pi，然后重试。",
+  "modelChangeFailed": "Pi 未能确认模型切换结果。请刷新后重试。",
+  "modelThinkingFailed": "Pi 未能确认思考等级。请刷新后重试。",
+  "piDisconnected": "已与 Pi 断开连接，请刷新重连。",
+  "piNotConnected": "Pi 未连接",
+  "modelNoSelection": "请选择模型",
+  "modelRefresh": "从 Pi 刷新",
+  "modelUpdating": "正在等待 Pi 确认…",
+  "thinkingUnavailable": "Pi 未返回思考等级，请更新 Pi 后刷新。",
+  "thinkingNotSupported": "此模型不支持思考。",
+  "modelPickerDismiss": "关闭模型选择器",
+  "modelAndThinking": "{model} · {level}",
+  "availableModelCount": "可用模型（{count}）",
+  "extensionUnsupported": "暂不支持这类 Pi 扩展界面请求。",
+  "confirm": "确认",
+  "cancel": "取消",
+  "close": "关闭",
+  "@modelAndThinking": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      },
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "@availableModelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "piExtensionInvalidRequest": "Pi 扩展发来了一条无法显示的请求，连接未中断。",
+  "piReconnecting": "正在重新连接 Pi…",
+  "chatYou": "你",
+  "chatAssistantNumber": "#{number}",
+  "@chatAssistantNumber": {
+    "description": "当前会话中每条 AI 发言的编号，不按用户问答轮次计数。",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "chatReady": "就绪",
+  "chatWorking": "正在处理…",
+  "chatRetrying": "服务暂时不可用，Pi 正在重试…",
+  "chatCompacting": "正在整理上下文…",
+  "chatStopping": "正在停止…",
+  "chatStop": "停止",
+  "chatLoading": "正在读取对话…",
+  "chatWelcome": "从一个问题开始",
+  "chatWelcomeHint": "询问代码、分析问题，或让 Pi 修改当前项目。",
+  "chatInputHint": "Enter 发送 · Shift+Enter 换行",
+  "chatBusyHint": "可以先写下一条，当前任务结束后再发送。",
+  "chatThinking": "思考过程",
+  "chatCopy": "复制",
+  "chatCopied": "已复制",
+  "chatCopyFailed": "复制失败，请重试。",
+  "chatCode": "代码",
+  "chatOutput": "输出",
+  "chatArguments": "参数",
+  "chatPreviewLimited": "内容较长，仅显示预览；复制可获得完整内容。",
+  "chatShowMore": "展开内容",
+  "chatShowLess": "收起内容",
+  "chatToolPreparing": "准备执行",
+  "chatToolRunning": "执行中",
+  "chatToolDone": "已完成",
+  "chatToolFailed": "执行失败",
+  "chatToolInterrupted": "已中断",
+  "chatNoOutput": "此工具没有返回文字输出。",
+  "chatChanges": "文件改动",
+  "chatChangesEmpty": "本会话还没有文件改动。",
+  "chatChangesScope": "按文件汇总本会话的成功编辑记录，不是 Git 净改动。终端命令产生的改动不会自动列在这里。",
+  "chatSelectChange": "选择文件查看编辑记录",
+  "chatViewDiff": "查看改动",
+  "chatDiff": "Diff",
+  "chatNoChanges": "内容没有变化",
+  "chatEmptyFile": "空文件",
+  "chatFileCreated": "新建文件",
+  "chatToolFileStats": "{lines} 行 · {size}",
+  "@chatToolFileStats": {
+    "placeholders": {
+      "lines": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "chatToolTimeout": "超时 {seconds} 秒",
+  "@chatToolTimeout": {
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "chatWrittenContent": "写入内容",
+  "chatNoBaseline": "没有旧内容，仅展示本次写入，无法对比。",
+  "chatDiffUnavailable": "Pi 没有返回这次编辑的 Diff。",
+  "chatLatest": "回到最新消息",
+  "chatLoadFailed": "无法读取对话。请检查 Pi 连接，然后刷新。",
+  "chatSendFailed": "Pi 未接受这条消息，草稿已保留。请检查模型配置后重试。",
+  "chatReplyFailed": "这次回复未完成。请检查模型服务与额度，再发送消息继续。",
+  "chatUncertain": "尚未收到 Pi 的确认，暂时禁止再次发送，避免重复执行。请等待确认或刷新查看状态。",
+  "chatStopFailed": "Pi 尚未确认停止，请稍后重试停止。",
+  "chatSessionCancelled": "Pi 扩展取消了会话切换，原对话已保留。",
+  "chatInvalidEvent": "Pi 发来了一条无法显示的事件，其余对话仍会继续。任务结束后可刷新同步。",
+  "chatAborted": "回复已停止",
+  "chatLengthLimit": "回复达到模型输出上限，可以发送消息让 Pi 继续。",
+  "chatImageUnavailable": "图片无法显示，文件可能已移动、损坏或过大。",
+  "chatUnsupportedContent": "暂不支持显示此内容块",
+  "chatOpenLinkFailed": "无法打开链接。请检查文件是否存在、是否有默认打开程序；不支持可执行文件、网络共享和特殊协议。",
+  "chatRemoteImage": "图片未自动加载",
+  "chatQueued": "等待中的消息",
+  "chatRefresh": "同步对话",
+  "chatSessionHistoryHint": "当前工作目录的 Pi 历史对话，按最近更新排序。",
+  "chatRead": "读取",
+  "chatEdit": "编辑",
+  "chatWrite": "写入",
+  "chatBash": "终端",
+  "chatFileCount": "文件改动（{count}）",
+  "@chatFileCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatEditCount": "{count} 次编辑",
+  "@chatEditCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatEditNumber": "第 {count} 次编辑",
+  "@chatEditNumber": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceChoose": "选择工作区",
+  "workspaceOpen": "打开文件夹",
+  "workspaceCreate": "新建工作区",
+  "workspaceName": "文件夹名称",
+  "workspaceParent": "选择存放位置",
+  "workspaceCreateHint": "在所选位置创建一个空文件夹，不自动初始化 Git。",
+  "workspaceRecent": "最近使用",
+  "workspaceLoading": "正在读取工作区…",
+  "workspaceRefresh": "刷新工作区与历史",
+  "workspaceBusy": "请先等待当前操作完成，或停止正在运行的任务。",
+  "workspaceLoadFailed": "无法读取工作区。请确认 Node.js 和 npm 安装的 Pi 可用，然后刷新重试。",
+  "workspacePathFailed": "文件夹无法访问，可能已移动或删除。请重新选择。",
+  "workspaceNameInvalid": "名称无效，请使用普通文件夹名称，不要包含路径分隔符。",
+  "workspacePathExists": "目标文件夹已存在。请换一个名称，或直接打开它。",
+  "workspaceCreateFailed": "创建失败，请检查存放位置的写入权限。",
+  "workspaceSwitchFailed": "未能在目标目录启动 Pi，已尝试恢复原工作区。请检查目录与 Pi 配置后重试。",
+  "workspaceUnknown": "尚未收到后端确认，请勿重复创建或切换。等待确认后刷新列表。",
+  "workspaceCreatedKept": "目录已创建并保留，但切换未完成。可从最近使用中重新打开：",
+  "workspacePersistenceFailed": "最近使用列表未能保存，下次启动可能需要重新选择工作区。",
+  "sessionSearch": "搜索历史对话…",
+  "sessionNoMatch": "没有匹配的历史对话",
+  "sessionHistoryFailed": "历史对话读取失败，请刷新重试。",
+  "sessionHistoryLoading": "正在读取历史对话…",
+  "worktreeManage": "选择 Worktree",
+  "worktreeCreate": "新建 Worktree",
+  "worktreeBranch": "新分支名称",
+  "worktreeBase": "起始分支",
+  "worktreeHead": "当前提交（HEAD）",
+  "worktreeDetached": "游离 HEAD",
+  "worktreeLocked": "已锁定",
+  "worktreeUnavailable": "目录已失效",
+  "worktreeNotGit": "当前目录不是 Git 仓库，仍可正常聊天。",
+  "worktreeNoCommit": "仓库还没有提交，首次提交后才能创建 Worktree。",
+  "worktreeDirty": "当前目录有未提交改动，不会复制到新 Worktree。",
+  "worktreeCreateHint": "从所选提交创建独立目录和新分支，不改动原目录，不复制未提交或忽略的文件。创建成功后切换到新目录。",
+  "worktreeLocation": "新目录将放在",
+  "worktreeGitFailed": "Git 操作失败，请确认已安装 Git、目录可写，并刷新后重试。",
+  "worktreeBranchInvalid": "分支名称无效，请换一个名称。",
+  "worktreeBranchExists": "分支已存在，请为新 Worktree 使用新的分支名称。",
+  "worktreeBaseInvalid": "起始分支已变化或不可用，请刷新后重新选择。",
+  "workspaceOpenSelected": "打开工作区",
+  "sessionMessageCount": "{count} 条消息",
+  "@sessionMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "worktreeRemove": "移除 Worktree",
+  "worktreeRemoveConfirm": "仅移除下面的工作目录，保留 Git 分支和 Pi 会话。存在未提交、未跟踪或忽略的文件时不会移除。",
+  "worktreeInUse": "不能移除主工作区或当前正在使用的 Worktree，请先切换到其他目录。",
+  "worktreeDirtyBlocked": "此 Worktree 有未提交、未跟踪或忽略的文件，未移除。请先自行保存或清理。",
+  "worktreeLockedBlocked": "此 Worktree 已锁定，未移除。请先在 Git 中确认并解除锁定。",
+  "workspaceCreateOpen": "创建并打开",
+  "chatImage": "图片",
+  "chatAddImages": "添加图片",
+  "chatRemoveImage": "移除图片",
+  "chatPreviewImage": "点击放大图片",
+  "chatImageLoading": "正在读取图片…",
+  "chatOpenFile": "用系统默认程序打开",
+  "chatLoadRemoteImage": "点击加载网络图片",
+  "chatImagePickFailed": "无法读取图片，请检查文件后重新选择。",
+  "chatImageFormat": "请选择 PNG、JPEG、GIF 或 WebP 图片。",
+  "chatImageTooLarge": "图片过大。单张最多 10 MB，总共最多 20 MB，分辨率不超过 4000 万像素。",
+  "chatImageTooMany": "每条消息最多添加 8 张图片。",
+  "chatImageModel": "当前模型不支持图片，请切换模型或移除图片。",
+  "chatAddAttachment": "添加附件",
+  "chatAddFiles": "添加文件",
+  "chatRemoveAttachment": "移除附件",
+  "chatPasteImage": "粘贴的图片",
+  "chatPasteFailed": "无法读取剪贴板附件。请重新复制，或使用加号添加；更新应用后请重新打开窗口。",
+  "chatFilePickFailed": "无法添加文件，请检查文件是否仍存在、是否可读取。不支持文件夹和网络共享。",
+  "chatFileTooLarge": "文件过大。每个文件最多 20 MB，文件附件合计最多 50 MB。",
+  "chatFileTooMany": "每条消息最多添加 8 个文件。",
+  "chatFileAttachmentHint": "发送缓存副本，由 Pi 按需读取。PDF、Office 等文档需要后端有相应读取工具。",
+  "chatAttachmentSize": "{size} MB",
+  "chatLightboxClose": "关闭大图（Esc）",
+  "chatLightboxHint": "滚轮缩放，拖动平移；双击放大或复位。",
+  "@chatAttachmentSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBack": "返回应用",
+  "settingsSearch": "搜索设置…",
+  "settingsNoResults": "没有找到匹配的设置",
+  "appearanceTitle": "外观",
+  "appearanceSubtitle": "调整配色、毛玻璃、文字大小和界面比例。修改后立即生效，自动保存。",
+  "appearanceTheme": "主题与配色",
+  "appearanceMode": "显示模式",
+  "appearanceModeHint": "跟随系统，或始终使用浅色、深色。",
+  "appearanceSystem": "跟随系统",
+  "appearanceLight": "浅色",
+  "appearanceDark": "深色",
+  "appearanceSource": "配色来源",
+  "appearanceSourceHint": "Material 3 会用种子色生成相互搭配的背景、文字和强调色。",
+  "appearanceOriginal": "默认配色",
+  "appearanceWindows": "Windows 强调色",
+  "appearanceCustomSeed": "自选种子色",
+  "appearanceSeed": "种子色",
+  "appearanceSeedHint": "生成整套配色，不是把所有部位涂成同一种颜色。",
+  "appearanceSystemHint": "读取 Windows 强调色，切回应用时自动更新。Windows 开启“从背景自动选取强调色”后可随壁纸变化。",
+  "appearanceSystemUnavailable": "暂时无法读取系统强调色，正在使用默认种子色。更新应用后请重新打开，或点击重试。",
+  "appearanceRefresh": "重新读取",
+  "appearanceSizing": "文字与界面大小",
+  "appearanceFont": "基准字号",
+  "appearanceFontHint": "只调整文字大小，标题与代码字号按比例变化；保留系统文字缩放。默认 13。",
+  "appearanceScale": "UI 比例",
+  "appearanceScaleHint": "整体缩放文字、按钮、图标和间距，叠加在系统显示缩放之上。默认 100%。",
+  "appearanceColors": "分区颜色",
+  "appearanceColorsHint": "覆盖当前显示模式的配色；浅色与深色分别保存。切换配色来源不会清除覆盖值。",
+  "appearanceEditingLight": "正在编辑浅色配色",
+  "appearanceEditingDark": "正在编辑深色配色",
+  "appearanceAdvanced": "高级颜色",
+  "appearanceAdvancedHint": "文字、边框与状态色",
+  "appearancePrimary": "强调色",
+  "appearanceCanvas": "主背景",
+  "appearanceSidebar": "顶部与侧边栏",
+  "appearanceComposer": "输入框",
+  "appearanceCard": "卡片",
+  "appearanceCode": "代码区",
+  "appearanceUserMessage": "用户消息",
+  "appearanceElevated": "浮层与菜单",
+  "appearanceTextPrimary": "主要文字",
+  "appearanceTextSecondary": "次要文字",
+  "appearanceTextMuted": "辅助文字",
+  "appearanceBorder": "边框",
+  "appearanceSuccess": "成功 / Diff 新增",
+  "appearanceWarning": "警告",
+  "appearanceError": "错误 / Diff 删除",
+  "appearanceAutomatic": "自动",
+  "appearanceOverridden": "已自定义",
+  "appearanceResetColor": "恢复自动配色",
+  "appearanceResetColors": "重置此模式的颜色",
+  "appearanceResetColorsHint": "仅清除当前浅色或深色模式的颜色覆盖，不改变字号、比例和另一种模式。",
+  "appearanceResetAll": "恢复默认外观",
+  "appearanceResetAllHint": "恢复默认配色、13 基准字号和 100% UI 比例，关闭两区毛玻璃并重置其不透明度，清除浅色、深色的自定义颜色。",
+  "appearanceSaving": "正在保存…",
+  "appearanceSaveFailed": "本次修改已生效，但未能保存到本机。请重试，或检查应用数据目录的写入权限。",
+  "appearanceLoadFailed": "无法读取已保存的外观，暂时使用默认值。重新打开应用可重试；修改设置会保存新值。",
+  "appearanceRetry": "重试保存",
+  "appearancePreview": "预览",
+  "appearancePreviewText": "文字、卡片和代码会随你的设置一起变化。",
+  "appearancePreviewCode": "const greeting = \"Hello, Pi\";",
+  "appearanceChooseColor": "选择颜色",
+  "appearanceHex": "#RRGGBB",
+  "appearanceHexInvalid": "请输入 6 位十六进制颜色，例如 #0075DE。",
+  "appearanceApply": "应用颜色",
+  "appearanceHue": "色相",
+  "appearanceSaturation": "饱和度",
+  "appearanceValue": "明度",
+  "appearanceContrastWarning": "这个颜色与当前文字或背景的对比度较低，可能不易看清。",
+  "appearancePercent": "{value}%",
+  "appearanceFontValue": "{value}",
+  "@appearancePercent": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "@appearanceFontValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "appearanceGlass": "桌面毛玻璃",
+  "appearanceGlassHint": "模糊窗口背后的桌面和其他窗口，两区分别设置。模糊程度由 Windows 控制，明暗模式共用这些设置。需要 Windows 11 22H2 或更新版本。",
+  "appearanceGlassSidebar": "顶部与侧边栏毛玻璃",
+  "appearanceGlassSidebarHint": "标题栏、左侧导航和拖拽区一起变化。",
+  "appearanceGlassCanvas": "主界面毛玻璃",
+  "appearanceGlassCanvasHint": "用于聊天与设置页的主背景；文字、输入框和卡片保持清晰。",
+  "appearanceGlassSidebarOpacity": "顶部与侧边栏底色不透明度",
+  "appearanceGlassCanvasOpacity": "主界面底色不透明度",
+  "appearanceGlassOpacityHint": "越低越透，100% 为纯色。看不清文字时请调高；底色仍可在“分区颜色”中修改。",
+  "appearanceGlassOn": "开启",
+  "appearanceGlassOff": "关闭",
+  "appearanceGlassSystemDisabled": "系统暂未允许透明效果，正在显示纯色。请检查 Windows 的“透明效果”、对比度主题和节电模式。",
+  "appearanceGlassUnsupported": "当前系统不支持此材质，正在显示纯色。需要 Windows 11 22H2 或更新版本。",
+  "appearanceGlassUnavailable": "原生毛玻璃暂不可用，正在显示纯色。更新并重新打开应用后可重试；热重载无法载入原生改动。"
+}

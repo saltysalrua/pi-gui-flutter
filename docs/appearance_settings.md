@@ -1,0 +1,224 @@
+---
+title: "外观设置：动态配色、分区毛玻璃与缩放"
+version: "1.3.2"
+status: "implemented"
+type: "feature-and-architecture"
+tags: [flutter, settings, material3, windows, theme]
+---
+
+# 外观设置
+
+## 使用方法
+
+点击主界面左下角 **设置**，进入 **外观**。布局参考 Codex 设置界面：左侧返回、搜索与分类，右侧分组设置。当前只列出已经实现的外观分类。
+
+- **显示模式**：跟随系统、浅色、深色。
+- **配色来源**：默认配色、Windows 强调色、自选种子色。首次启动仍使用原有默认配色。
+- **基准字号**：12–18，默认 13。只改变文字，标题、正文和代码字号一起按比例变化。
+- **UI 比例**：80%、90%、100%、110%、125%、150%，默认 100%。整体缩放文字、按钮、图标、间距和浮层，不更改 Windows 的显示缩放。
+- **桌面毛玻璃**：顶部与侧边栏、主界面分别开关和调节底色不透明度，默认关闭。
+- **分区颜色**：强调色、主背景、顶部与侧边栏、输入框、卡片、代码区、用户消息。
+- **高级颜色**：浮层与菜单、三层文字、边框、成功 / Diff 新增、警告、错误 / Diff 删除。默认折叠；搜索匹配其中的项目时自动展开。
+
+点击色块打开取色器，可拖动颜色面板、调整 HSV 滑块，或输入 `#RRGGBB`。点击“应用颜色”才提交，取消或 Esc 不修改原值。取色器不支持 Alpha 通道或屏幕吸管；分区毛玻璃的不透明度在单独的设置组调整。文字与背景对比度过低时提示，但允许保留用户选择。
+
+所有设置立即生效并自动保存在本机。每个颜色右侧的重置按钮恢复自动生成值；“重置此模式的颜色”只清除当前明暗模式的覆盖；“恢复默认外观”需确认，会重置两套覆盖、来源、模式、字号、比例，并关闭两区毛玻璃、恢复其默认不透明度。
+
+### 顶部与侧边栏的统一底色
+
+顶部标题栏、首页侧栏与拖拽调宽区共用 `sidebarBackground`，不再显示顶部底边框和侧栏右侧的常驻分隔线。外观里的“顶部与侧边栏”会同时改变这两个区域，不增加颜色键或迁移已有偏好。
+
+首页与设置页的右侧主内容区均使用 `canvasBackground`，仅左上角采用 `AppRadius.xl`（16 逻辑像素）圆角；其余三个角保持直角，没有额外描边或阴影。两页内容区都紧贴标题栏下沿、窗口右边与底边；设置页不再使用四角圆角矩形，也不再保留右侧 / 底部的 8px 外边距。圆角外露出统一底色，子内容也会裁切，滚动不会盖住圆角。设置页与首页的侧栏共享宽度，主内容左边缘也保持一致；设置页窄窗口响应式布局不变，首页空会话输入居中、有消息后输入到底部的两态逻辑不变。
+
+- `HomeView` 与 `AppearanceSettingsView` 共用 `AppDesktopScaffold`，由同一背景画布分别绘制顶部/侧栏区域与主内容区域。主内容仍由内部透明 `AppCard` 用单角圆角、无描边、`Clip.antiAlias` 裁切；其他卡片默认行为不变。
+- 公共外壳内的 `CustomTitleBar`、`HomeSidebar` 和分隔条使用透明背景，由外壳统一提供底色；不能再盖一层纯色或重复叠加半透明颜色。独立使用这些组件时原默认背景不变。窗口拖拽、双击最大化及控制按钮不变。
+- `AppResizeDivider(showIdleIndicator: false)` 隐藏静止时的线和手柄；悬停或拖动时淡入手柄，10px 命中区、左右拖拽和双击复位保留。外壳中的左右半侧透出统一侧栏底色，避免圆角旁出现实色竖条。改动面板的分隔条保留原有默认样式。
+- 动效沿用 `AppDurations.quick` / `AppCurves.smoothOut`，减弱动态时立即切换。没有新增 RPC 命令或事件。
+
+### 分区桌面毛玻璃
+
+在 **设置 → 外观 → 桌面毛玻璃** 中操作，也可搜索“毛玻璃”：
+
+1. 开启“顶部与侧边栏毛玻璃”或“主界面毛玻璃”。两区各自生效，不要求一起开启。
+2. 开启后出现对应的“底色不透明度”滑块，范围 20%–100%，每步 5%。默认侧栏 65%、主界面 85%；越低越能透出背景，100% 显示纯色。看不清文字时调高一些。
+3. 关闭某一区域只恢复该区纯色，保留它的滑块数值；重新开启继续使用原值。标题栏始终跟随侧边栏，聊天和设置页的主背景使用同一项主界面设置。
+4. 不透明度以外的底色仍在“分区颜色”修改。两区的开关和不透明度在明暗模式间共用，颜色覆盖仍按明暗模式分别保存。
+
+这是 **Windows 原生桌面 Acrylic**，模糊窗口背后的桌面或其他窗口，不是给文字加模糊，也不是应用内的渐变仿制。Windows 控制模糊半径，本设置只独立控制每区的底色覆盖程度；不提供无法兑现的分区原生模糊半径。文字、按钮、输入框、卡片、代码块与 Diff 面板不会随背景一起降低透明度。
+
+**需要 Windows 11 22H2 或更新版本，并重新构建、启动新版本。** 仅热重载不能注册新增的原生通道。旧 Windows、非 Windows、旧 Runner 缺少通道、调用失败时保留纯色并显示原因；不会把窗口降级成未经模糊的全透明窗口。关闭 Windows“透明效果”、启用对比度主题或节电模式时也会回退纯色，不改写保存的选项。系统设置/主题/强调色/DWM 合成/电源广播及窗口激活会触发回读，系统本身也可能在窗口失焦时调整材质。未修改用户的 Windows 设置。
+
+背景按两个互不覆盖的路径分别绘制，主内容圆角外的部分属于侧栏区，避免在主背景下面铺满侧栏颜色而造成透明度串联。原有空会话居中输入、发送后底部输入、共享侧栏宽度、设置路由与 Pi 会话生命周期均不改变。
+
+开关和底色变化复用 `AppDurations.fast` / `AppCurves.smoothOut`；减弱动态时立即切换。原生能力不可用时立即回退不透明背景，优先保证可读性。滑块复用 `AppSteppedSlider(showTicks: false)`，模型思考档位的默认刻度显示不变。
+
+### 两页共用可拖拽侧栏
+
+鼠标放到侧栏右边缘时显示手柄，左右拖动即可调宽，双击恢复默认 260 逻辑像素。首页调宽后打开设置、设置调宽后返回首页，侧栏与主内容左边缘都不会换成另一套宽度；两页使用同一个 10px 拖拽区，不再让设置页固定为 230px。
+
+- 共享状态位于 `lib/ui/core/sidebar_layout_controller.dart` 的 `SidebarLayoutController.instance`，由应用进程持有，两页通过 `ListenableBuilder` 订阅。页面不各存一份宽度，也不相互调用 `setState`。
+- 默认 260px，最小 180px，最大为 480px 与当前逻辑视口宽度一半中的较小值（沿用首页限制）。`widthFor(viewportWidth)` 统一计算显示宽度，`resizeBy(delta, viewportWidth: ...)` 从实际显示边缘开始拖动，避免窗口变窄后反向拖动出现空行程；`reset()` 恢复默认。
+- 窗口缩小只临时限制显示宽度，未继续拖动时放大可恢复之前的宽度。UI 比例变化仍使用缩放后的逻辑视口计算，两页上限一致。
+- 设置页逻辑视口不足 760px 时继续隐藏侧栏及拖拽区，将返回和搜索移到顶部；不重置共享宽度，恢复宽窗口后继续使用原值。
+- 宽度仅保存在本次 GUI 运行期间，重新启动恢复默认；不写入 `appearance.json`，不触发配色保存或 Pi RPC，也不改聊天会话。
+
+### Windows 动态配色的含义
+
+使用 `dynamic_color` 的桌面 `getAccentColor()` 读取 Windows 强调色，再通过 Flutter `ColorScheme.fromSeed` 生成 Material 3 明暗调色板。这不是直接抓取壁纸，也不保证生成后的主色与 Windows 原始强调色完全相同——Material 会调整明度、彩度和对比度。
+
+Windows 设置中开启“从背景自动选取强调色”后，应用可间接随壁纸变化。启动、窗口重新获得焦点、系统明暗变化、点击“重新读取”时刷新。不轮询、不修改系统设置，也不承诺在应用始终持有焦点时实时捕获其他程序对强调色的更改。
+
+读取失败时使用默认种子色，并在设置页明确提示；自定义覆盖不会丢失。新增原生插件后需要重新构建并启动应用，仅热重载不能把插件装入旧进程。
+
+### 明暗模式、字号和缩放的关系
+
+- 浅色、深色的颜色覆盖分别保存。想改另一套，先切换显示模式；“跟随系统”编辑当前实际显示的那套。
+- 切换配色来源保留覆盖；因此手动覆盖的分区不再跟随种子色变化，点该项重置可恢复自动。
+- 基准字号以 `TextTheme.bodyMedium` 的 13 为基准；聊天正文 `bodyLarge` 默认 14，按相同比例变化，不是所有文字都变成同一个字号。
+- 系统文字缩放仍然有效。最终视觉大小由主题字号、系统文字缩放、应用 UI 比例和 Windows 显示缩放共同决定。
+- 小窗口或高比例下，设置页收起侧栏，把返回和搜索移到顶部；设置行空间不够时上下排列，可滚动访问其余设置。
+
+## 代码结构与边界
+
+**无 Pi RPC 命令或事件。** 外观是 GUI 本地偏好，不读取、编辑 Pi 私有配置或会话。原有全局 `dialogOverlay` / `notificationToast` 插槽仍位于普通路由上方，并一同缩放。
+
+| 路径 | 职责 |
+| --- | --- |
+| `lib/core/models/appearance_preferences.dart` | 版本化数据、枚举、HEX 校验、数值边界、明暗独立覆盖 |
+| `lib/core/services/window_material_service.dart` | GUI 原生 MethodChannel；强类型材质状态、事件和旧 Runner 容错 |
+| `lib/ui/core/window_material_controller.dart` | 原生请求串行、合并最新开关/明暗状态、防止迟到响应覆盖系统回退 |
+| `lib/ui/core/window_material_scope.dart` | Navigator 上方的唯一材质驱动；仅原生确认 active 后允许透明，保留高对比度保护 |
+| `lib/ui/atoms/app_desktop_scaffold.dart` | 共用桌面外壳、两区背景路径、单角圆角、透明标题栏/侧栏与拖拽条 |
+| `windows/runner/window_material.h/.cpp` | DWM Acrylic、系统透明/高对比度/节电检查，原生状态回传 |
+| `windows/runner/flutter_window.cpp` | 原生生命周期/消息路由；补全隐藏标题栏的 NC 激活默认处理，避免 DWM 卡在未激活灰底 |
+| `lib/core/services/appearance_store.dart` | GUI 自有 JSON 文件读写，临时文件 flush 后 rename 替换 |
+| `lib/ui/features/settings/controllers/appearance_controller.dart` | 即时状态、顺序保存/合并等待中的写入、失败重试、系统强调色观察 |
+| `lib/ui/features/settings/views/appearance_settings_view.dart` | 设置路由、分类/搜索、分组设置、取色/恢复确认及预览 |
+| `lib/ui/features/settings/appearance_labels.dart` | 颜色枚举到 i18n 文案的映射 |
+| `lib/ui/core/sidebar_layout_controller.dart` | 首页 / 设置共用的侧栏宽度、视口限制、拖拽和复位；纯内存状态 |
+| `lib/ui/core/theme/appearance_palette.dart` | 默认 / M3 色板到语义 Token 的映射，再叠加覆盖；对比度与前景色选择 |
+| `lib/ui/core/theme/app_theme.dart` | 构建明暗 `ThemeData`，统一缩放 TextTheme，配置选择高亮与 Tooltip |
+| `lib/ui/core/theme/app_colors_extension.dart` | 含输入框、代码区、用户消息和中性滑块手柄的语义色 |
+| `lib/ui/atoms/app_setting.dart` | 可复用分组卡片、响应式标签/控件行 |
+| `lib/ui/atoms/app_select.dart` | 复用操作按钮的带文字选择框，键盘与菜单动效 |
+| `lib/ui/atoms/app_color_picker.dart` | 色块、颜色按钮与局部草稿式 HEX/HSV 取色弹窗 |
+| `lib/ui/atoms/app_scale.dart` | 整个逻辑视口与 Overlay 的布局/绘制/命中缩放 |
+| `lib/main.dart` | 启动先读偏好，AppearanceScope + ListenableBuilder 绑定主题 |
+| `lib/ui/features/home/views/home_view.dart` | 设置入口；正常关闭窗口等待偏好保存完毕 |
+
+复用 `AppCard`、`AppActionButton`、`AppIconButton`、`AppNavTile`、`AppTextField`、`AppSteppedSlider`、`AppDisclosure`、`AppDialog`、`AppCodeBlock`；不在页面里另写私有装饰控件。文案位于 `lib/l10n/app_zh.arb` / `app_en.arb`。
+
+折叠栏的标题与说明统一左对齐，说明长度变化不会推移标题。`AppActionButton` 的双行文字跟随 `mainAxisAlignment` 对齐；新增 `expandLabel`（默认 `false`）允许文字区占满剩余宽度。`AppDisclosure` 仅在 `framed: true` 时启用它，让箭头靠边框右侧；透明工具行保留紧凑的文字 / 状态间距，模型选择器保留原有居中布局。
+
+### 原生材质通道（不是 Pi RPC）
+
+`WindowMaterialHost` 在 `MaterialApp.builder` 中包住 Navigator 与扩展 Overlay，仍位于 `AppScale` 内。它持有一个 `WindowMaterialController` / `WindowMaterialService`，不因打开设置或修改不透明度重建。后台只接收“任一区域开启”和实际明暗模式，不接收两个区域的布局坐标或不透明度。
+
+通道 `pi_gui/window_material`：
+
+```json
+{"method": "setAcrylic", "arguments": {"enabled": true, "dark": false}}
+```
+
+返回字符串 `active` / `disabled` / `unsupported` / `systemDisabled` / `unavailable`；系统策略变化通过 `statusChanged` 方法回传同样的字符串。缺失或未知响应一律视为不可用。原生同步使用 `DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE, DWMSBT_TRANSIENTWINDOW)` 和 `DwmExtendFrameIntoClientArea`；关闭时显式恢复 `DWMSBT_NONE`。只清除 `window_manager` 留下的旧 accent gradient，避免与系统 backdrop 冲突，不安装额外插件。
+
+原生请求串行执行，中间的过时配置可合并；迟到响应不能把刚关闭的透明背景重新开启。系统策略事件若与请求并发，确认回读后才接受结果。拖动不透明度只更新 Flutter 的分区底色和本地偏好，不重复设置 DWM，不经过 Pi。
+
+### 隐藏标题栏不能丢掉 Windows 激活状态
+
+`window_manager 0.5.2` 的 `windows/window_manager_plugin.cpp` 在隐藏标题栏时，会为 `WM_NCACTIVATE` 发出 Dart focus/blur 事件后直接返回 `1`。这会跳过 `DefWindowProc` 对 Windows 自身“活动标题栏”状态的更新。结果可能是：应用已在前台、Flutter 背景 alpha 正常、材质通道返回 `active`、DWM 类型也是 `3`，但 `GetWindowInfo().dwWindowStatus & WS_ACTIVECAPTION` 仍为 0，Acrylic 一直显示未激活状态的灰色回退层。
+
+修复在 `FlutterWindow::MessageHandler` 的插件已处理分支：若消息为 `WM_NCACTIVATE` 且插件返回 `TRUE`，额外调用 `DefWindowProc(hwnd, message, wparam, -1)`，之后仍保留插件原有返回值和材质事件处理。`lParam = -1` 只阻止原生非客户区重绘，不阻止激活状态更新，因而不会重新画出系统标题栏；不吞掉 focus/blur 事件，也不把窗口永久置顶或永久伪装为激活状态。此处理不应仅限于毛玻璃开启时，否则在开启前就可能留下错误状态。
+
+`active` 和 DWM 类型 3 **只说明原生配置已成功设置，不是最终像素的证明**。遇到“只有灰色、没有背景颜色”时，先在未最小化且确实位于前台的窗口上核对 NC 激活状态，再用受控背景对照。不要仅凭 API 返回值归咎于不透明度或 Windows 全局设置，也不要只凭任务栏正常就认定所有窗口的状态都正常。失焦时 Windows 正常切换成不透明回退层不属于这个缺陷；切回前台后应恢复背景材质。
+
+### 不让系统强调色覆盖自定义标题栏
+
+Windows 的“在标题栏和窗口边框上显示强调色”与应用里的“配色来源”是两个独立设置。原生窗口恢复正常激活后，DWM 默认配色可能在透明的自定义标题栏上画出实色色带；本机确认是 8px 标题栏色带加 1px 系统强调色边框。
+
+`windows/runner/window_material.cpp` 的 `ConfigureCustomChrome` 对本窗口设置 `DWMWA_CAPTION_COLOR` / `DWMWA_BORDER_COLOR` 为 `DWMWA_COLOR_NONE`（API 哨兵值 `0xFFFFFFFE`，不是硬编码的 UI 颜色）。在原生对象创建、材质应用及相关系统消息时维护，毛玻璃关闭时也保留此策略；不改 Windows 全局设置或应用配色来源。旧 Windows 不支持这些外观属性时不阻断启动。
+
+不改 `WM_NCCALCSIZE`、客户区尺寸或窗口样式，也不覆盖刚补全的 `WM_NCACTIVATE` 处理，因此保留拖拽缩放、系统圆角与阴影。独立新构建验证了浅/深色、毛玻璃开/关、重新激活、主题/强调色消息和最大化还原：原色带行与标题栏正文空白处的 RGB 差为 0；开启毛玻璃时，边缘能分别透出受控红/蓝背景，不再绘制系统强调色实线。左右/底部/顶部的原生缩放命中分别保持 `HTLEFT` / `HTRIGHT` / `HTBOTTOM` / `HTTOP`。测试没有修改用户的配色或 Windows 设置，也未重启活动 GUI / Pi。
+
+### 生命周期与缩放注意事项
+
+设置通过普通 `PageRouteBuilder` push，保留下面的 `HomeView`，不能通过替换首页或新建 RPC 客户端打开设置。修改主题时保持 `MaterialApp` / Navigator 的 Element 身份，不能给它们加上随主题改变的 Key。
+
+`AppScale` 把内容布局在 `窗口逻辑尺寸 / 比例` 的视口内，由 `FittedBox` 同时变换绘制与命中测试。内部 `MediaQuery` 同步调整 size、DPR、insets，但保留系统 TextScaler。Navigator、应用扩展 Overlay 都在同一个变换下，不能只 Transform 页面而让菜单留在未缩放的 Overlay 中。
+
+输入框居中/底部的两态布局仍由原有 `AppComposerLayout` 管理。成功 read 等透明工具行继续透明；代码背景覆盖只影响有背景的代码块和行内代码，不给工具调用重新加框。
+
+主题过渡和缩放使用 `AppDurations` / `AppCurves`。`disableAnimations` 时降级为即时切换；选择框、弹窗、折叠区沿用公共动效。滑块手柄使用独立 `controlThumb`，不能复用 M3 深色主题可能为深色的 `onPrimary`。
+
+### 持久化
+
+文件位于 `path_provider.getApplicationSupportDirectory()/appearance.json`，不是工作区，也不是 Pi 配置目录。Windows 的具体上级目录由应用的 company/product 元数据决定，不硬编码用户名。文件无凭据、会话或工作区数据。
+
+```json
+{
+  "version": 1,
+  "mode": "system",
+  "source": "system",
+  "seed": "#0075DE",
+  "baseFontSize": 14.0,
+  "uiScale": 1.1,
+  "sidebarGlass": {"enabled": true, "opacity": 0.65},
+  "canvasGlass": {"enabled": false, "opacity": 0.85},
+  "lightColors": {
+    "composer": "#F1F7F5"
+  },
+  "darkColors": {
+    "sidebar": "#151B19"
+  }
+}
+```
+
+- 未知枚举回退默认值，非法颜色忽略，字号与比例限制在支持范围；未知文件版本或损坏文件报告加载失败，暂用默认值。
+- 只有用户修改后才写入新的偏好，不因加载失败立即覆盖原文件。
+- 正在执行的写入先完成，后续等待中的旧快照可以合并，最终最新设置胜出。
+- 保存失败保留已经生效的内存值，显示人话提示与重试入口；不能悄悄声称已持久化。
+- 自定义颜色仍以不透明六位 HEX 存储。`sidebarGlass` / `canvasGlass` 只保存各区底色不透明度，不调用全窗口 `setOpacity`。旧 version 1 文件缺少这两个字段时两区默认关闭；非法开关回退默认、有限数值限制到 0.2–1.0、非有限数值恢复该区默认值。
+
+## 毛玻璃激活状态修复验证
+
+- 在原问题窗口、不改用户的两区 30% 不透明度时，最内/最外 Flutter 图层的背景 alpha 均约为 30%，排除了 Flutter 不透明底层覆盖。窗口在前台但 NC 激活位为 0；受控红/蓝双色背景下，标题栏两个空白采样点都为 `(221,221,220)`。一次性校正 NC 激活后，两点分别为 `(244,176,162)` / `(171,183,243)`，确认根因在窗口激活状态而不是 Windows 的透明开关。此临时诊断不是永久修复方式。
+- 对新编译的独立 Profile QA 窗口（临时偏好、不创建 Pi、普通非置顶窗口）验证：先刻意置为 NC 未激活，再通过正常 `SendMessage(WM_NCACTIVATE)` 经过插件和 Runner 路由恢复，而非由探针直接调用默认过程恢复，确认修复来自正式 Runner 的消息处理；激活位和红/蓝背景透色均恢复。
+- 浅色、深色分别通过 3 轮激活/失活消息、最小化后还原、最大化后还原；另走查一次真实窗口前后台切换。浅色两个采样点最大通道差为 81，深色为 152，均不是灰色平层。关闭两区后返回 `disabled`，再开启及切换深色后返回 `active` 并继续正确透色。
+- 仅采样已确认 PID 的 QA/目标窗口空白标题栏点，背景由自建不透明窗口提供，不保存或读取聊天截图。采样前需确认窗口未最小化、点在屏幕内、目标在前台；`GetPixel == 0xFFFFFFFF` 是 `CLR_INVALID`，不能当作白色。临时还原/置顶实验结束后恢复原窗口状态。
+- 临时 Dart 像素探针通过安全热重载装入和移除，生产 Dart 文件恢复原样；活动会话、GUI 和 Pi 未重启，无运行时错误。独立 QA 窗口及参照背景已关闭。没有修改用户的外观参数、Windows 设置、Pub 插件或 Flutter SDK。
+- 本次 `flutter analyze --no-pub` 无问题，全套 **57 项测试通过**；新 Profile 和生产入口 Release 构建成功。修复是 C++ Runner 改动，持续修复须下次启动新构建，不能靠热重载替换旧进程里的原生代码。
+
+## 初版毛玻璃验证（历史记录）
+
+- `flutter analyze --no-pub` 无问题；全套 **57 项测试通过**，正式 `flutter build windows --release -t lib/main.dart` 成功。
+- 新增 `test/window_material_test.dart` 的 5 项核心测试：旧偏好迁移/坏值/区域独立、请求串行和过时响应、系统策略与响应竞态、处理中销毁、原生通道编码/缺失/未知响应。原有 7 项外观测试继续通过，不新增纯样式 Widget 测试。
+- 独立 Windows Profile QA 窗口使用临时偏好文件，直接装载生产设置页/公共外壳，不创建 Pi。真实指针打开两组选项、选择开关、拖动 20%/100% 端点；另一项的值不变，恢复默认确认可关闭两区并恢复 65%/85%。
+- 原生 DWM 属性回读：开启时为 3（Acrylic），两区关闭后为 1（None）。Flutter 图层取样：侧栏单独 20% 时两区 alpha 为 51/255，两区 20% 为 51/51，侧栏 100% + 主界面 20% 为 255/51，确认没有透明度叠加。
+- 使用自建不透明彩条窗口作为 QA 背景，在核实两个 PID、背景覆盖范围和前台 QA 窗口后，仅截取 QA 窗口范围检查最终系统合成效果：模糊彩条可见、底色互不干扰、圆角与正文清晰。普通 Flutter 图层截图不含 DWM 背景；`PrintWindow` 在透明处可能显示黑色，不能据此判定原生效果失败。没有抓取其他应用内容。
+- 深色主题、最大化/还原、920×600 + 18 字号 + 150% UI 已走查；滚动后两区设置均可访问，150% 下实际滑块拖拽仍可到 20%/100%。重开独立 QA 窗口后恢复之前的两区值并返回 active。系统策略回退使用核心状态机测试覆盖，未为测试修改系统全局透明、高对比度或节电选项。
+- 临时 QA 入口已移除，QA 窗口和自建背景窗口已关闭。未热重启、关闭或覆盖承载当前 Agent 的 GUI / Pi / 时间线；原生效果须下次启动新构建后使用。
+
+## 历史验证记录
+
+顶部 / 侧栏一体化调整已通过 `flutter analyze`，并热重载到当前 Windows GUI。使用 Flutter inspector 截图确认两区底色一致、顶部横线与侧栏竖线消失，主内容左上角圆弧正常，未重启 GUI / Pi 或切换活动会话。随后同步设置页的单角圆角、无描边和贴边布局，`flutter analyze --no-pub` 通过并完成热重载；当时设置路由未打开，未取得设置页截图。这些是纯展示调整，不新增 Widget 测试，也未重新运行下述历史全套构建验证。
+
+共享拖拽侧栏通过当前 Windows GUI 的真实 Flutter 指针事件走查：设置页从 260 拖到 350px 后返回首页仍为 350px；首页再拖到 290px，重新打开设置仍为 290px。两页拖拽条与主内容左边缘的实际 RenderBox 坐标逐项一致。继续验证 180 / 480px 边界和复位回调返回 260px；700px 逻辑视口下宽度上限为 350px。已取得设置页 inspector 截图，确认圆角、贴边和统一底色正常，检查无运行时错误。验证结束恢复原宽度和原页面，移除临时 QA helper，不关闭或重启 GUI / Pi。
+
+```bash
+flutter analyze
+flutter test test/appearance_test.dart
+flutter test
+flutter build windows --release
+```
+
+`test/appearance_test.dart` 聚焦 7 项高风险逻辑：坏值/版本容错、真实文件替换、M3/覆盖优先级与前景对比、字号和 UI 比例独立、异步保存顺序、失败重试、系统色刷新不覆盖用户设置。纯展示 Widget 不增加截图断言测试。
+
+折叠栏对齐修复通过独立临时弹窗热重载走查：448 逻辑像素宽下分别显示短 / 长说明，标题与说明的左边缘一致、箭头位置一致；248 宽 + 150% 文字缩放下长说明正常省略，不推移标题或箭头；展开内容后水平对齐保持不变。两处原子组件的静态分析通过。临时 QA 代码与弹窗验证后移除，不重启或改写当前聊天。
+
+动态配色首次实现时使用独立 Windows QA 副本和独立偏好文件验证：真实系统强调色、明暗/种子色切换、HEX 非法禁用与合法提交、搜索高级颜色、恢复确认、920×600 下 18 字号 + 150% UI、缩放后的菜单实际命中和返回保留底层页面。另用离线聊天组件验证空会话居中、有消息后底部输入、高字号 / 高比例与输入框颜色覆盖。截图仅使用 Flutter inspector，不抓取其他应用。没有热重启或关闭承载当前 Agent 的 GUI/Pi。
+
+动态配色首次实现时 `flutter analyze` 无问题、全套 52 项测试通过，Windows Release 构建成功。可执行文件为 `build/windows/x64/runner/Release/pi_gui.exe`；当前已经运行的旧 Debug 窗口不会被自动替换。
+
+参考：[dynamic_color 官方包说明](https://pub.dev/packages/dynamic_color/versions/1.8.1)、[VS Code 分区主题色参考](https://code.visualstudio.com/api/references/theme-color)（标题栏 / 侧栏背景与边框分开管理）。
+
+毛玻璃参考：[WM_NCACTIVATE 与 lParam=-1](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-ncactivate)、[Windows Acrylic 材质](https://learn.microsoft.com/en-us/windows/apps/design/style/acrylic)、[DWM_SYSTEMBACKDROP_TYPE](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwm_systembackdrop_type)。原生构建与 C++ 检查见 [Windows 构建说明](windows_build.md)。

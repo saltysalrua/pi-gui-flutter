@@ -1,0 +1,142 @@
+name: Windows release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Different commits must not cancel a version build already in flight.
+concurrency:
+  group: windows-release-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Check version
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.version.outputs.changed }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test version gate and packaging
+        run: python3 -m unittest discover -s tool -p 'test_ci_release.py' -v
+      - name: Compare pubspec versions across the whole push
+        id: version
+        run: python3 tool/ci_release.py detect
+
+  build:
+    name: Build Windows x64
+    needs: version
+    if: needs.version.outputs.changed == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      # subosito/flutter-action v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: beta
+          flutter-version: 3.44.0-0.3.pre
+          architecture: x64
+          cache: true
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Repair Cargokit hidden-directory lookup
+        shell: pwsh
+        run: ./tool/fix_cargokit_windows.ps1
+      - name: Analyze Dart
+        run: flutter analyze
+      - name: Test core behavior (no model credentials)
+        run: flutter test
+      - name: Test workspace backend
+        run: node --test test/workspace_backend.test.mjs
+      - name: Test tool diff observer
+        run: node tool/check_tool_diff.mjs
+      - name: Build production entrypoint
+        run: flutter build windows --release -t lib/main.dart
+      - name: Package complete application and SHA-256
+        run: python tool/ci_release.py package
+      # actions/upload-artifact v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-x64-${{ needs.version.outputs.version }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  publish:
+    name: Publish GitHub Release
+    needs: [version, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: publish-${{ needs.version.outputs.tag }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.version.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.version.outputs.version }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # actions/download-artifact v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-x64-${{ needs.version.outputs.version }}
+          path: dist
+      - name: Verify downloaded archive
+        working-directory: dist
+        run: sha256sum --check -- *.sha256
+      - name: Publish without moving existing version tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            tagged_commit=$(git rev-list -n 1 "$RELEASE_TAG")
+            if [ "$tagged_commit" != "$GITHUB_SHA" ]; then
+              echo "::error::Version tag belongs to another commit."
+              echo "Bump pubspec.yaml version before publishing new code."
+              exit 1
+            fi
+            # Never replace assets on an already published release.
+            draft=$(gh release view "$RELEASE_TAG" --json isDraft \
+              --jq .isDraft 2>/dev/null || true)
+            if [ "$draft" = false ]; then
+              echo "This commit is already published; nothing to replace."
+              exit 0
+            fi
+          fi
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            args=(--draft --target "$GITHUB_SHA"
+                  --title "Pi GUI $RELEASE_VERSION"
+                  --notes-file docs/release_usage.md --generate-notes)
+            if [ "$PRERELEASE" = true ]; then args+=(--prerelease); fi
+            gh release create "$RELEASE_TAG" "${args[@]}"
+          fi
+          # Resume a partially uploaded draft after a failed run.
+          gh release upload "$RELEASE_TAG" dist/*.zip dist/*.sha256 --clobber
+          gh release edit "$RELEASE_TAG" --draft=false
+          gh release view "$RELEASE_TAG" --json url --jq .url \
+            >> "$GITHUB_STEP_SUMMARY"

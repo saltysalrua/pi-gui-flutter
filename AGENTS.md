@@ -139,4 +139,49 @@ rules:
       - "绝在主页面布局中把结构写死而不预留动态挂载槽位"
       - "绝把扩展逻辑与主界面核心视图硬编码揉杂在一起"
       - "绝忽略或吞掉 Pi RPC 派发上来的 extension_ui_request 事件"
+
+  # 9. 动效与过渡规范 (Motion & Transitions - transitions.dev)
+  motion_and_transitions:
+    summary: "全面遵循 transitions.dev 现代动效体系与 Motion Tokens 标尺，杜绝随意手写魔法时间与生硬跳变"
+    tokens:
+      durations:
+        stagger: "40ms (按项交错延迟，用于列表项逐个入场)"
+        micro: "80ms (微交互、抖动分段、tooltip 延迟)"
+        quick: "150ms (模态/下拉收起、文字切换、轻量反馈)"
+        fast: "250ms (图标替换、下拉/模态展开、Tab滑动、页面滑动)"
+        medium: "350ms (抽屉面板收起、Toast收起)"
+        slow: "400ms (抽屉面板展开、骨架屏揭示、输入清空)"
+        very_slow: "500ms (强调时刻、徽章弹出、文本渐显、成功对勾绘制)"
+      curves:
+        smooth_out: "Cubic(0.22, 1.0, 0.36, 1.0) (现代高质感自然减速，用于模态/下拉/面板/页面展开与尺寸过渡)"
+        in_out: "Curves.easeInOut (用于图标平滑变形、文本原位切换、渐变过渡)"
+        bounce: "Cubic(0.34, 1.36, 0.64, 1.0) (用于徽章弹入、微反馈轻弹性)"
+        bounce_strong: "Cubic(0.34, 3.85, 0.64, 1.0) (强弹性回弹，用于悬浮离开时的自然复位)"
+        linear: "Curves.linear (用于微光循环扫描、加载轮播)"
+      distances_and_scales:
+        scale_modal: "0.96 (模态弹窗进场初值)"
+        scale_dropdown: "0.97 (下拉菜单展开初值)"
+        scale_tooltip: "0.98 (Tooltip 浮层初值)"
+        distance_micro: "4.0 (文字原位微位移)"
+        distance_base: "8.0 (徽章斜向切入、页面滑动距离)"
+        distance_shake: "6.0 ~ 8.0 (表单错误抖动振幅)"
+    patterns:
+      card_resize: "卡片内容变动时平滑补间宽高，使用 fast/slow + smooth_out"
+      menu_dropdown: "跟随锚点源点展开 (scale 0.97 -> 1.0 + fade)，使用 fast(250ms) 开 / quick(150ms) 关"
+      modal_dialog: "居中缩放展开 (scale 0.96 -> 1.0 + fade)，使用 fast(250ms) 开 / quick(150ms) 关"
+      panel_reveal: "侧边抽屉滑动配合轻微虚化入场，使用 slow(400ms) 进 / medium(350ms) 出"
+      icon_swap: "同一插槽图标替换，采用 scale + cross-fade，使用 fast(250ms) + in_out"
+      text_states_swap: "按钮或标题文字原地切换，垂直微位移 4px + 淡入淡出，使用 quick(150ms)"
+      tabs_sliding: "分段控制器选中滑块位移，使用 fast(250ms) + smooth_out"
+      notification_badge: "气泡/徽章斜向切入并轻弹，使用 very_slow(500ms) + bounce"
+      success_check: "操作成功打勾动画，路径绘制 + 顺时针微旋 + 轻弹，使用 very_slow(500ms)"
+      error_shake: "输入非法或指令校验失败时快速多段水平抖动，使用 micro(80ms) 分段并自动归位"
+      thinking_and_streaming: "AI 思考状态使用线性微光流扫 (Shimmer Text)，流式输出时单字/分块平滑渐显"
+    accessibility:
+      summary: "严格适配减弱动态 (prefers-reduced-motion)"
+      how_to: "检测 MediaQuery.disableAnimationsOf(context)，开启时自动降级为瞬时切换或纯透明度淡入"
+    forbidden:
+      - "绝在代码中随手硬编码孤立魔法时长 (如 Duration(milliseconds: 233))"
+      - "绝在界面状态切换时出现毫无过渡的生硬瞬间闪断"
+      - "绝滥用拖沓阻碍操作的无意义动画 (任何阻断性动效严禁超过 250ms)"
 ```
