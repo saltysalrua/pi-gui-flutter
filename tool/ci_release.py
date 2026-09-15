@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -89,6 +90,17 @@ def detect(root: Path, event_name: str, event: dict) -> dict[str, str]:
     }
 
 
+def release_notes(root: Path) -> str:
+    """Publish the guide body, not its repository-only YAML metadata."""
+    text = (root / "docs/release_usage.md").read_text(encoding="utf-8-sig")
+    if not text.startswith("---\n"):
+        return text
+    _, separator, body = text[4:].partition("\n---\n")
+    if not separator:
+        raise ValueError("release_usage.md has an unclosed YAML header.")
+    return body.lstrip("\n")
+
+
 def package(root: Path, source: Path, output: Path) -> Path:
     version = parse_version((root / "pubspec.yaml").read_text(encoding="utf-8-sig"))
     for name in ("pi_gui.exe", "flutter_windows.dll", "data/icudtl.dat", "data/app.so"):
@@ -107,8 +119,8 @@ def package(root: Path, source: Path, output: Path) -> Path:
         for path in sorted(source.rglob("*")):
             if path.is_file():
                 bundle.write(path, path.relative_to(source).as_posix())
+        bundle.writestr("README.md", release_notes(root).encode("utf-8"))
         for original, destination in (
-            ("docs/release_usage.md", "README.md"),
             ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
             ("assets/fonts/MiSans/LICENSE.pdf", "licenses/MiSans-LICENSE.pdf"),
         ):
@@ -123,7 +135,7 @@ def package(root: Path, source: Path, output: Path) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("detect", "package"))
+    parser.add_argument("command", choices=("detect", "package", "notes"))
     args = parser.parse_args()
     if args.command == "detect":
         try:
@@ -147,6 +159,8 @@ def main() -> None:
                     f" → Current: `{result['version']}`\n\n"
                     f"Build requested: **{result['changed']}**\n"
                 )
+    elif args.command == "notes":
+        sys.stdout.buffer.write(release_notes(ROOT).encode("utf-8"))
     else:
         print(package(ROOT, ROOT / "build/windows/x64/runner/Release", ROOT / "dist"))
 

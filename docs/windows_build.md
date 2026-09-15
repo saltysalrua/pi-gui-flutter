@@ -1,14 +1,16 @@
 ---
 title: "Windows 构建与原生检查"
-version: "1.1.3"
+version: "1.2.0"
 status: "verified"
 type: "troubleshooting"
 tags: [windows, flutter, clipboard, cargokit]
 ---
 
-# Windows 构建：Cargokit 隐藏目录警告
+# Windows 构建与原生检查
 
-## 现象与原因
+当前使用 Flutter **3.47.4 / stable**、Dart **3.13.3**，Windows 默认渲染器为 **Impeller**。SDK 升级需要完整构建并启动新进程；不要覆盖承载当前会话的旧 SDK 或运行产物。版本约束、隔离升级验证和 Skia 临时回退见 [Flutter 版本与渲染器](flutter_renderer.md)。
+
+## Cargokit 隐藏目录警告：现象与原因
 
 `flutter run -d windows` 构建剪贴板依赖时可能打印：
 

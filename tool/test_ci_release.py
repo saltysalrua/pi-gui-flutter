@@ -7,7 +7,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from ci_release import detect, git, package, parse_version
+from ci_release import detect, git, package, parse_version, release_notes
 
 
 class ReleaseTest(unittest.TestCase):
@@ -109,6 +109,14 @@ class ReleaseTest(unittest.TestCase):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"notice")
+        guide = self.root / "docs/release_usage.md"
+        body = "# Windows 便携版使用说明\n\n正文。\n\n---\n\n保留正文分隔线。\n"
+        guide.write_text(body, encoding="utf-8")
+        self.assertEqual(release_notes(self.root), body)
+        guide.write_bytes(
+            ("---\r\ntitle: 使用说明\r\n---\r\n\r\n" + body).encode("utf-8-sig")
+        )
+        self.assertEqual(release_notes(self.root), body)
         archive = package(self.root, source, self.root / "dist")
         with zipfile.ZipFile(archive) as bundle:
             self.assertIsNone(bundle.testzip())
@@ -116,6 +124,7 @@ class ReleaseTest(unittest.TestCase):
             self.assertIn("plugin.dll", bundle.namelist())
             self.assertIn("data/flutter_assets/font.ttf", bundle.namelist())
             self.assertIn("licenses/MiSans-LICENSE.pdf", bundle.namelist())
+            self.assertEqual(bundle.read("README.md").decode("utf-8"), body)
         checksum = archive.with_suffix(".zip.sha256").read_text(encoding="utf-8")
         self.assertEqual(
             checksum,

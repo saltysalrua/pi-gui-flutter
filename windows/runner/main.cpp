@@ -17,6 +17,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
+  // Flutter 3.47+ defaults to Impeller on Windows. Leave the engine default
+  // intact so flutter run --no-enable-impeller remains available for diagnosis.
   flutter::DartProject project(L"data");
 
   std::vector<std::string> command_line_arguments =

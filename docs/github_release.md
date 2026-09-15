@@ -1,6 +1,6 @@
 ---
 title: "GitHub 自动构建与发布"
-version: "1.0.0"
+version: "1.1.1"
 status: "implemented"
 type: "developer-guide"
 tags: [github-actions, windows, flutter, release]
@@ -45,7 +45,7 @@ tags: [github-actions, windows, flutter, release]
 ## 构建内容与边界
 
 - Runner：`windows-2022` / x64；原生构建使用其 Visual Studio C++ 工具链。
-- Flutter：固定 **3.44.0-0.3.pre / beta**，与本项目已验证环境一致。升级时显式更新 `.github/workflows/release.yml`，连同 Dart SDK 约束和 `pubspec.lock` 一起验证；不要使用会自动漂移的最新 beta。
+- Flutter：固定 **3.47.4 / stable**（Dart **3.13.3**），Windows 默认使用 Impeller。升级时显式更新 `.github/workflows/release.yml`，连同 SDK 约束和 `pubspec.lock` 一起验证；不要使用会自动漂移的最新 stable/beta。迁移结果与回退方式见 [Flutter 版本与渲染器](flutter_renderer.md)。
 - 依赖：提交 `pubspec.lock`，使用 `flutter pub get --enforce-lockfile`，随后执行已有 Cargokit 隐藏目录修复。
 - 构建：`flutter build windows --release -t lib/main.dart`。CI 在全新目录构建，不接触开发机活动 GUI。
 - 包装：完整 `build/windows/x64/runner/Release`，包括 EXE、DLL、`data/`、用户说明和第三方声明；缺少 AOT/资源或发现额外 QA EXE 时拒绝包装。
@@ -59,12 +59,14 @@ tags: [github-actions, windows, flutter, release]
 | 路径 | 职责 |
 | --- | --- |
 | `.github/workflows/release.yml` | 三阶段版本检查 → Windows 构建 → 最小权限发布，Action 固定提交 SHA |
-| `tool/ci_release.py` | `detect` 读取事件 / Git 旧版本并产生 Job 输出；`package` 校验产物边界、制作 ZIP / SHA-256 |
+| `tool/ci_release.py` | `detect` 读取事件 / Git 旧版本；`notes` 输出去掉 YAML 头的使用说明；`package` 校验产物、制作 ZIP / SHA-256，README 复用同一正文 |
 | `tool/test_ci_release.py` | 秒级临时 Git 仓库回归：首次推送、多提交、纯依赖、回退、构建号、手动触发与包装 |
 | `pubspec.yaml` / `pubspec.lock` | 应用版本与确定的依赖解析 |
 | `tool/fix_cargokit_windows.ps1` | 按实际 Pub 包路径修复上游已知问题 |
-| `docs/release_usage.md` | Release 正文与 ZIP 内 README 的共同来源 |
+| `docs/release_usage.md` | Release 正文与 ZIP 内 README 的共同来源；源码保留 YAML Frontmatter，发布时只输出 Markdown 正文 |
 | `THIRD_PARTY_NOTICES.md` / `assets/fonts/MiSans/LICENSE.pdf` | 随包分发的资源声明与字体原始许可 |
+
+发布 Job 用 `python3 tool/ci_release.py notes` 生成临时说明文件，再交给 `gh release create --notes-file`。不把源码文档的 `title` / `type` / `status` 元信息展示给用户；ZIP 的 README 使用同样处理，正文中的 Markdown 分隔线保留。该变更只影响新发布，不自动覆盖既有 Release 正文或附件。
 
 版本检查以 `GITHUB_EVENT_NAME`、`GITHUB_EVENT_PATH` 为输入，向 `GITHUB_OUTPUT` 输出，例如：
 

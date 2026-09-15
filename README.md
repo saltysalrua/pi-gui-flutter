@@ -16,12 +16,14 @@ type: "project"
 
 ## 从源码运行
 
-需要 Windows 桌面 Flutter 开发环境（当前固定 Flutter **3.44.0-0.3.pre / beta**）、PATH 中的 Node.js，以及 npm 安装的 `@earendil-works/pi-coding-agent`。先在 Pi 中配置模型和凭据；本项目不直接调用模型 API。
+需要 Windows 桌面 Flutter 开发环境（当前固定 Flutter **3.47.4 / stable**，配套 Dart **3.13.3**）、PATH 中的 Node.js，以及 npm 安装的 `@earendil-works/pi-coding-agent`。先在 Pi 中配置模型和凭据；本项目不直接调用模型 API。
 
 ```bash
-flutter pub get
+flutter pub get --enforce-lockfile
 flutter run -d windows
 ```
+
+Windows 默认使用 Impeller。更换 SDK 后需要完整构建并启动新进程，不能靠热重载切换引擎；若旧 GUI 承载当前会话，请等会话结束再切换。版本确认与临时回退见 [Flutter 版本与渲染器](docs/flutter_renderer.md)。
 
 Pi 在当前选择的工作区目录执行任务；GUI 优先恢复上次打开的目录，首次启动使用启动目录。发送代码任务可能让 Pi 在此目录执行工具或修改文件，请按实际开发任务使用。
 
@@ -65,6 +67,7 @@ dart run tool/check_chat_rpc.dart --with-model
 
 - [GitHub 自动构建与发布](docs/github_release.md)
 - [Windows 构建与原生检查](docs/windows_build.md)
+- [Flutter 版本与 Windows 渲染器](docs/flutter_renderer.md)
 - [第三方资源声明与 MiSans 许可](THIRD_PARTY_NOTICES.md)
 - [RPC 对话、Markdown 与文件改动](docs/rpc_chat.md)
 - [模型选择器与 RPC 连接](docs/model_picker_rpc.md)

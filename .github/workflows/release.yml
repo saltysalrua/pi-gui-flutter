@@ -46,8 +46,8 @@ jobs:
       # subosito/flutter-action v2
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
-          channel: beta
-          flutter-version: 3.44.0-0.3.pre
+          channel: stable
+          flutter-version: 3.47.4
           architecture: x64
           cache: true
       - name: Resolve locked dependencies
@@ -125,9 +125,10 @@ jobs:
               exit 0
             fi
           else
+            python3 tool/ci_release.py notes > "$RUNNER_TEMP/release-notes.md"
             args=(--draft --target "$GITHUB_SHA"
                   --title "Pi GUI $RELEASE_VERSION"
-                  --notes-file docs/release_usage.md --generate-notes)
+                  --notes-file "$RUNNER_TEMP/release-notes.md" --generate-notes)
             if [ "$PRERELEASE" = true ]; then args+=(--prerelease); fi
             gh release create "$RELEASE_TAG" "${args[@]}"
           fi
