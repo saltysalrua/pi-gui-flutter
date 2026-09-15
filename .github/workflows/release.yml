@@ -25,7 +25,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -42,9 +42,13 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
       # subosito/flutter-action v2
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
@@ -63,14 +67,23 @@ jobs:
         run: flutter test
       - name: Test workspace backend
         run: node --test test/workspace_backend.test.mjs
+      - name: Install Pi for native tool regression (CI only)
+        shell: pwsh
+        run: |
+          npm install --global @earendil-works/pi-coding-agent@0.85.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $npmRoot = npm root --global
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $piRoot = Join-Path $npmRoot '@earendil-works/pi-coding-agent'
+          "PI_GUI_PI_PACKAGE_DIR=$piRoot" >> $env:GITHUB_ENV
       - name: Test tool diff observer
         run: node tool/check_tool_diff.mjs
       - name: Build production entrypoint
         run: flutter build windows --release -t lib/main.dart
       - name: Package complete application and SHA-256
         run: python tool/ci_release.py package
-      # actions/upload-artifact v4
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      # actions/upload-artifact v7.0.1 (Node 24)
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: windows-x64-${{ needs.version.outputs.version }}
           path: |
@@ -97,12 +110,12 @@ jobs:
       RELEASE_VERSION: ${{ needs.version.outputs.version }}
       PRERELEASE: ${{ needs.version.outputs.prerelease }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
-      # actions/download-artifact v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      # actions/download-artifact v8.0.1 (Node 24)
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: windows-x64-${{ needs.version.outputs.version }}
           path: dist
@@ -120,15 +133,21 @@ jobs:
               echo "Bump pubspec.yaml version before publishing new code."
               exit 1
             fi
-            # Never replace assets on an already published release.
-            draft=$(gh release view "$RELEASE_TAG" --json isDraft \
-              --jq .isDraft 2>/dev/null || true)
-            if [ "$draft" = false ]; then
-              echo "This commit is already published; nothing to replace."
+          fi
+          if release=$(gh release view "$RELEASE_TAG" \
+            --json isDraft,targetCommitish 2>/dev/null); then
+            # A draft might not have created a Git tag yet. Check its target.
+            if [ "$(jq -r .isDraft <<< "$release")" = true ]; then
+              target=$(jq -r .targetCommitish <<< "$release")
+              if [ "$target" != "$GITHUB_SHA" ]; then
+                echo "::error::Existing draft belongs to another commit."
+                exit 1
+              fi
+            else
+              echo "This version is already published; nothing to replace."
               exit 0
             fi
-          fi
-          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          else
             args=(--draft --target "$GITHUB_SHA"
                   --title "Pi GUI $RELEASE_VERSION"
                   --notes-file docs/release_usage.md --generate-notes)
