@@ -59,7 +59,7 @@ dart run tool/check_chat_rpc.dart --with-model
 
 ## 自动发布
 
-修改 `pubspec.yaml` 的 `version` 并推送到 `master`，GitHub Actions 会在版本实际变化时分析、测试、构建，并自动创建带 ZIP / SHA-256 的 Release；仅修改依赖或普通源码不会触发 Windows 构建。首次推送也会构建，可在 Actions 手动重跑。见 [GitHub 自动构建与发布](docs/github_release.md)。
+修改 `pubspec.yaml` 的 `version` 并推送到 `master`，GitHub Actions 会在版本实际变化时构建，并自动创建带 ZIP / SHA-256 的 Release；仅修改依赖或普通源码不会触发 Windows 构建。首次推送也会构建，可在 Actions 手动重跑。见 [GitHub 自动构建与发布](docs/github_release.md)。
 
 ## 文档
 

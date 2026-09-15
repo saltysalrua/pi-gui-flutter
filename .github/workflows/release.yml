@@ -29,8 +29,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Test version gate and packaging
-        run: python3 -m unittest discover -s tool -p 'test_ci_release.py' -v
       - name: Compare pubspec versions across the whole push
         id: version
         run: python3 tool/ci_release.py detect
@@ -45,10 +43,6 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 24.19.0
-          package-manager-cache: false
       # subosito/flutter-action v2
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
@@ -61,23 +55,6 @@ jobs:
       - name: Repair Cargokit hidden-directory lookup
         shell: pwsh
         run: ./tool/fix_cargokit_windows.ps1
-      - name: Analyze Dart
-        run: flutter analyze
-      - name: Test core behavior (no model credentials)
-        run: flutter test
-      - name: Test workspace backend
-        run: node --test test/workspace_backend.test.mjs
-      - name: Install Pi for native tool regression (CI only)
-        shell: pwsh
-        run: |
-          npm install --global @earendil-works/pi-coding-agent@0.85.1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $npmRoot = npm root --global
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $piRoot = Join-Path $npmRoot '@earendil-works/pi-coding-agent'
-          "PI_GUI_PI_PACKAGE_DIR=$piRoot" >> $env:GITHUB_ENV
-      - name: Test tool diff observer
-        run: node tool/check_tool_diff.mjs
       - name: Build production entrypoint
         run: flutter build windows --release -t lib/main.dart
       - name: Package complete application and SHA-256

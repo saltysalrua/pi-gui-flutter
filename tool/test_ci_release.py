@@ -42,7 +42,11 @@ class ReleaseTest(unittest.TestCase):
         for value in ("1.0", "01.0.0", "1.0.0+65536", "1.0.0+abc", "1.0.0-01", "$(id)"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 parse_version(f"version: {value}")
-        for source in ("name: app", "  version: 1.0.0", "version: 1.0.0\nversion: 2.0.0"):
+        for source in (
+            "name: app",
+            "  version: 1.0.0",
+            "version: 1.0.0\nversion: 2.0.0",
+        ):
             with self.assertRaises(ValueError):
                 parse_version(source)
 
@@ -65,13 +69,19 @@ class ReleaseTest(unittest.TestCase):
     def test_dependency_only_net_revert_manual_and_invalid_history(self):
         before = self.commit("1.0.0+1")
         self.commit("1.0.0+1", "dependency changed")
-        self.assertEqual(detect(self.root, "push", {"before": before})["changed"], "false")
+        self.assertEqual(
+            detect(self.root, "push", {"before": before})["changed"], "false"
+        )
         self.commit("1.0.0+2")
         self.commit("1.0.0+1")
-        self.assertEqual(detect(self.root, "push", {"before": before})["changed"], "false")
+        self.assertEqual(
+            detect(self.root, "push", {"before": before})["changed"], "false"
+        )
         self.assertEqual(detect(self.root, "workflow_dispatch", {})["changed"], "true")
         self.commit("1.1.0-beta.1+2")
-        self.assertEqual(detect(self.root, "push", {"before": before})["prerelease"], "true")
+        self.assertEqual(
+            detect(self.root, "push", {"before": before})["prerelease"], "true"
+        )
         with self.assertRaises(ValueError):
             detect(self.root, "push", {"before": "--help"})
         with self.assertRaises(subprocess.CalledProcessError):
@@ -81,14 +91,20 @@ class ReleaseTest(unittest.TestCase):
         self.commit("1.0.0+1")
         source = self.root / "Release"
         for name in (
-            "pi_gui.exe", "flutter_windows.dll", "data/icudtl.dat", "data/app.so",
-            "data/flutter_assets/font.ttf", "plugin.dll",
+            "pi_gui.exe",
+            "flutter_windows.dll",
+            "data/icudtl.dat",
+            "data/app.so",
+            "data/flutter_assets/font.ttf",
+            "plugin.dll",
         ):
             path = source / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"fixture")
         for name in (
-            "docs/release_usage.md", "THIRD_PARTY_NOTICES.md", "assets/fonts/MiSans/LICENSE.pdf",
+            "docs/release_usage.md",
+            "THIRD_PARTY_NOTICES.md",
+            "assets/fonts/MiSans/LICENSE.pdf",
         ):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -101,7 +117,10 @@ class ReleaseTest(unittest.TestCase):
             self.assertIn("data/flutter_assets/font.ttf", bundle.namelist())
             self.assertIn("licenses/MiSans-LICENSE.pdf", bundle.namelist())
         checksum = archive.with_suffix(".zip.sha256").read_text(encoding="utf-8")
-        self.assertEqual(checksum, f"{hashlib.sha256(archive.read_bytes()).hexdigest()}  {archive.name}\n")
+        self.assertEqual(
+            checksum,
+            f"{hashlib.sha256(archive.read_bytes()).hexdigest()}  {archive.name}\n",
+        )
         (source / "qa.exe").write_bytes(b"not production")
         with self.assertRaises(ValueError):
             package(self.root, source, self.root / "dist")

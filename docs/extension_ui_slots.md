@@ -40,14 +40,17 @@ tags: [flutter, pi-rpc, extension-ui, slots, pi-lens, todos]
 ### 1. Pi RPC 组件工厂模式无缝拦截桥
 
 Pi 官方扩展系统采用动态组件工厂函数机制：
+
 ```javascript
 ui.setWidget("pi-lens", (tui, theme) => ({
   render: (width) => [ ...lines ]
 }), { placement: "belowEditor" });
 ```
+
 在原生 `pi --mode rpc` 模式下，官方后端会因为不是 TUI 而跳过函数型组件，导致 `pi-lens` 或类似插件默认被静默抑制。
 
 pi-gui 在 `assets/backend/workspace_rpc.mjs` 中注入轻量发射拦截器：
+
 - 注入 `AgentSession.prototype.bindExtensions`，对外传递 `options.mode = "tui"`，通知插件当前宿主环境具备完整的可视化交互插槽能力。
 - 拦截 `uiContext.setWidget`：当传入函数时，自动构造 `mockTui` 实例并执行初始渲染与注册 `requestRender()` 监听。
 - 当插件调用 `tui.requestRender()` 时，重新调用 `render(80)`，并以标准单行 JSONL `extension_ui_request` (method: `setWidget`) 派发至 Flutter 前端。

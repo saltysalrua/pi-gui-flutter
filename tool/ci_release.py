@@ -94,7 +94,9 @@ def package(root: Path, source: Path, output: Path) -> Path:
     for name in ("pi_gui.exe", "flutter_windows.dll", "data/icudtl.dat", "data/app.so"):
         if not (source / name).is_file():
             raise ValueError(f"Incomplete Windows release: missing {name}")
-    executables = {p.name.lower() for p in source.iterdir() if p.suffix.lower() == ".exe"}
+    executables = {
+        p.name.lower() for p in source.iterdir() if p.suffix.lower() == ".exe"
+    }
     if executables != {"pi_gui.exe"}:
         raise ValueError(f"Unexpected EXE in release directory: {sorted(executables)}")
     if not (source / "data/flutter_assets").is_dir():
@@ -129,7 +131,9 @@ def main() -> None:
                 Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8")
             )
         except (KeyError, OSError, json.JSONDecodeError) as error:
-            raise SystemExit(f"Cannot read the GitHub event payload: {error}") from error
+            raise SystemExit(
+                f"Cannot read the GitHub event payload: {error}"
+            ) from error
         result = detect(ROOT, os.environ["GITHUB_EVENT_NAME"], event)
         lines = "".join(f"{key}={value}\n" for key, value in result.items())
         print(lines, end="")

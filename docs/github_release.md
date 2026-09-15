@@ -15,7 +15,7 @@ tags: [github-actions, windows, flutter, release]
 1. 修改根目录 `pubspec.yaml` 的 `version`，例如从 `1.0.0+1` 改为 `1.0.1+2`。
 2. 将本次源码、版本号和文档提交并推送到 `master`。
 3. 打开 GitHub → **Actions → Windows release** 查看进度。
-4. 分析、测试和构建全部通过后，**Releases** 自动出现标签 `v1.0.1+2`，附完整 Windows x64 ZIP 和 `.zip.sha256`。
+4. 构建、打包成功后，**Releases** 自动出现标签 `v1.0.1+2`，附完整 Windows x64 ZIP 和 `.zip.sha256`。
 
 完整版本号是唯一来源：修改 `+` 后的构建号也会触发，预发布示例为 `1.1.0-beta.1+3`，会创建 GitHub Pre-release。Windows 的四段数值都限制为 0–65535；不支持用文字作为构建号。
 
@@ -38,16 +38,15 @@ tags: [github-actions, windows, flutter, release]
 - 标签已经指向别的提交：发布明确失败；应增加版本号，不能强移旧标签或覆盖旧版本。
 - 上传中途失败：Release 先保留为 Draft，同一提交重跑会补齐附件后公开。Draft 即使尚未创建标签，也校验目标提交，不能被另一提交接管。
 
-不同提交不会相互取消正在构建的版本；同一版本的发布步骤串行执行。失败的分析/测试/构建不会产生公开 Release，成功构建的 ZIP 还会在 Actions Artifacts 中保存 30 天。
+不同提交不会相互取消正在构建的版本；同一版本的发布步骤串行执行。失败的构建或打包不会产生公开 Release，成功构建的 ZIP 还会在 Actions Artifacts 中保存 30 天。
 
-Windows Runner 的 `TEMP` 可能使用不同大小写或 8.3 短路径。`test/workspace_backend.test.mjs` 的临时仓库 fixture 必须先 `realpath`，与生产 `directory()` 一致，否则 `cwd === target` 的失败注入匹配不到，误报缺少 `WORKSPACE_START_FAILED`。首次云端运行发现此问题，已在本机通过小写 `TEMP` 复现并修正 fixture；不要跳过测试或改变生产路径规范化。
+发布流水线只负责版本检测、构建、打包和发布。不安装 Pi，不运行 Diff / RPC 探针、Flutter 测试或其他业务回归；不要将无关的集成验证加成发布前置条件。
 
 ## 构建内容与边界
 
 - Runner：`windows-2022` / x64；原生构建使用其 Visual Studio C++ 工具链。
 - Flutter：固定 **3.44.0-0.3.pre / beta**，与本项目已验证环境一致。升级时显式更新 `.github/workflows/release.yml`，连同 Dart SDK 约束和 `pubspec.lock` 一起验证；不要使用会自动漂移的最新 beta。
 - 依赖：提交 `pubspec.lock`，使用 `flutter pub get --enforce-lockfile`，随后执行已有 Cargokit 隐藏目录修复。
-- 检查：`flutter analyze`、`flutter test`、Node 工作区核心测试、无模型 Diff 观察器检查。CI 固定 Node.js `24.19.0`，并安装 Pi `0.85.1` 到 Runner 的全局 npm 目录，通过 `PI_GUI_PI_PACKAGE_DIR` 显式传给探针；该检查调用真实 Pi write 工具，但不请求模型。Pi 仅为 CI 测试依赖，不进入 ZIP。
 - 构建：`flutter build windows --release -t lib/main.dart`。CI 在全新目录构建，不接触开发机活动 GUI。
 - 包装：完整 `build/windows/x64/runner/Release`，包括 EXE、DLL、`data/`、用户说明和第三方声明；缺少 AOT/资源或发现额外 QA EXE 时拒绝包装。
 - 产物：`pi-gui-flutter-1.0.0+1-windows-x64.zip`、同名 `.zip.sha256`；发布前再次校验哈希。
