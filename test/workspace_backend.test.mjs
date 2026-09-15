@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, realpath, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -16,7 +16,11 @@ const exec = promisify(execFile);
 const git = async (cwd, ...args) =>
   (await exec("git", ["-C", cwd, ...args])).stdout;
 async function fixture(t, withCommit = true) {
-  const root = await mkdtemp(path.join(tmpdir(), "pi-gui-工作区-"));
+  // Windows runners may expose TEMP using different casing or an 8.3 alias.
+  // Match the realpath normalization used by the production directory service.
+  const root = await realpath(
+    await mkdtemp(path.join(tmpdir(), "pi-gui-工作区-")),
+  );
   t.after(() => rm(root, { recursive: true, force: true, maxRetries: 3 }));
   const repo = path.join(root, "source with spaces");
   await mkdir(repo);

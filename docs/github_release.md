@@ -40,6 +40,8 @@ tags: [github-actions, windows, flutter, release]
 
 不同提交不会相互取消正在构建的版本；同一版本的发布步骤串行执行。失败的分析/测试/构建不会产生公开 Release，成功构建的 ZIP 还会在 Actions Artifacts 中保存 30 天。
 
+Windows Runner 的 `TEMP` 可能使用不同大小写或 8.3 短路径。`test/workspace_backend.test.mjs` 的临时仓库 fixture 必须先 `realpath`，与生产 `directory()` 一致，否则 `cwd === target` 的失败注入匹配不到，误报缺少 `WORKSPACE_START_FAILED`。首次云端运行发现此问题，已在本机通过小写 `TEMP` 复现并修正 fixture；不要跳过测试或改变生产路径规范化。
+
 ## 构建内容与边界
 
 - Runner：`windows-2022` / x64；原生构建使用其 Visual Studio C++ 工具链。
