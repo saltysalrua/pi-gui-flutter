@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'app_card.dart';
 import 'app_resize_divider.dart';
 import 'custom_title_bar.dart';
@@ -17,6 +18,7 @@ class AppDesktopScaffold extends StatelessWidget {
     this.onSidebarResize,
     this.onSidebarReset,
     this.animate = true,
+    this.contentAnimation,
   });
   final Color sidebarBackground, contentBackground;
   final Widget? sidebar;
@@ -24,6 +26,10 @@ class AppDesktopScaffold extends StatelessWidget {
   final ValueChanged<double>? onSidebarResize;
   final VoidCallback? onSidebarReset;
   final bool animate;
+
+  /// Optional page entry/exit motion. Backgrounds, title bar and divider stay
+  /// fixed, and content opacity is never changed (safe for Acrylic/backdrops).
+  final Animation<double>? contentAnimation;
   final Widget child;
   static const _dividerWidth = 10.0;
   static const _radius = BorderRadius.only(
@@ -37,6 +43,26 @@ class AppDesktopScaffold extends StatelessWidget {
     final duration = !animate || MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : AppDurations.fast;
+    Widget movingContent(Widget content, {bool clip = false}) {
+      final animation = contentAnimation;
+      // Leave existing pages' subtree paths untouched unless they opt in.
+      if (animation == null) return content;
+      final moving = AnimatedBuilder(
+        animation: animation,
+        child: content,
+        builder: (context, child) {
+          final progress = MediaQuery.disableAnimationsOf(context)
+              ? 1.0
+              : AppCurves.smoothOut.transform(animation.value);
+          return Transform.translate(
+            offset: Offset(AppSpacing.sm * (1 - progress), 0),
+            child: child,
+          );
+        },
+      );
+      return clip ? ClipRect(child: moving) : moving;
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: TweenAnimationBuilder<Color?>(
@@ -66,7 +92,10 @@ class AppDesktopScaffold extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (sidebar != null) ...[
-                    SizedBox(width: sidebarWidth, child: sidebar),
+                    SizedBox(
+                      width: sidebarWidth,
+                      child: movingContent(sidebar!, clip: true),
+                    ),
                     AppResizeDivider(
                       hitWidth: _dividerWidth,
                       showIdleIndicator: false,
@@ -83,7 +112,7 @@ class AppDesktopScaffold extends StatelessWidget {
                       showBorder: false,
                       borderRadiusGeometry: _radius,
                       clipBehavior: Clip.antiAlias,
-                      child: child,
+                      child: movingContent(child),
                     ),
                   ),
                 ],

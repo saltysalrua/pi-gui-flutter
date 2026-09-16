@@ -16,6 +16,7 @@ import '../../../atoms/app_select.dart';
 import '../../../atoms/app_setting.dart';
 import '../../../atoms/app_stepped_slider.dart';
 import '../../../atoms/app_text_field.dart';
+import '../../../core/app_desktop_page_route.dart';
 import '../../../core/context_l10n.dart';
 import '../../../core/sidebar_layout_controller.dart';
 import '../../../core/theme/appearance_palette.dart';
@@ -26,16 +27,9 @@ import '../controllers/appearance_controller.dart';
 
 Future<void> showAppearanceSettings(BuildContext context) =>
     Navigator.of(context).push<void>(
-      PageRouteBuilder(
-        transitionDuration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : AppDurations.fast,
-        reverseTransitionDuration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : AppDurations.quick,
-        pageBuilder: (_, _, _) => const AppearanceSettingsView(),
-        transitionsBuilder: (_, animation, _, child) =>
-            FadeTransition(opacity: animation, child: child),
+      AppDesktopPageRoute<void>(
+        reduceMotion: MediaQuery.disableAnimationsOf(context),
+        builder: (_) => const AppearanceSettingsView(),
       ),
     );
 
@@ -173,6 +167,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
               ],
             );
             return AppDesktopScaffold(
+              contentAnimation: ModalRoute.of(context)?.animation,
               sidebarBackground: WindowMaterialScope.tint(
                 context,
                 colors.sidebarBackground,

@@ -1,6 +1,6 @@
 ---
 title: "外观设置：动态配色、分区毛玻璃与缩放"
-version: "1.3.2"
+version: "1.3.3"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, settings, material3, windows, theme]
@@ -34,6 +34,16 @@ tags: [flutter, settings, material3, windows, theme]
 - 公共外壳内的 `CustomTitleBar`、`HomeSidebar` 和分隔条使用透明背景，由外壳统一提供底色；不能再盖一层纯色或重复叠加半透明颜色。独立使用这些组件时原默认背景不变。窗口拖拽、双击最大化及控制按钮不变。
 - `AppResizeDivider(showIdleIndicator: false)` 隐藏静止时的线和手柄；悬停或拖动时淡入手柄，10px 命中区、左右拖拽和双击复位保留。外壳中的左右半侧透出统一侧栏底色，避免圆角旁出现实色竖条。改动面板的分隔条保留原有默认样式。
 - 动效沿用 `AppDurations.quick` / `AppCurves.smoothOut`，减弱动态时立即切换。没有新增 RPC 命令或事件。
+
+### 设置页进出动效
+
+打开设置时，侧栏控件与右侧内容从右侧 **8 逻辑像素** 滑回原位；返回时反向轻移。顶部标题栏、拖拽分隔条及两区背景不参与位移，整页不再淡入淡出。颜色与毛玻璃不透明度仍由用户设置决定，不会为了切页临时变浅、变深或变成纯色。
+
+- 参考 [Windows 页面切换](https://learn.microsoft.com/en-us/windows/apps/develop/motion/page-transitions) 的内容位移方式，但不采用整页透明度动画。打开使用 `AppDurations.fast`（250ms），返回使用 `AppDurations.quick`（150ms），曲线为 `AppCurves.smoothOut`，距离复用 `AppSpacing.sm`。开启“减弱动态”时直接切换。
+- `showAppearanceSettings` 使用公共 `AppDesktopPageRoute<void>`。通过 Flutter 的 `delegatedTransition` 在**整个过渡期间**让前一页 Offstage，抑制默认的退出淡化 / 缩放；首页仍保持挂载，RPC、聊天、输入草稿和会话不因切页重建。
+- 仅删除 `FadeTransition` 不够：普通 opaque 路由在入场完成前仍会绘制前一页，两个半透明外壳会叠色。新路由在返回的最后一帧也停止绘制自身，确保首页恢复绘制时不会再叠一层设置背景。不要改回整页 Fade / Slide，也不要用不透明遮罩来掩盖问题。
+- `AppDesktopScaffold.contentAnimation` 只变换子内容，侧栏和正文分别裁切到各自区域。该参数默认空，不给首页插入新的动画包装，不改变现有首页布局或子树路径。设置页弹出的菜单、取色器和确认框仍保留下面的设置页面，沿用自身公共动效。
+- 设置分组 `AppSettingsGroup` 在减弱动态时直接显示内容，与 `AppDisclosure` 一致；不再运行零时长 `AnimatedSize`，避免 Flutter beta 在布局过程中同步重新标脏的断言。
 
 ### 分区桌面毛玻璃
 
@@ -88,7 +98,8 @@ Windows 设置中开启“从背景自动选取强调色”后，应用可间接
 | `lib/core/services/window_material_service.dart` | GUI 原生 MethodChannel；强类型材质状态、事件和旧 Runner 容错 |
 | `lib/ui/core/window_material_controller.dart` | 原生请求串行、合并最新开关/明暗状态、防止迟到响应覆盖系统回退 |
 | `lib/ui/core/window_material_scope.dart` | Navigator 上方的唯一材质驱动；仅原生确认 active 后允许透明，保留高对比度保护 |
-| `lib/ui/atoms/app_desktop_scaffold.dart` | 共用桌面外壳、两区背景路径、单角圆角、透明标题栏/侧栏与拖拽条 |
+| `lib/ui/atoms/app_desktop_scaffold.dart` | 共用桌面外壳、两区背景路径、单角圆角、透明标题栏/侧栏与拖拽条；可选的仅内容位移 |
+| `lib/ui/core/app_desktop_page_route.dart` | 设置页的无淡化路由、过渡期间遮停前页绘制并保留其状态 |
 | `windows/runner/window_material.h/.cpp` | DWM Acrylic、系统透明/高对比度/节电检查，原生状态回传 |
 | `windows/runner/flutter_window.cpp` | 原生生命周期/消息路由；补全隐藏标题栏的 NC 激活默认处理，避免 DWM 卡在未激活灰底 |
 | `lib/core/services/appearance_store.dart` | GUI 自有 JSON 文件读写，临时文件 flush 后 rename 替换 |
@@ -142,7 +153,7 @@ Windows 的“在标题栏和窗口边框上显示强调色”与应用里的“
 
 ### 生命周期与缩放注意事项
 
-设置通过普通 `PageRouteBuilder` push，保留下面的 `HomeView`，不能通过替换首页或新建 RPC 客户端打开设置。修改主题时保持 `MaterialApp` / Navigator 的 Element 身份，不能给它们加上随主题改变的 Key。
+设置通过 `AppDesktopPageRoute`（继承 `PageRouteBuilder`）正常 push，保留下面的 `HomeView`，仅在过渡期间额外停止前页绘制；不能通过替换首页或新建 RPC 客户端打开设置。修改主题时保持 `MaterialApp` / Navigator 的 Element 身份，不能给它们加上随主题改变的 Key。
 
 `AppScale` 把内容布局在 `窗口逻辑尺寸 / 比例` 的视口内，由 `FittedBox` 同时变换绘制与命中测试。内部 `MediaQuery` 同步调整 size、DPR、insets，但保留系统 TextScaler。Navigator、应用扩展 Overlay 都在同一个变换下，不能只 Transform 页面而让菜单留在未缩放的 Overlay 中。
 
@@ -178,6 +189,13 @@ Windows 的“在标题栏和窗口边框上显示强调色”与应用里的“
 - 正在执行的写入先完成，后续等待中的旧快照可以合并，最终最新设置胜出。
 - 保存失败保留已经生效的内存值，显示人话提示与重试入口；不能悄悄声称已持久化。
 - 自定义颜色仍以不透明六位 HEX 存储。`sidebarGlass` / `canvasGlass` 只保存各区底色不透明度，不调用全窗口 `setOpacity`。旧 version 1 文件缺少这两个字段时两区默认关闭；非法开关回退默认、有限数值限制到 0.2–1.0、非有限数值恢复该区默认值。
+
+## 设置页动效验证
+
+- 使用安全热重载装载临时独立 QA 弹窗与嵌套 Navigator，前页是带生命周期计数的公共外壳，后页是正式 `AppearanceSettingsView`。偏好仅存内存，没有创建 Pi、改写用户偏好或覆盖活动聊天。
+- 对入场 / 返回的首段、中段、末段及完成态逐帧取样，共 69 个状态，包含浅 / 深色 30% 毛玻璃、高饱和紫色侧栏与绿色主背景、100% 纯色、减弱动态、650px 窄视口 + 150% 文字。相同背景区域的 RGBA 在进出前后及中途保持一致，30% 的 alpha 为 76/255、纯色为 255/255，没有过渡叠色。采样只读取 QA 自身 `RenderRepaintBoundary`，不用于宣称 Windows 最终桌面合成像素。
+- 设置页上方再打开 / 关闭透明测试弹窗，设置背景仍可见。六轮返回后前页仍只有一次挂载、零次销毁；减弱动态的 `AnimatedSize` 问题修复后重复走查无运行时错误。截图确认浅 / 深色与窄窗口内容、圆角和固定标题栏正常。
+- 临时 QA 入口和文件已移除，并热重载回正式代码。静态分析通过；未新增永久展示 Widget 测试，也未重启 GUI / Pi。
 
 ## 毛玻璃激活状态修复验证
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'app_card.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/theme/theme_context_extensions.dart';
@@ -15,37 +16,42 @@ class AppSettingsGroup extends StatelessWidget {
   final String? description;
   final List<Widget> children;
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Text(title, style: context.textTheme.titleMedium),
-      if (description != null) ...[
-        const SizedBox(height: AppSpacing.xs),
-        Text(description!, style: context.textTheme.bodySmall),
+  Widget build(BuildContext context) {
+    final rows = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) const Divider(),
+          children[i],
+        ],
       ],
-      const SizedBox(height: AppSpacing.md),
-      AppCard(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-        borderRadius: AppRadius.xl,
-        child: AnimatedSize(
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : AppDurations.fast,
-          curve: AppCurves.smoothOut,
-          alignment: Alignment.topCenter,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < children.length; i++) ...[
-                if (i > 0) const Divider(),
-                children[i],
-              ],
-            ],
-          ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(title, style: context.textTheme.titleMedium),
+        if (description != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(description!, style: context.textTheme.bodySmall),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          borderRadius: AppRadius.xl,
+          // Like AppDisclosure, bypass AnimatedSize in reduced-motion mode:
+          // a zero-duration controller can re-dirty itself during layout.
+          child: MediaQuery.disableAnimationsOf(context)
+              ? rows
+              : AnimatedSize(
+                  duration: AppDurations.fast,
+                  curve: AppCurves.smoothOut,
+                  alignment: Alignment.topCenter,
+                  child: rows,
+                ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 class AppSettingRow extends StatelessWidget {
@@ -75,9 +81,8 @@ class AppSettingRow extends StatelessWidget {
         );
         final narrow =
             constraints.maxWidth < 520 ||
-            MediaQuery.textScalerOf(
-                  context,
-                ).scale(context.textTheme.bodyMedium!.fontSize!) >
+            MediaQuery.textScalerOf(context)
+                    .scale(context.textTheme.bodyMedium!.fontSize!) >
                 20;
         if (narrow) {
           return Column(
