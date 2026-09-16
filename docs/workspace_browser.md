@@ -1,6 +1,6 @@
 ---
 title: "右侧文件树、Git graph 与毛玻璃"
-version: "2.0.0"
+version: "2.0.1"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, workspace, git, graph, diff, acrylic, rpc]
@@ -13,7 +13,7 @@ tags: [flutter, workspace, git, graph, diff, acrylic, rpc]
 点击主内容标签栏右侧的 **文件与 Git** 文件夹图标，展开右栏。空会话也有这个入口，输入卡片仍保持居中；发送第一条消息后才移到底部。右栏替代原来的“本会话文件改动汇总”，只有 **文件**、**Git graph** 两个图标页签，不增加提交、暂存、切分支等写操作。
 
 - 默认宽 **300 逻辑像素**，左边缘可拖拽，双击恢复默认。普通窗口最小 240、最大 640，并至少给聊天保留约 360px。聊天区域不足 640px 时改为覆盖式右栏，点击左侧遮罩关闭；不重置原来记住的宽度。
-- 两个页签及关闭 / 重开保留已读取的数据和展开目录。并行会话改造后，每个目录有独立浏览 Controller；跨目录切换会切换到该目录的浏览状态，而不是清空其他目录。右栏跟随当前活动会话或文件标签的目录。
+- 两个页签及关闭 / 重开保留已读取的数据和展开目录。并行会话改造后，每个目录有独立浏览 Controller；同目录新建第二个会话仍复用右栏的开关、页签、展开和已读取数据。跨目录切换会切换到该目录的浏览状态，而不是清空其他目录。右栏跟随当前活动会话或文件标签的目录。
 - 右上角刷新只读取文件和 Git，不同步聊天、不发送 Prompt，也不切换模型。文件工具执行完和 Agent 停稳后合并刷新，窗口重新获得焦点时也刷新已打开的右栏。关闭右栏不做后台轮询；外部程序的改动可点刷新确认。
 - 参考用户提供的紧凑文件树截图与 [VS Code Git Graph](https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph) 的提交连线、引用标记和按需查看详情，不照搬其仓库写操作。
 
@@ -84,6 +84,15 @@ workspace_manager.mjs → WorkspaceBrowser（workspace_browser.mjs）
 
 所有请求携带已确认的绝对 `workspace`。多会话后端先核对该目录是否已注册，返回值也携带工作区；每目录 Controller 保留 generation、刷新 revision 和请求身份校验。旧目录响应不能覆盖其他目录，刷新重入仍合并并执行一次强制尾随读取。错误保留已确认列表并提示失败。只读查询不占会话运行锁；各会话工具结束 / 停稳时只使所属目录缓存失效。
 
+### 同目录路径的比较
+
+Windows 下 Git 的 worktree 列表可能返回 `D:/Code/pi-gui`，Node 的会话和浏览结果则返回 `D:\Code\pi-gui`。二者是同一目录，不能直接用字符串相等判断，否则第二个会话会丢弃正常的文件 / Git 结果，Git 页没有数据也没有错误，表现为一直“正在读取”。
+
+- `WorkspaceBrowserController` 的工作区切换判断，以及目录、Git graph、文件预览、提交详情的响应校验统一使用 `path.equals`，遵循当前平台的分隔符和大小写规则；不手动全局转小写，也不绕过后端的目录 / 路径安全检查。
+- `WorkbenchController._browsers` / `_documentTabs` 使用 `path.equals` + `path.hash` 的路径键，避免同目录不同写法创建两份浏览和文档状态。
+- generation / revision 校验继续拦截旧请求。仍属当前请求、但响应真的来自另一目录时，目录 / graph 显示可重试错误，不再静默丢弃并留在加载画面；已有确认数据保留。
+- 这是 Flutter 状态判断修复，不需要更换 Node 后端。没有改动 RPC 命令、会话进程、聊天布局或文件访问权限。
+
 ```json
 {"id":"gui-1","type":"gui_list_files","workspace":"D:\\project","path":"lib","force":true,"limit":500}
 {"type":"response","id":"gui-1","command":"gui_list_files","success":true,"data":{"workspace":"D:\\project","path":"lib","branch":"main","git":true,"gitWarning":null,"hasMore":false,"entries":[{"name":"main.dart","path":"lib/main.dart","directory":false,"symlink":false,"missing":false,"status":"modified","indexStatus":"M","worktreeStatus":"M"}]}}
@@ -126,6 +135,17 @@ workspace_manager.mjs → WorkspaceBrowser（workspace_browser.mjs）
 原 `workspace_browser_dialog.dart` 已被非模态文档正文替代。原 `chat_changes_panel.dart` 已移除，聊天 Controller 不再保存右栏开关或选择路径；原有工具结果、Diff 证据和成功文件记录投影保留。
 
 ## 验证
+
+### 第二个会话持续读取的回归
+
+```bash
+flutter test --no-pub test/workspace_browser_test.dart test/workbench_browser_test.dart test/pi_rpc_client_test.dart test/app_tabs_controller_test.dart
+```
+
+- 定向 21 项通过，最终 `flutter test --no-pub` 全量 84 项通过，4 个改动 Dart 文件的主动 LSP 检查无诊断。新增用例先在旧代码上复现失败，再验证修复。覆盖同目录斜杠 / 大小写差异、四类浏览响应、缓存及展开保留、第二个逻辑会话复用同一右栏，以及真正错目录的错误提示。原有迟到响应隔离、刷新合并和断连测试继续通过。
+- 活动 Windows 应用经热重载和仅右栏的只读刷新检查：文件树已加载根目录及展开目录共 7 份列表，没有目录错误或挂起的读取；运行时没有报错。临时帧后 QA helper 已移除。不通过新 Prompt 或重启 Agent 做验证。
+
+### 首次实现
 
 以下为右栏首次实现的验证记录；后续标签页改造的验证见 [文档标签页](document_tabs.md)。
 

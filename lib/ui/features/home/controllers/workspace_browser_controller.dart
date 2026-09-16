@@ -51,7 +51,11 @@ class WorkspaceBrowserController extends ChangeNotifier {
       workspace == cwd;
 
   void setWorkspace(String? path) {
-    if (_disposed || workspace == path) return;
+    if (_disposed ||
+        workspace == path ||
+        (workspace != null && path != null && p.equals(workspace!, path))) {
+      return;
+    }
     workspace = path;
     _generation++;
     _revision++;
@@ -224,9 +228,13 @@ class WorkspaceBrowserController extends ChangeNotifier {
           force: force,
           limit: directoryLimit(path),
         );
-        if (_current(generation, revision, cwd) &&
-            result.workspace == cwd &&
-            result.path == path) {
+        if (_current(generation, revision, cwd)) {
+          // Git uses forward slashes on Windows; Node returns native paths.
+          // Compare directory identity, not its spelling, while keeping the
+          // generation/revision guard for genuinely stale responses.
+          if (!p.equals(result.workspace, cwd) || result.path != path) {
+            throw const PiRpcException('WORKSPACE_CHANGED');
+          }
           directories[path] = result;
         }
       } catch (error) {
@@ -281,7 +289,10 @@ class WorkspaceBrowserController extends ChangeNotifier {
     unawaited(() async {
       try {
         final result = await _pi.getGitGraph(cwd, limit: graphLimit);
-        if (_current(generation, revision, cwd) && result.workspace == cwd) {
+        if (_current(generation, revision, cwd)) {
+          if (!p.equals(result.workspace, cwd)) {
+            throw const PiRpcException('WORKSPACE_CHANGED');
+          }
           graph = result;
         }
       } catch (error) {
@@ -304,7 +315,7 @@ class WorkspaceBrowserController extends ChangeNotifier {
     final result = await _pi.getFilePreview(cwd, path, commit: commit);
     if (_disposed ||
         generation != _generation ||
-        result.workspace != workspace) {
+        !p.equals(result.workspace, cwd)) {
       throw const PiRpcException('WORKSPACE_CHANGED');
     }
     return result;
@@ -317,7 +328,7 @@ class WorkspaceBrowserController extends ChangeNotifier {
     final result = await _pi.getGitCommit(cwd, commit);
     if (_disposed ||
         generation != _generation ||
-        result.workspace != workspace) {
+        !p.equals(result.workspace, cwd)) {
       throw const PiRpcException('WORKSPACE_CHANGED');
     }
     return result;

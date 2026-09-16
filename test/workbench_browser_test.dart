@@ -1,0 +1,120 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
+import 'package:pi_gui/core/rpc/pi_channel_hub.dart';
+import 'package:pi_gui/ui/features/home/controllers/workbench_controller.dart';
+import 'package:pi_gui/ui/features/home/controllers/workspace_browser_controller.dart';
+
+import 'pi_rpc_client_test.dart' show TestTransport;
+import 'workspace_browser_test.dart' show listing;
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('second session shares file/graph state despite a differently spelled workspace', () async {
+    final cwd = p.absolute('Workspace');
+    final alias = p.style == p.Style.windows
+        ? cwd.replaceAll('\\', '/').toLowerCase()
+        : '$cwd/.';
+    final transport = TestTransport();
+    final workbench = WorkbenchController(
+      hub: PiChannelHub(() async => transport),
+    );
+    addTearDown(() async {
+      await workbench.shutdown();
+      workbench.dispose();
+    });
+    final channels = <Map<String, Object?>>[
+      {'id': 'primary', 'workspace': cwd, 'status': 'ready'},
+    ];
+    transport.onSend = (packet) {
+      final command = packet['message'] as Map<String, dynamic>;
+      final data = switch (command['type']) {
+        'gui_get_catalog' => {
+          'projects': <Object>[],
+          'channels': channels,
+          'jobs': <Object>[],
+        },
+        'gui_open_channel' => () {
+          final channel = <String, Object?>{
+            'id': command['channelId'],
+            'workspace': cwd,
+            'status': 'ready',
+          };
+          channels.add(channel);
+          return channel;
+        }(),
+        'gui_workspace_history' => {'sessions': <Object>[]},
+        'gui_list_files' => listing(cwd),
+        'gui_get_git_graph' => {
+          'workspace': cwd,
+          'root': cwd,
+          'branch': 'main',
+          'head': null,
+          'hasMore': false,
+          'commits': <Object>[],
+        },
+        'get_state' => {'model': null, 'thinkingLevel': 'off'},
+        'get_messages' => {'messages': <Object>[]},
+        'get_available_models' => {'models': <Object>[]},
+        'get_available_thinking_levels' => {
+          'levels': ['off'],
+        },
+        _ => throw StateError('Unexpected command: ${command['type']}'),
+      };
+      transport.emit({
+        'type': 'gui_channel',
+        'channel': packet['channel'],
+        'message': {
+          'type': 'response',
+          'id': command['id'],
+          'command': command['type'],
+          'success': true,
+          'data': data,
+        },
+      });
+    };
+    await workbench.initialize();
+    final browser = workbench.activeBrowser!;
+    browser.tab = WorkspaceBrowserTab.graph;
+    browser.toggle();
+    await browser.ensureLoaded();
+    final tree = browser.directories[''];
+    final graph = browser.graph;
+    final documents = workbench.documentTabsFor(cwd);
+    browser.expanded.add('src');
+    browser.selectFile('file');
+    final reads = transport.commands.where((packet) {
+      final type = (packet['message'] as Map)['type'];
+      return type == 'gui_list_files' || type == 'gui_get_git_graph';
+    }).length;
+
+    await workbench.openSession(alias);
+    expect(workbench.sessions.length, 2);
+    expect(workbench.activeSession!.id, isNot('primary'));
+    expect(workbench.activeBrowser, same(browser));
+    expect(workbench.documentTabsFor(alias), same(documents));
+    expect(browser.isOpen, true);
+    expect(browser.tab, WorkspaceBrowserTab.graph);
+    expect(browser.expanded, {'src'});
+    expect(browser.selectedPath, 'file');
+    await workbench.activeBrowser!.ensureLoaded();
+    expect(browser.directories[''], same(tree));
+    expect(browser.graph, same(graph));
+    expect(browser.refreshing || browser.graphLoading, false);
+    expect(
+      transport.commands.where((packet) {
+        final type = (packet['message'] as Map)['type'];
+        return type == 'gui_list_files' || type == 'gui_get_git_graph';
+      }).length,
+      reads,
+    );
+    expect(
+      workbench.browserFor(p.join(cwd, 'different')),
+      isNot(same(browser)),
+    );
+    // Drain hydration before disposing the independent session controllers.
+    while (workbench.sessions.values.any((session) => session.hydrating)) {
+      await Future<void>.delayed(Duration.zero);
+    }
+  });
+}

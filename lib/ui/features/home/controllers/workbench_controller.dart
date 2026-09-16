@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -159,8 +160,16 @@ class WorkbenchController extends ChangeNotifier {
   final loadingHistory = <String>{};
   final historyErrors = <String>{};
   final expandedProjects = <String>{}, expandedWorktrees = <String>{};
-  final _browsers = <String, WorkspaceBrowserController>{};
-  final _documentTabs = <String, WorkspaceTabsController>{};
+  // Catalog worktrees and Pi channels may spell the same Windows path with
+  // different separators/casing. Share directory state, not raw-string keys.
+  final _browsers = HashMap<String, WorkspaceBrowserController>(
+    equals: p.equals,
+    hashCode: p.hash,
+  );
+  final _documentTabs = HashMap<String, WorkspaceTabsController>(
+    equals: p.equals,
+    hashCode: p.hash,
+  );
   final _sessionEvents = <String, StreamSubscription<PiRpcEvent>>{};
   PiCatalog? catalog;
   String? failure, catalogFailure, selectedWorkspace, _foreground;

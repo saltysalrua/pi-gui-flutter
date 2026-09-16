@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:pi_gui/core/models/commit_graph.dart';
 import 'package:pi_gui/core/rpc/pi_browser_types.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_client.dart';
@@ -189,6 +190,81 @@ void main() {
     expect(browser.directories['']!.entries, isNotEmpty);
     expect(browser.directoryErrors[''], 'DIRECTORY_UNAVAILABLE');
     expect(browser.refreshing, false);
+  });
+
+  test('equivalent workspace paths accept all browser results and keep cached state', () async {
+    final (transport, _, browser) = await fixture();
+    // On Windows, reproduce Git's forward slashes versus Node's native path,
+    // including casing. On POSIX, retain its case-sensitive path semantics.
+    final cwd = p.absolute('Workspace');
+    final alias = p.style == p.Style.windows
+        ? cwd.replaceAll('\\', '/').toLowerCase()
+        : '$cwd/.';
+    browser.setWorkspace(alias);
+    browser.tab = WorkspaceBrowserTab.graph;
+    transport.onSend = (command) =>
+        transport.reply(command, switch (command['type']) {
+          'gui_list_files' => listing(cwd),
+          'gui_get_git_graph' => {
+            'workspace': cwd,
+            'root': cwd,
+            'branch': 'main',
+            'head': null,
+            'hasMore': false,
+            'commits': <Object>[],
+          },
+          'gui_get_file_preview' => preview(cwd),
+          'gui_get_git_commit' => {
+            'workspace': cwd,
+            'hash': 'a' * 40,
+            'author': 'author',
+            'message': 'initial',
+            'date': '2026-01-01T12:00:00Z',
+            'parents': <String>[],
+            'files': <Object>[],
+            'limited': false,
+          },
+          _ => null,
+        });
+    await browser.refresh();
+    expect(browser.directories['']?.workspace, cwd);
+    expect(browser.graph?.workspace, cwd);
+    expect((await browser.preview('file')).workspace, cwd);
+    expect((await browser.details('a' * 40)).workspace, cwd);
+    final cached = browser.directories[''];
+    browser.expanded.add('src');
+    browser.selectFile('file');
+    browser.setWorkspace(cwd);
+    expect(browser.directories[''], same(cached));
+    expect(browser.expanded, {'src'});
+    expect(browser.selectedPath, 'file');
+    expect(browser.directoryErrors, isEmpty);
+    expect(browser.graphError, isNull);
+    expect(browser.refreshing || browser.graphLoading, false);
+  });
+
+  test('a mismatched current response reports failure instead of indefinite loading', () async {
+    final (transport, _, browser) = await fixture();
+    transport.onSend = (command) =>
+        transport.reply(command, switch (command['type']) {
+          'gui_list_files' => listing('/different'),
+          'gui_get_git_graph' => {
+            'workspace': '/different',
+            'root': '/different',
+            'branch': null,
+            'head': null,
+            'hasMore': false,
+            'commits': <Object>[],
+          },
+          _ => null,
+        });
+    browser.tab = WorkspaceBrowserTab.graph;
+    await browser.refresh();
+    expect(browser.directoryErrors[''], 'WORKSPACE_CHANGED');
+    expect(browser.graphError, 'WORKSPACE_CHANGED');
+    expect(browser.refreshing || browser.graphLoading, false);
+    expect(browser.directories, isEmpty);
+    expect(browser.graph, isNull);
   });
 
   test('DAG lanes preserve merge edges, join shared parents, and do not connect independent roots', () {
