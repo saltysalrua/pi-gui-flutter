@@ -29,8 +29,12 @@ class SlotManager {
   SlotManager._();
   static final SlotManager instance = SlotManager._();
 
+  /// UI-only anchor for extension questions, shared by the two composer states.
+  final editorAnchor = GlobalKey();
+
   final Map<ExtensibleSlotId, ValueNotifier<List<Widget>>> _slotNotifiers = {
-    for (final id in ExtensibleSlotId.values) id: ValueNotifier<List<Widget>>([]),
+    for (final id in ExtensibleSlotId.values)
+      id: ValueNotifier<List<Widget>>([]),
   };
 
   /// 获取指定槽位的变更通知器

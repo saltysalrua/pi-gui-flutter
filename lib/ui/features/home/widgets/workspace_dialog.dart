@@ -11,6 +11,7 @@ import 'package:pi_gui/ui/atoms/app_text_field.dart';
 import 'package:pi_gui/ui/core/context_l10n.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
+
 import '../controllers/workspace_controller.dart';
 import '../workspace_labels.dart';
 
@@ -26,9 +27,11 @@ class WorkspaceDialog extends StatefulWidget {
   const WorkspaceDialog({
     super.key,
     required this.controller,
+    this.anchorKey,
     this.initialPage = WorkspaceDialogPage.choose,
   });
   final WorkspaceController controller;
+  final GlobalKey? anchorKey;
   final WorkspaceDialogPage initialPage;
   @override
   State<WorkspaceDialog> createState() => _WorkspaceDialogState();
@@ -329,6 +332,11 @@ class _WorkspaceDialogState extends State<WorkspaceDialog> {
       return PopScope(
         canPop: !controller.isBusy && !_picking,
         child: AppDialog(
+          maxWidth: 400,
+          maxHeight: 480,
+          anchorKey: widget.anchorKey,
+          placement: AppDialogPlacement.beside,
+          fallbackAlignment: Alignment.topLeft,
           title: switch (_page) {
             WorkspaceDialogPage.choose => l10n.workspaceChoose,
             WorkspaceDialogPage.create => l10n.workspaceCreate,

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_gui/core/models/appearance_preferences.dart';
@@ -32,41 +33,38 @@ class _Store implements AppearanceStore {
 }
 
 void main() {
-  test(
-    'versioned preferences tolerate bad fields and isolate brightness overrides',
-    () {
-      final p = AppearancePreferences.fromJson({
-        'version': 1,
-        'mode': 'unknown',
-        'source': 'custom',
-        'seed': '#123ABC',
-        'baseFontSize': 99,
-        'uiScale': -3,
-        'lightColors': {
-          'canvas': '#fF0000',
-          'unknown': '#123456',
-          'sidebar': 'oops',
-        },
-        'darkColors': {'composer': '#334455'},
-      });
-      expect(p.mode, AppearanceMode.system);
-      expect(p.source, PaletteSource.custom);
-      expect(p.baseFontSize, 18);
-      expect(p.uiScale, 0.8);
-      expect(p.seed, 0xff123abc);
-      expect(p.lightColors, {AppearanceColor.canvas: 0xffff0000});
-      expect(AppearancePreferences.fromJson(p.toJson()).toJson(), p.toJson());
-      final reset = p.withColor(AppearanceColor.canvas, null, dark: false);
-      expect(reset.lightColors, isEmpty);
-      expect(reset.darkColors, p.darkColors);
-      expect(
-        () => AppearancePreferences.fromJson({'version': 2}),
-        throwsFormatException,
-      );
-      expect(parseHexRgb('#12345678'), isNull);
-      expect(parseHexRgb('#fff'), isNull);
-    },
-  );
+  test('versioned preferences tolerate bad fields and isolate brightness overrides', () {
+    final p = AppearancePreferences.fromJson({
+      'version': 1,
+      'mode': 'unknown',
+      'source': 'custom',
+      'seed': '#123ABC',
+      'baseFontSize': 99,
+      'uiScale': -3,
+      'lightColors': {
+        'canvas': '#fF0000',
+        'unknown': '#123456',
+        'sidebar': 'oops',
+      },
+      'darkColors': {'composer': '#334455'},
+    });
+    expect(p.mode, AppearanceMode.system);
+    expect(p.source, PaletteSource.custom);
+    expect(p.baseFontSize, 18);
+    expect(p.uiScale, 0.8);
+    expect(p.seed, 0xff123abc);
+    expect(p.lightColors, {AppearanceColor.canvas: 0xffff0000});
+    expect(AppearancePreferences.fromJson(p.toJson()).toJson(), p.toJson());
+    final reset = p.withColor(AppearanceColor.canvas, null, dark: false);
+    expect(reset.lightColors, isEmpty);
+    expect(reset.darkColors, p.darkColors);
+    expect(
+      () => AppearancePreferences.fromJson({'version': 2}),
+      throwsFormatException,
+    );
+    expect(parseHexRgb('#12345678'), isNull);
+    expect(parseHexRgb('#fff'), isNull);
+  });
 
   test(
     'actual file replacement round trips and rejects damaged data',
@@ -77,9 +75,30 @@ void main() {
       final store = FileAppearanceStore(resolveFile: () async => file);
       expect((await store.load()).baseFontSize, 13);
       await store.save(AppearancePreferences(baseFontSize: 14));
-      await store.save(AppearancePreferences(baseFontSize: 17, uiScale: 1.25));
-      expect((await store.load()).baseFontSize, 17);
-      expect((await store.load()).uiScale, 1.25);
+      await store.save(
+        AppearancePreferences(
+          baseFontSize: 17,
+          uiScale: 1.25,
+          cardGlass: const GlassPreferences(enabled: true, opacity: 0.4),
+        ),
+      );
+      final loaded = await store.load();
+      expect(loaded.baseFontSize, 17);
+      expect(loaded.uiScale, 1.25);
+      expect(loaded.cardGlass.toJson(), {'enabled': true, 'opacity': 0.4});
+      expect(loaded.canvasGlass.enabled, false);
+      final controller = AppearanceController(
+        store: store,
+        readAccent: () async => null,
+      );
+      addTearDown(controller.dispose);
+      await controller.initialize(observeSystem: false);
+      controller.reset();
+      await controller.settled;
+      expect((await store.load()).cardGlass.toJson(), {
+        'enabled': false,
+        'opacity': 0.75,
+      });
       await file.writeAsString('{broken');
       await expectLater(store.load(), throwsFormatException);
     },

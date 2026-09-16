@@ -30,8 +30,8 @@ int? parseHexRgb(String value) {
 String formatHexRgb(int color) =>
     '#${(color & 0xffffff).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
-/// Tint opacity only; Windows owns the native blur radius. Missing fields keep
-/// existing installations opaque. Each region retains its opacity when disabled.
+/// Tint opacity only; blur radii belong to Windows or the GUI's material tokens.
+/// Missing fields keep existing installations opaque; disabling retains opacity.
 class GlassPreferences {
   const GlassPreferences({this.enabled = false, this.opacity = 0.75});
   static const minOpacity = 0.2, maxOpacity = 1.0;
@@ -69,6 +69,7 @@ class AppearancePreferences {
     this.uiScale = 1,
     this.sidebarGlass = defaultSidebarGlass,
     this.canvasGlass = defaultCanvasGlass,
+    GlassPreferences this._cardGlass = defaultCardGlass,
     Map<AppearanceColor, int> lightColors = const {},
     Map<AppearanceColor, int> darkColors = const {},
   }) : lightColors = Map.unmodifiable(lightColors),
@@ -76,6 +77,7 @@ class AppearancePreferences {
 
   static const defaultSidebarGlass = GlassPreferences(opacity: 0.65);
   static const defaultCanvasGlass = GlassPreferences(opacity: 0.85);
+  static const defaultCardGlass = GlassPreferences(opacity: 0.75);
   static const defaultSeed = 0xff0075de;
   static const defaultFontSize = 13.0;
   static const minFontSize = 12.0, maxFontSize = 18.0;
@@ -86,7 +88,14 @@ class AppearancePreferences {
   final int seed;
   final double baseFontSize, uiScale;
   final GlassPreferences sidebarGlass, canvasGlass;
-  bool get wantsGlass => sidebarGlass.enabled || canvasGlass.enabled;
+  // The long-lived preferences instance can predate this field after hot reload.
+  // A nullable backing field keeps the active RPC-owning GUI safe to reload.
+  final GlassPreferences? _cardGlass;
+  GlassPreferences get cardGlass => _cardGlass ?? defaultCardGlass;
+  // Card-only glass also uses the native capability/system-policy gate. It
+  // never makes the canvas or sidebar transparent on the user's behalf.
+  bool get wantsGlass =>
+      sidebarGlass.enabled || canvasGlass.enabled || cardGlass.enabled;
   final Map<AppearanceColor, int> lightColors, darkColors;
 
   AppearancePreferences copyWith({
@@ -97,6 +106,7 @@ class AppearancePreferences {
     double? uiScale,
     GlassPreferences? sidebarGlass,
     GlassPreferences? canvasGlass,
+    GlassPreferences? cardGlass,
     Map<AppearanceColor, int>? lightColors,
     Map<AppearanceColor, int>? darkColors,
   }) => AppearancePreferences(
@@ -107,6 +117,7 @@ class AppearancePreferences {
     uiScale: uiScale ?? this.uiScale,
     sidebarGlass: sidebarGlass ?? this.sidebarGlass,
     canvasGlass: canvasGlass ?? this.canvasGlass,
+    cardGlass: cardGlass ?? this.cardGlass,
     lightColors: lightColors ?? this.lightColors,
     darkColors: darkColors ?? this.darkColors,
   );
@@ -166,6 +177,7 @@ class AppearancePreferences {
         json['canvasGlass'],
         defaultCanvasGlass,
       ),
+      cardGlass: GlassPreferences.fromJson(json['cardGlass'], defaultCardGlass),
       lightColors: colors(json['lightColors']),
       darkColors: colors(json['darkColors']),
     );
@@ -180,6 +192,7 @@ class AppearancePreferences {
     'uiScale': uiScale,
     'sidebarGlass': sidebarGlass.toJson(),
     'canvasGlass': canvasGlass.toJson(),
+    'cardGlass': cardGlass.toJson(),
     'lightColors': {
       for (final e in lightColors.entries) e.key.name: formatHexRgb(e.value),
     },

@@ -1,6 +1,6 @@
 ---
 title: "扩展槽位与 Extension UI 动态挂载机制"
-version: "1.0.0"
+version: "1.1.0"
 status: "implemented"
 type: "architecture"
 tags: [flutter, pi-rpc, extension-ui, slots, pi-lens, todos]
@@ -32,6 +32,29 @@ tags: [flutter, pi-rpc, extension-ui, slots, pi-lens, todos]
    - **典型插件**：插件主动发起的交互弹窗（如 `select`、`confirm`、`input`、`editor`）。
 5. **全局通知 (`notificationToast`)**：
    - **典型插件**：插件发起的非阻塞通知 (`notify`)。
+
+## 问答小卡片
+
+Agent / 扩展通过 `select`、`confirm`、`input`、`editor` 向用户提问时，显示靠近聊天输入框的小卡片，不再统一居中：
+
+- 默认放在输入卡片右上方，右边缘对齐、间隔 8px。上方放不下时尝试下方；长内容优先在可用空间内滚动，不盖住输入区。无可见输入框（例如正在设置页）时回退到窗口右下角。
+- 最大宽度 **420px**、高度 **480px**，短问答按内容收缩；窗口边缘至少留 16px。长说明和选项在卡片内部滚动，选项左对齐并允许换行，不把重要文字省略掉；底部“取消 / 确认”始终独立于滚动区。
+- 遮罩为主题 scrim 的 12%，减轻整屏被盖住的感觉，但仍阻止点击背后页面。点击选项提交原始值，取消或 Esc 返回取消；输入草稿不会因窗口缩放而重建。Tab 在问答焦点域内循环。
+- 排队、超时、断连清理和 `extension_ui_response` 的语义不变。没有新增问卷协议或在 Flutter 中重写 `ask_user_question` 工具；本次覆盖的是已通过这些标准请求呈现的问答，外部工具自己的浏览器 / TUI 界面不受这个组件控制。
+
+### 代码与协议
+
+- `lib/core/slots/slot_manager.dart`：`editorAnchor` 只保存 UI 锚点。
+- `lib/ui/features/home/widgets/home_starter_panel.dart`：在实际输入 `AppCard.elevated` 上挂载锚点，空会话居中 / 有消息后到底部仍只有一个输入组件。
+- `lib/ui/features/home/controllers/pi_extension_ui_bridge.dart`：`_ExtensionDialog` 复用 `AppDialog`、`AppActionButton`、`AppTextField`，通过 `anchorKey` 接收输入区位置；仍经 `dialogOverlay` 挂在普通路由上方。
+- `lib/ui/atoms/app_dialog.dart`：统一锚点定位、避边、可用空间与滚动边界；布局后核对坐标以适应窗口缩放和同帧出现的入口，使用原有 `AppDurations` / `AppCurves` / `AppShadows`。
+
+```json
+{"type":"extension_ui_request","id":"question-1","method":"select","title":"这次采用哪种布局？","options":["靠近入口的小卡片","保持现在的布局"]}
+{"type":"extension_ui_response","id":"question-1","value":"靠近入口的小卡片"}
+```
+
+安全热重载的独立 QA 验证了浅 / 深色、正常 / 窄视口、150% 文字、长说明与 30 个选项、编辑框、取消以及焦点链上的 Esc 回调。正常短问答实际为 **420×242**，输入框上方间隔 8px；560×400 下长问答限制为 **420×256**，末尾选项可滚动到达，取消按钮仍可见。测试只截图自建 QA 图层，不抓取其他窗口或活动聊天；临时代码已清理。
 
 ---
 

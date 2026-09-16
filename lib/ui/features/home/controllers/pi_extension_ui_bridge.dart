@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_client.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_types.dart';
@@ -7,6 +9,7 @@ import 'package:pi_gui/core/slots/slot_manager.dart';
 import 'package:pi_gui/ui/atoms/app_action_button.dart';
 import 'package:pi_gui/ui/atoms/app_badge.dart';
 import 'package:pi_gui/ui/atoms/app_card.dart';
+import 'package:pi_gui/ui/atoms/app_dialog.dart';
 import 'package:pi_gui/ui/atoms/app_notification_toast.dart';
 import 'package:pi_gui/ui/atoms/app_text_field.dart';
 import 'package:pi_gui/ui/core/context_l10n.dart';
@@ -126,8 +129,7 @@ class PiExtensionUiBridge {
         key: UniqueKey(),
         message: message,
         invalidRequest: invalidRequest,
-        onDismiss: () =>
-            _slots.clearSlot(ExtensibleSlotId.notificationToast),
+        onDismiss: () => _slots.clearSlot(ExtensibleSlotId.notificationToast),
       ),
     ]);
   }
@@ -139,6 +141,7 @@ class PiExtensionUiBridge {
         _ExtensionDialog(
           key: ValueKey(request.id),
           request: request,
+          anchorKey: _slots.editorAnchor,
           onDone: (value, confirmed, cancelled) => _finish(
             request,
             value: value,
@@ -197,9 +200,11 @@ class _ExtensionDialog extends StatefulWidget {
   const _ExtensionDialog({
     super.key,
     required this.request,
+    required this.anchorKey,
     required this.onDone,
   });
   final PiExtensionUiRequest request;
+  final GlobalKey anchorKey;
   final void Function(String? value, bool? confirmed, bool cancelled) onDone;
   @override
   State<_ExtensionDialog> createState() => _ExtensionDialogState();
@@ -207,8 +212,12 @@ class _ExtensionDialog extends StatefulWidget {
 
 class _ExtensionDialogState extends State<_ExtensionDialog> {
   late final _input = TextEditingController(text: widget.request.prefill);
+  final _focusScope = FocusScopeNode(
+    traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
+  );
   @override
   void dispose() {
+    _focusScope.dispose();
     _input.dispose();
     super.dispose();
   }
@@ -220,66 +229,70 @@ class _ExtensionDialogState extends State<_ExtensionDialog> {
     return Stack(
       children: [
         ModalBarrier(
-          color: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.4),
+          color: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.12),
           dismissible: false,
         ),
-        Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 460,
-              maxHeight: MediaQuery.sizeOf(context).height - AppSpacing.xxl,
-            ),
-            child: AppCard(
-              child: SingleChildScrollView(
-                child: FocusScope(
-                  autofocus: true,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        _plainText(request.title ?? ''),
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      if (request.message case final message?)
-                        Text(_plainText(message)),
-                      const SizedBox(height: AppSpacing.md),
-                      if (request.method == 'input' ||
-                          request.method == 'editor')
-                        AppTextField(
-                          controller: _input,
-                          hintText: request.placeholder ?? '',
-                          autofocus: true,
-                          maxLines: request.method == 'editor' ? 6 : 1,
-                        ),
-                      for (final option in request.options ?? <String>[])
-                        AppActionButton.subtle(
-                          label: _plainText(option),
-                          onPressed: () => widget.onDone(option, null, false),
-                        ),
-                      const SizedBox(height: AppSpacing.md),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          AppActionButton.subtle(
-                            label: l10n.cancel,
-                            onPressed: () => widget.onDone(null, null, true),
-                          ),
-                          if (request.method != 'select')
-                            AppActionButton(
-                              label: l10n.confirm,
-                              onPressed: () => widget.onDone(
-                                request.method == 'confirm'
-                                    ? null
-                                    : _input.text,
-                                request.method == 'confirm' ? true : null,
-                                false,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
+        SafeArea(
+          child: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.escape): () =>
+                  widget.onDone(null, null, true),
+            },
+            child: FocusScope(
+              node: _focusScope,
+              autofocus: true,
+              child: AppDialog(
+                title: _plainText(request.title ?? ''),
+                maxWidth: 420,
+                maxHeight: 480,
+                anchorKey: widget.anchorKey,
+                placement: AppDialogPlacement.above,
+                fallbackAlignment: Alignment.bottomRight,
+                actions: [
+                  AppActionButton.subtle(
+                    label: l10n.cancel,
+                    onPressed: () => widget.onDone(null, null, true),
                   ),
+                  if (request.method != 'select')
+                    AppActionButton(
+                      label: l10n.confirm,
+                      onPressed: () => widget.onDone(
+                        request.method == 'confirm' ? null : _input.text,
+                        request.method == 'confirm' ? true : null,
+                        false,
+                      ),
+                    ),
+                ],
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (request.message case final message?) ...[
+                      Text(
+                        _plainText(message),
+                        style: context.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    if (request.method == 'input' || request.method == 'editor')
+                      AppTextField(
+                        controller: _input,
+                        hintText: request.placeholder ?? '',
+                        autofocus: true,
+                        maxLines: request.method == 'editor' ? 6 : 1,
+                      ),
+                    for (final option in request.options ?? <String>[])
+                      AppActionButton.subtle(
+                        label: _plainText(option),
+                        labelContent: Text(
+                          _plainText(option),
+                          style: context.textTheme.labelLarge,
+                        ),
+                        isExpanded: true,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        onPressed: () => widget.onDone(option, null, false),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -342,21 +355,24 @@ class _ExtensionWidgetViewState extends State<_ExtensionWidgetView> {
       );
     }
 
-    final title = cleanLines.first.replaceFirst(RegExp(r'^[●○•\s]+'), '').trim();
+    final title = cleanLines.first
+        .replaceFirst(RegExp(r'^[●○•\s]+'), '')
+        .trim();
     final items = cleanLines.skip(1).toList();
 
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     final keyLower = widget.widgetKey.toLowerCase();
-    final headerIcon = keyLower.contains('lens') ||
+    final headerIcon =
+        keyLower.contains('lens') ||
             keyLower.contains('diag') ||
             keyLower.contains('lint')
         ? Icons.troubleshoot_rounded
         : keyLower.contains('todo') ||
-                keyLower.contains('task') ||
-                keyLower.contains('plan')
-            ? Icons.checklist_rounded
-            : Icons.widgets_outlined;
+              keyLower.contains('task') ||
+              keyLower.contains('plan')
+        ? Icons.checklist_rounded
+        : Icons.widgets_outlined;
 
     final innerContent = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,15 +399,16 @@ class _ExtensionWidgetViewState extends State<_ExtensionWidgetView> {
                 const SizedBox(width: AppSpacing.xs),
                 Text(
                   title,
-                  style: (widget.isBelowEditor
-                          ? textTheme.labelSmall
-                          : textTheme.labelMedium)
-                      ?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: widget.isBelowEditor
-                        ? colors.textSecondary
-                        : colors.textPrimary,
-                  ),
+                  style:
+                      (widget.isBelowEditor
+                              ? textTheme.labelSmall
+                              : textTheme.labelMedium)
+                          ?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: widget.isBelowEditor
+                                ? colors.textSecondary
+                                : colors.textPrimary,
+                          ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 AnimatedRotation(
@@ -456,30 +473,30 @@ class _ExtensionWidgetViewState extends State<_ExtensionWidgetView> {
     final line = rawLine.replaceFirst(RegExp(r'^[├└─│↳\s]+'), '').trim();
     if (line.isEmpty) return const SizedBox.shrink();
     if (line.startsWith('─') || line.startsWith('───')) {
-      return Divider(
-        height: AppSpacing.sm,
-        color: colors.borderSubtle,
-      );
+      return Divider(height: AppSpacing.sm, color: colors.borderSubtle);
     }
 
     // 通用状态符号识别：不与特定插件或特定 todo 结构绑死
-    final isCompleted = line.startsWith('✓') ||
+    final isCompleted =
+        line.startsWith('✓') ||
         line.startsWith('✔') ||
         line.startsWith('[x]') ||
         line.startsWith('[X]');
-    final isInProgress = line.startsWith('◐') ||
+    final isInProgress =
+        line.startsWith('◐') ||
         line.startsWith('◒') ||
         line.startsWith('◓') ||
         line.startsWith('◔') ||
         line.startsWith('[-]');
-    final isFailed = line.startsWith('✗') ||
-        line.startsWith('✘') ||
-        line.startsWith('[!]');
-    final isWarning = line.startsWith('!') ||
+    final isFailed =
+        line.startsWith('✗') || line.startsWith('✘') || line.startsWith('[!]');
+    final isWarning =
+        line.startsWith('!') ||
         line.startsWith('⚠') ||
         line.startsWith('[w]') ||
         line.startsWith('[W]');
-    final isBullet = line.startsWith('○') ||
+    final isBullet =
+        line.startsWith('○') ||
         line.startsWith('•') ||
         line.startsWith('- ') ||
         line.startsWith('* ') ||
@@ -524,22 +541,27 @@ class _ExtensionWidgetViewState extends State<_ExtensionWidgetView> {
               padding: const EdgeInsets.only(top: 2.0),
               child: Icon(icon, size: 14, color: iconColor),
             ),
-            SizedBox(width: widget.isBelowEditor ? AppSpacing.xs : AppSpacing.sm),
+            SizedBox(
+              width: widget.isBelowEditor ? AppSpacing.xs : AppSpacing.sm,
+            ),
           ],
           Expanded(
             child: Text(
               displayText.isEmpty ? line : displayText,
-              style: (widget.isBelowEditor
-                      ? textTheme.labelSmall
-                      : textTheme.bodySmall)
-                  ?.copyWith(
-                color: isCompleted
-                    ? colors.textMuted
-                    : (widget.isBelowEditor
-                        ? colors.textSecondary
-                        : colors.textPrimary),
-                decoration: isCompleted ? TextDecoration.lineThrough : null,
-              ),
+              style:
+                  (widget.isBelowEditor
+                          ? textTheme.labelSmall
+                          : textTheme.bodySmall)
+                      ?.copyWith(
+                        color: isCompleted
+                            ? colors.textMuted
+                            : (widget.isBelowEditor
+                                  ? colors.textSecondary
+                                  : colors.textPrimary),
+                        decoration: isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
             ),
           ),
         ],

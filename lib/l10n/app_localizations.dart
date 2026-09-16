@@ -1559,7 +1559,7 @@ abstract class AppLocalizations {
   /// No description provided for @appearanceResetAllHint.
   ///
   /// In zh, this message translates to:
-  /// **'恢复默认配色、13 基准字号和 100% UI 比例，关闭两区毛玻璃并重置其不透明度，清除浅色、深色的自定义颜色。'**
+  /// **'恢复默认配色、13 基准字号和 100% UI 比例，关闭全部毛玻璃并重置其不透明度，清除浅色、深色的自定义颜色。'**
   String get appearanceResetAllHint;
 
   /// No description provided for @appearanceSaving.
@@ -1673,7 +1673,7 @@ abstract class AppLocalizations {
   /// No description provided for @appearanceGlassHint.
   ///
   /// In zh, this message translates to:
-  /// **'模糊窗口背后的桌面和其他窗口，两区分别设置。模糊程度由 Windows 控制，明暗模式共用这些设置。需要 Windows 11 22H2 或更新版本。'**
+  /// **'顶部与侧栏、主界面和卡片分别设置。桌面模糊由 Windows 控制，卡片模糊应用内背景，文字保持清晰。明暗模式共用设置，需要 Windows 11 22H2 或更新版本。'**
   String get appearanceGlassHint;
 
   /// No description provided for @appearanceGlassSidebar.
@@ -1697,7 +1697,7 @@ abstract class AppLocalizations {
   /// No description provided for @appearanceGlassCanvasHint.
   ///
   /// In zh, this message translates to:
-  /// **'用于聊天与设置页的主背景；文字、输入框和卡片保持清晰。'**
+  /// **'用于聊天与设置页的主背景；输入框和其他卡片由下方的卡片毛玻璃单独控制。'**
   String get appearanceGlassCanvasHint;
 
   /// No description provided for @appearanceGlassSidebarOpacity.
@@ -1711,6 +1711,24 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'主界面底色不透明度'**
   String get appearanceGlassCanvasOpacity;
+
+  /// No description provided for @appearanceGlassCards.
+  ///
+  /// In zh, this message translates to:
+  /// **'卡片毛玻璃'**
+  String get appearanceGlassCards;
+
+  /// No description provided for @appearanceGlassCardsHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'用于输入卡片、设置卡片和弹窗等有底色的卡片，不改变透明工具行。要透出桌面，请同时开启主界面毛玻璃；纯色背景上的模糊不明显。'**
+  String get appearanceGlassCardsHint;
+
+  /// No description provided for @appearanceGlassCardsOpacity.
+  ///
+  /// In zh, this message translates to:
+  /// **'卡片毛玻璃底色不透明度'**
+  String get appearanceGlassCardsOpacity;
 
   /// No description provided for @appearanceGlassOpacityHint.
   ///

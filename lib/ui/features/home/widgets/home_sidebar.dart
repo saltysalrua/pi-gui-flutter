@@ -11,6 +11,7 @@ import 'package:pi_gui/ui/atoms/slot_container.dart';
 import 'package:pi_gui/ui/core/context_l10n.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
+
 import '../controllers/workspace_controller.dart';
 import '../workspace_labels.dart';
 
@@ -34,13 +35,16 @@ class HomeSidebar extends StatefulWidget {
   final String? selectedSessionId;
   final ValueChanged<String>? onSessionSelected;
   final VoidCallback? onNewConversation, onSettingsPressed;
-  final VoidCallback onChooseWorkspace, onChooseWorktree;
+  final ValueChanged<GlobalKey> onChooseWorkspace, onChooseWorktree;
   @override
   State<HomeSidebar> createState() => _HomeSidebarState();
 }
 
 class _HomeSidebarState extends State<HomeSidebar> {
   final _search = TextEditingController();
+  final _addProjectAnchor = GlobalKey();
+  final _projectAnchor = GlobalKey();
+  final _worktreeAnchor = GlobalKey();
   String _query = '';
   @override
   void dispose() {
@@ -50,9 +54,9 @@ class _HomeSidebarState extends State<HomeSidebar> {
 
   Widget _session(BuildContext context, PiSessionSummary session) {
     final locale = Localizations.localeOf(context).toString();
-    final updated = DateFormat.yMd(
-      locale,
-    ).add_Hm().format(session.modified.toLocal());
+    final updated = DateFormat.yMd(locale)
+        .add_Hm()
+        .format(session.modified.toLocal());
     final title = session.title.isEmpty
         ? context.l10n.newConversation
         : session.title;
@@ -121,10 +125,11 @@ class _HomeSidebarState extends State<HomeSidebar> {
                         : () => workspace.refresh(loadConversation: false),
                   ),
                   AppIconButton.subtle(
+                    key: _addProjectAnchor,
                     icon: Icons.add,
                     tooltip: l10n.workspaceChoose,
                     onPressed: workspace.canSwitch
-                        ? widget.onChooseWorkspace
+                        ? () => widget.onChooseWorkspace(_addProjectAnchor)
                         : null,
                   ),
                 ],
@@ -135,17 +140,21 @@ class _HomeSidebarState extends State<HomeSidebar> {
               child: Tooltip(
                 message: snapshot?.current.path ?? l10n.workspaceChoose,
                 child: AppNavTile(
+                  key: _projectAnchor,
                   title: snapshot?.current.name ?? l10n.workspaceChoose,
                   isFolder: true,
                   leading: const Icon(Icons.folder_open_outlined),
                   trailing: const Icon(Icons.unfold_more_rounded, size: 16),
-                  onTap: workspace.canSwitch ? widget.onChooseWorkspace : null,
+                  onTap: workspace.canSwitch
+                      ? () => widget.onChooseWorkspace(_projectAnchor)
+                      : null,
                 ),
               ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               child: AppActionButton.subtle(
+                key: _worktreeAnchor,
                 label:
                     snapshot?.git?.branch ??
                     (snapshot?.git == null
@@ -156,7 +165,9 @@ class _HomeSidebarState extends State<HomeSidebar> {
                 mainAxisAlignment: MainAxisAlignment.start,
                 height: 30,
                 padding: const EdgeInsets.all(AppSpacing.xs),
-                onPressed: workspace.canSwitch ? widget.onChooseWorktree : null,
+                onPressed: workspace.canSwitch
+                    ? () => widget.onChooseWorktree(_worktreeAnchor)
+                    : null,
               ),
             ),
             if (workspace.failureCode case final code?)

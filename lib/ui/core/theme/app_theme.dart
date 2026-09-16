@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/models/appearance_preferences.dart';
 import 'app_colors_extension.dart';
+import 'app_card_theme.dart';
 import 'appearance_palette.dart';
 import 'app_tokens.dart';
 
@@ -58,7 +60,16 @@ class AppTheme {
       brightness: brightness,
       fontFamily: fontFamily,
       scaffoldBackgroundColor: colors.canvasBackground,
-      extensions: [colors],
+      extensions: [
+        colors,
+        AppCardTheme(
+          opacity: settings.cardGlass.enabled ? settings.cardGlass.opacity : 1,
+          blurSigma:
+              settings.cardGlass.enabled && settings.cardGlass.opacity < 1
+              ? AppGlass.cardBlurSigma
+              : 0,
+        ),
+      ],
       colorScheme: scheme,
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: colors.primary,

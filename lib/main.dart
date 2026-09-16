@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:window_manager/window_manager.dart';
+
 import 'l10n/app_localizations.dart';
 import 'ui/core/theme/app_theme.dart';
 import 'ui/core/window_material_scope.dart';

@@ -51,6 +51,11 @@ abstract final class AppRadius {
   static const double pill = 9999.0;
 }
 
+/// App-local material metrics; not the native desktop Acrylic blur radius.
+abstract final class AppGlass {
+  static const double cardBlurSigma = 16;
+}
+
 /// 统一阴影层级 (亮暗自适应)
 abstract final class AppShadows {
   /// 卡片微弱浮起 (微质感，适合工作台悬浮卡片)

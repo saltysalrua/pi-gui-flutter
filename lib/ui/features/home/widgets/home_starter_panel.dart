@@ -7,7 +7,9 @@ import 'package:pi_gui/ui/atoms/app_menu_button.dart';
 import 'package:pi_gui/ui/core/chat_resource_scope.dart';
 import 'package:pi_gui/core/services/chat_resources.dart';
 import 'package:pi_gui/ui/atoms/app_image.dart';
+
 import '../controllers/image_attachment_controller.dart';
+
 import 'package:pi_gui/core/slots/slot_manager.dart';
 import 'package:pi_gui/ui/atoms/app_icon_button.dart';
 import 'package:pi_gui/ui/atoms/app_action_button.dart';
@@ -126,6 +128,7 @@ class _HomeStarterPanelState extends State<HomeStarterPanel> {
           padding: EdgeInsets.only(bottom: AppSpacing.sm),
         ),
         AppCard.elevated(
+          key: SlotManager.instance.editorAnchor,
           backgroundColor: context.colors.composerBackground,
           borderColor: _focusNode.hasFocus ? context.colors.borderFocus : null,
           child: Column(

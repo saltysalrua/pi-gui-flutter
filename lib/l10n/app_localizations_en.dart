@@ -826,7 +826,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appearanceResetAllHint =>
-      'Restore the default palette, base font size 13 and UI scale 100%. Turn off glass, reset both opacities, and clear custom colors in both modes.';
+      'Restore the default palette, base font size 13 and UI scale 100%. Turn off all glass, reset all tint opacities, and clear custom colors in both modes.';
 
   @override
   String get appearanceSaving => 'Saving…';
@@ -893,7 +893,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appearanceGlassHint =>
-      'Blur the desktop and windows behind this app, with separate settings for each region. Windows controls the blur radius. Light and dark modes share these settings. Requires Windows 11 22H2 or newer.';
+      'Separate settings for the title bar and sidebar, main area and cards. Windows blurs the desktop; cards blur in-app backgrounds while text stays clear. Shared by light and dark modes. Requires Windows 11 22H2 or newer.';
 
   @override
   String get appearanceGlassSidebar => 'Title bar and sidebar glass';
@@ -907,7 +907,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appearanceGlassCanvasHint =>
-      'Applies to the chat and settings backgrounds. Text, the composer and cards stay clear.';
+      'Applies to the chat and settings backgrounds. The composer and other cards use the separate Card glass setting below.';
 
   @override
   String get appearanceGlassSidebarOpacity =>
@@ -915,6 +915,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appearanceGlassCanvasOpacity => 'Main area tint opacity';
+
+  @override
+  String get appearanceGlassCards => 'Card glass';
+
+  @override
+  String get appearanceGlassCardsHint =>
+      'Applies to tinted cards such as the composer, settings and dialogs. Transparent tool rows stay unchanged. Also enable Main area glass to reveal the desktop; blur is subtle on a flat background.';
+
+  @override
+  String get appearanceGlassCardsOpacity => 'Card glass tint opacity';
 
   @override
   String get appearanceGlassOpacityHint =>

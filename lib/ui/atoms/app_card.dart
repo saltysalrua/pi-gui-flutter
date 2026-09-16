@@ -1,4 +1,9 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
+import 'package:pi_gui/core/services/window_material_service.dart';
+import 'package:pi_gui/ui/core/window_material_scope.dart';
+import 'package:pi_gui/ui/core/theme/app_card_theme.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
 
@@ -13,6 +18,9 @@ class AppCard extends StatelessWidget {
   /// Per-corner radii, when supplied, take precedence over [borderRadius].
   final BorderRadiusGeometry? borderRadiusGeometry;
   final bool showBorder;
+
+  /// Follow the shared card material. Fully transparent shells always opt out.
+  final bool glass;
   final Clip clipBehavior;
   final Color? backgroundColor;
   final Color? borderColor;
@@ -27,6 +35,7 @@ class AppCard extends StatelessWidget {
     this.borderRadius = AppRadius.lg,
     this.borderRadiusGeometry,
     this.showBorder = true,
+    this.glass = true,
     this.clipBehavior = Clip.none,
     this.backgroundColor,
     this.borderColor,
@@ -43,6 +52,7 @@ class AppCard extends StatelessWidget {
     this.borderRadius = AppRadius.xl,
     this.borderRadiusGeometry,
     this.showBorder = true,
+    this.glass = true,
     this.clipBehavior = Clip.none,
     this.backgroundColor,
     this.borderColor,
@@ -54,24 +64,81 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final effectiveBg = backgroundColor ?? colors.cardBackground;
+    final background = backgroundColor ?? colors.cardBackground;
+    final material =
+        Theme.of(context).extension<AppCardTheme>() ?? const AppCardTheme();
+    final active =
+        glass &&
+        background.a > 0 &&
+        material.opacity < 1 &&
+        WindowMaterialScope.statusOf(context) == WindowMaterialStatus.active &&
+        !MediaQuery.highContrastOf(context);
+    final inheritedBlur = _CardBackdropScope.of(context);
+    final blur = active && material.blurSigma > 0 && !inheritedBlur;
+    final effectiveBg = active
+        ? background.withValues(alpha: background.a * material.opacity)
+        : background;
     final effectiveBorder = borderColor ?? colors.borderDefault;
+    final radius = borderRadiusGeometry ?? BorderRadius.circular(borderRadius);
 
-    return Container(
-      width: width,
-      height: height,
-      padding: padding ?? const EdgeInsets.all(AppSpacing.md),
-      clipBehavior: clipBehavior,
-      decoration: BoxDecoration(
-        color: effectiveBg,
-        borderRadius:
-            borderRadiusGeometry ?? BorderRadius.circular(borderRadius),
-        border: showBorder
-            ? Border.all(color: effectiveBorder, width: 1.0)
-            : null,
-        boxShadow: shadows,
+    // Keep the child at the same Element path when toggling material or policy:
+    // editors, selection, scroll positions and focus must not be recreated.
+    // Only the backdrop is clipped/filtered; text and controls stay untouched.
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: radius, boxShadow: shadows),
+      child: Stack(
+        fit: StackFit.passthrough,
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: radius,
+              child: BackdropFilter(
+                enabled: blur,
+                filter: ImageFilter.blur(
+                  sigmaX: material.blurSigma,
+                  sigmaY: material.blurSigma,
+                ),
+                // Replace, rather than composite a second copy of the already
+                // translucent desktop tint (also correct inside route fades).
+                blendMode: BlendMode.src,
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+          Container(
+            width: width,
+            height: height,
+            padding: padding ?? const EdgeInsets.all(AppSpacing.md),
+            clipBehavior: clipBehavior,
+            decoration: BoxDecoration(
+              color: effectiveBg,
+              borderRadius: radius,
+              border: showBorder
+                  ? Border.all(color: effectiveBorder, width: 1.0)
+                  : null,
+            ),
+            child: _CardBackdropScope(
+              active: inheritedBlur || blur,
+              child: child,
+            ),
+          ),
+        ],
       ),
-      child: child,
     );
   }
+}
+
+/// Nested cards keep their tint but do not blur the same background repeatedly.
+class _CardBackdropScope extends InheritedWidget {
+  const _CardBackdropScope({required this.active, required super.child});
+  final bool active;
+  static bool of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<_CardBackdropScope>()
+          ?.active ??
+      false;
+  @override
+  bool updateShouldNotify(_CardBackdropScope oldWidget) =>
+      active != oldWidget.active;
 }

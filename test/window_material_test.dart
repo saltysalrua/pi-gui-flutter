@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,10 +34,12 @@ void main() {
     () {
       final old = AppearancePreferences.fromJson({'version': 1});
       expect(old.wantsGlass, false);
+      expect(old.cardGlass.toJson(), {'enabled': false, 'opacity': 0.75});
       final parsed = AppearancePreferences.fromJson({
         'version': 1,
         'sidebarGlass': {'enabled': true, 'opacity': -10},
         'canvasGlass': {'enabled': 'true', 'opacity': double.nan},
+        'cardGlass': {'enabled': true, 'opacity': double.infinity},
       });
       expect(parsed.sidebarGlass.enabled, true);
       expect(parsed.sidebarGlass.opacity, GlassPreferences.minOpacity);
@@ -45,17 +48,49 @@ void main() {
         parsed.canvasGlass.opacity,
         AppearancePreferences.defaultCanvasGlass.opacity,
       );
+      expect(parsed.cardGlass.toJson(), {'enabled': true, 'opacity': 0.75});
       final next = parsed.copyWith(
         canvasGlass: const GlassPreferences(enabled: true, opacity: 4),
+        cardGlass: const GlassPreferences(enabled: true, opacity: -1),
       );
       final roundTrip = AppearancePreferences.fromJson(next.toJson());
       expect(roundTrip.sidebarGlass.toJson(), parsed.sidebarGlass.toJson());
       expect(roundTrip.canvasGlass.opacity, 1);
+      expect(roundTrip.cardGlass.opacity, GlassPreferences.minOpacity);
       final disabled = roundTrip.copyWith(
         sidebarGlass: roundTrip.sidebarGlass.copyWith(enabled: false),
       );
       expect(disabled.sidebarGlass.opacity, parsed.sidebarGlass.opacity);
       expect(disabled.canvasGlass.toJson(), roundTrip.canvasGlass.toJson());
+      expect(disabled.cardGlass.toJson(), roundTrip.cardGlass.toJson());
+      final cardOnly = old.copyWith(cardGlass: roundTrip.cardGlass);
+      expect(cardOnly.wantsGlass, true);
+      expect(cardOnly.canvasGlass.toJson(), old.canvasGlass.toJson());
+      expect(cardOnly.sidebarGlass.toJson(), old.sidebarGlass.toJson());
+      final cardsOff = cardOnly.copyWith(
+        cardGlass: cardOnly.cardGlass.copyWith(enabled: false),
+      );
+      expect(cardsOff.wantsGlass, false);
+      expect(cardsOff.cardGlass.opacity, GlassPreferences.minOpacity);
+      for (final raw in [
+        null,
+        'invalid',
+        {'enabled': 1, 'opacity': '0.5'},
+      ]) {
+        expect(
+          AppearancePreferences.fromJson({'version': 1, 'cardGlass': raw})
+              .cardGlass
+              .toJson(),
+          old.cardGlass.toJson(),
+        );
+      }
+      expect(
+        AppearancePreferences.fromJson({
+          'version': 1,
+          'cardGlass': {'enabled': true, 'opacity': 2},
+        }).cardGlass.opacity,
+        1,
+      );
     },
   );
 
@@ -120,42 +155,39 @@ void main() {
     },
   );
 
-  test(
-    'platform channel encodes flags and handles missing or unknown native implementations',
-    () async {
-      TestWidgetsFlutterBinding.ensureInitialized();
-      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-      const channel = MethodChannel('pi_gui/window_material');
-      final messenger =
-          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-      final service = WindowMaterialService();
-      addTearDown(() {
-        service.dispose();
-        messenger.setMockMethodCallHandler(channel, null);
-        debugDefaultTargetPlatformOverride = null;
-      });
-      messenger.setMockMethodCallHandler(channel, (call) async {
-        expect(call.method, 'setAcrylic');
-        expect(call.arguments, {'enabled': true, 'dark': false});
-        return 'active';
-      });
-      expect(
-        await service.apply(enabled: true, dark: false),
-        WindowMaterialStatus.active,
-      );
-      messenger.setMockMethodCallHandler(channel, (_) async => 'future-status');
-      expect(
-        await service.apply(enabled: true, dark: false),
-        WindowMaterialStatus.unavailable,
-      );
-      messenger.setMockMethodCallHandler(
-        channel,
-        (_) async => throw MissingPluginException(),
-      );
-      expect(
-        await service.apply(enabled: true, dark: false),
-        WindowMaterialStatus.unavailable,
-      );
-    },
-  );
+  test('platform channel encodes flags and handles missing or unknown native implementations', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    const channel = MethodChannel('pi_gui/window_material');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final service = WindowMaterialService();
+    addTearDown(() {
+      service.dispose();
+      messenger.setMockMethodCallHandler(channel, null);
+      debugDefaultTargetPlatformOverride = null;
+    });
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'setAcrylic');
+      expect(call.arguments, {'enabled': true, 'dark': false});
+      return 'active';
+    });
+    expect(
+      await service.apply(enabled: true, dark: false),
+      WindowMaterialStatus.active,
+    );
+    messenger.setMockMethodCallHandler(channel, (_) async => 'future-status');
+    expect(
+      await service.apply(enabled: true, dark: false),
+      WindowMaterialStatus.unavailable,
+    );
+    messenger.setMockMethodCallHandler(
+      channel,
+      (_) async => throw MissingPluginException(),
+    );
+    expect(
+      await service.apply(enabled: true, dark: false),
+      WindowMaterialStatus.unavailable,
+    );
+  });
 }

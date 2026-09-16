@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_client.dart';
@@ -11,8 +12,11 @@ import 'package:pi_gui/ui/atoms/app_dialog.dart';
 import 'package:pi_gui/ui/core/context_l10n.dart';
 import 'package:pi_gui/ui/core/chat_resource_scope.dart';
 import 'package:pi_gui/ui/core/sidebar_layout_controller.dart';
+
 import '../controllers/image_attachment_controller.dart';
+
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
+
 import '../controllers/chat_controller.dart';
 import '../controllers/model_picker_controller.dart';
 import '../controllers/pi_extension_ui_bridge.dart';
@@ -70,7 +74,10 @@ class _HomeViewState extends State<HomeView> with WindowListener {
     if (_draftWorkspace case final path?) _attachments.setWorkspace(path);
   }
 
-  Future<void> _chooseWorkspace([bool worktrees = false]) async {
+  Future<void> _chooseWorkspace(
+    GlobalKey anchorKey, {
+    bool worktrees = false,
+  }) async {
     if (!_workspace.canSwitch) return;
     _workspace.dismissFailure();
     // Refresh the real Git list before presenting branches/worktrees.
@@ -80,10 +87,13 @@ class _HomeViewState extends State<HomeView> with WindowListener {
       context,
       (_) => WorkspaceDialog(
         controller: _workspace,
+        anchorKey: anchorKey,
         initialPage: worktrees
             ? WorkspaceDialogPage.worktrees
             : WorkspaceDialogPage.choose,
       ),
+      anchored: true,
+      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.12),
     );
   }
 
@@ -160,7 +170,8 @@ class _HomeViewState extends State<HomeView> with WindowListener {
             onSessionSelected: _changeSession,
             onNewConversation: _changeSession,
             onChooseWorkspace: _chooseWorkspace,
-            onChooseWorktree: () => _chooseWorkspace(true),
+            onChooseWorktree: (anchor) =>
+                _chooseWorkspace(anchor, worktrees: true),
             onSettingsPressed: () => showAppearanceSettings(context),
           ),
           child: ChatResourceScope(

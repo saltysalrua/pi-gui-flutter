@@ -1,6 +1,6 @@
 ---
 title: "工作区、历史会话与 Git Worktree"
-version: "1.0.0"
+version: "1.1.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, session, workspace, git-worktree]
@@ -22,6 +22,20 @@ tags: [flutter, pi-rpc, session, workspace, git-worktree]
 切换工作目录后从空会话开始，旧会话仍可在原目录的历史列表中打开。最近使用的目录与当前目录会保存，重启 GUI 优先打开上次的目录；目录已移动或删除时退回启动目录。尚未落盘的空会话不会伪装成历史记录。
 
 空会话仍使用居中输入卡片，有消息后才进入底部输入布局。目录间切换保留本次运行的各目录草稿，不自动发送；模型选择器继续采用原有的 280px 紧凑布局。
+
+## 贴近入口的小卡片
+
+项目与 Worktree 现在使用局部浮窗，不占满窗口，也不固定弹到屏幕中央：
+
+- 点击项目名、项目旁的 `+` 或分支行，卡片优先紧贴**实际点击的入口右侧**，间隔 8 逻辑像素；右侧不足时尝试左侧，再选择上方或下方并避开窗口边缘。
+- 卡片最大宽度 **400px**、高度 **480px**，短内容自然收缩。小窗口会进一步限制到入口上下的可用空间，四周至少留 16px；极矮视口优先保留可操作空间。
+- 新建、Worktree 列表和移除确认在同一张卡片内切换，继续使用最初入口作为锚点。长列表 / 表单内部滚动，底部关闭、返回与确认按钮保留；目录路径仍可通过 Tooltip 或确认页查看。
+- 遮罩减淡为主题 scrim 的 12%，仍是模态交互，不允许点穿操作底下的聊天。目录选择继续使用系统文件夹窗口，忙碌期间的关闭保护不变。
+- 窗口缩放或 UI 比例变化时重新测量入口，不重建表单。布局结束后再核对一次位置，处理入口比浮窗更晚布局的情况；无可见入口时回退至左上角，而不是误用隐藏页面的坐标。
+
+实现复用 `AppDialog(anchorKey, placement: AppDialogPlacement.beside)`。`HomeSidebar` 分别给三个入口保存 `GlobalKey`，经 `HomeView._chooseWorkspace` 传给 `WorkspaceDialog`；`showAppDialog(anchored: true)` 只做路由淡入淡出，卡片在自身位置轻微缩放，避免从整屏中心飞入。位置、尺寸和阴影都属于 UI，不增加 RPC，也不更改创建 / 切换 / 删除行为。
+
+本轮仅调整项目 / Worktree 与扩展问答。**设置保持整页，图片 lightbox 保持全屏**，模型选择器与 Diff 面板布局不变。问答卡片见 [扩展槽位](extension_ui_slots.md#问答小卡片)。参考 [VS Code Quick Picks](https://code.visualstudio.com/api/ux-guidelines/quick-picks) 的紧凑选择及多步输入方式。
 
 ## Worktree 的安全边界
 
@@ -127,6 +141,8 @@ node tool/check_workspace_rpc.mjs
 - 真实 Pi 探针：在临时配置目录用官方 SDK 创建测试会话；RPC 发现、读取、切换空目录、执行只读 cwd 检查、恢复历史；同时只存在一个 Pi 子进程。**不发送模型请求，不改用户历史或当前项目。**
 
 UI 通过 Windows 真机启动与操作走查验证，不增加纯展示型 Widget 测试。
+
+小卡片改动使用安全热重载与隔离 QA 浮层检查：1040×650 下 Worktree 长列表实际为 400×480，位于入口右侧 8px；560×400、150% 文字下新建 Worktree 卡片为 400×260，翻到入口下方，底部操作仍可见。使用生产 Widget 与离线 Controller，不执行真实创建、切换或移除，不接入活动聊天。临时 QA 入口验证后移除并热重载回生产代码；`flutter analyze --no-pub` 无问题，`workspace_rpc_test.dart` 与 `pi_rpc_client_test.dart` 共 11 项回归通过，生产热重载后无运行时错误。
 
 ## 当前不包含
 

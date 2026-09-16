@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../../../core/models/appearance_preferences.dart';
 import '../../../atoms/app_action_button.dart';
 import '../../../atoms/app_card.dart';
@@ -517,6 +518,16 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
             glass: p.canvasGlass,
             onChanged: (value) => controller.update(
               controller.preferences.copyWith(canvasGlass: value),
+            ),
+          ),
+          // The shared card material never changes either desktop region.
+          ...glassRows(
+            title: l.appearanceGlassCards,
+            hint: l.appearanceGlassCardsHint,
+            opacityTitle: l.appearanceGlassCardsOpacity,
+            glass: p.cardGlass,
+            onChanged: (value) => controller.update(
+              controller.preferences.copyWith(cardGlass: value),
             ),
           ),
         ],
