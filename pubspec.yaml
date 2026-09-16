@@ -38,6 +38,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/backend/workspace_rpc.mjs
+    - assets/backend/workspace_browser.mjs
     - assets/backend/gui_tool_diff.mjs
     - assets/images/
 

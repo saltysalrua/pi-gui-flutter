@@ -1685,7 +1685,7 @@ abstract class AppLocalizations {
   /// No description provided for @appearanceGlassSidebarHint.
   ///
   /// In zh, this message translates to:
-  /// **'标题栏、左侧导航和拖拽区一起变化。'**
+  /// **'标题栏、左右侧栏和拖拽区一起变化。'**
   String get appearanceGlassSidebarHint;
 
   /// No description provided for @appearanceGlassCanvas.
@@ -1765,6 +1765,318 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'原生毛玻璃暂不可用，正在显示纯色。更新并重新打开应用后可重试；热重载无法载入原生改动。'**
   String get appearanceGlassUnavailable;
+
+  /// No description provided for @browserTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'文件与 Git'**
+  String get browserTitle;
+
+  /// No description provided for @browserFiles.
+  ///
+  /// In zh, this message translates to:
+  /// **'文件'**
+  String get browserFiles;
+
+  /// No description provided for @browserGraph.
+  ///
+  /// In zh, this message translates to:
+  /// **'Git graph'**
+  String get browserGraph;
+
+  /// No description provided for @browserRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新文件与 Git'**
+  String get browserRefresh;
+
+  /// No description provided for @browserCollapse.
+  ///
+  /// In zh, this message translates to:
+  /// **'折叠全部文件夹'**
+  String get browserCollapse;
+
+  /// No description provided for @browserLoading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在读取…'**
+  String get browserLoading;
+
+  /// No description provided for @browserEmptyFolder.
+  ///
+  /// In zh, this message translates to:
+  /// **'空文件夹'**
+  String get browserEmptyFolder;
+
+  /// No description provided for @browserNoGit.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前文件夹不在 Git 仓库中。'**
+  String get browserNoGit;
+
+  /// No description provided for @browserNoCommits.
+  ///
+  /// In zh, this message translates to:
+  /// **'仓库还没有提交。'**
+  String get browserNoCommits;
+
+  /// No description provided for @browserGitMissing.
+  ///
+  /// In zh, this message translates to:
+  /// **'找不到 Git。安装 Git 后刷新，仍可浏览文件。'**
+  String get browserGitMissing;
+
+  /// No description provided for @browserReadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'读取失败，请检查文件夹权限后重试。'**
+  String get browserReadFailed;
+
+  /// No description provided for @browserGitFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法读取 Git 状态，请检查仓库后刷新。'**
+  String get browserGitFailed;
+
+  /// No description provided for @browserOldBackend.
+  ///
+  /// In zh, this message translates to:
+  /// **'此窗口的后端尚不支持文件浏览。下次正常启动更新后的应用即可使用，当前聊天不受影响。'**
+  String get browserOldBackend;
+
+  /// No description provided for @browserWorkspaceChanged.
+  ///
+  /// In zh, this message translates to:
+  /// **'工作区已切换，请关闭后重新选择。'**
+  String get browserWorkspaceChanged;
+
+  /// No description provided for @browserRetry.
+  ///
+  /// In zh, this message translates to:
+  /// **'重试'**
+  String get browserRetry;
+
+  /// No description provided for @browserMore.
+  ///
+  /// In zh, this message translates to:
+  /// **'加载更多'**
+  String get browserMore;
+
+  /// No description provided for @browserLimit.
+  ///
+  /// In zh, this message translates to:
+  /// **'已达到预览上限，请在外部工具中查看其余内容。'**
+  String get browserLimit;
+
+  /// No description provided for @browserContent.
+  ///
+  /// In zh, this message translates to:
+  /// **'文件内容'**
+  String get browserContent;
+
+  /// No description provided for @browserStaged.
+  ///
+  /// In zh, this message translates to:
+  /// **'已暂存的改动'**
+  String get browserStaged;
+
+  /// No description provided for @browserUnstaged.
+  ///
+  /// In zh, this message translates to:
+  /// **'未暂存的改动'**
+  String get browserUnstaged;
+
+  /// No description provided for @browserCommitDiff.
+  ///
+  /// In zh, this message translates to:
+  /// **'与首个父提交比较（首次提交与空内容比较）'**
+  String get browserCommitDiff;
+
+  /// No description provided for @browserBinary.
+  ///
+  /// In zh, this message translates to:
+  /// **'此文件是二进制或不是 UTF-8 文本，暂不预览。'**
+  String get browserBinary;
+
+  /// No description provided for @browserLargeFile.
+  ///
+  /// In zh, this message translates to:
+  /// **'文件超过 256 KiB，暂不预览。'**
+  String get browserLargeFile;
+
+  /// No description provided for @browserMissingFile.
+  ///
+  /// In zh, this message translates to:
+  /// **'文件已删除，可在 Diff 中查看改动。'**
+  String get browserMissingFile;
+
+  /// No description provided for @browserSymlink.
+  ///
+  /// In zh, this message translates to:
+  /// **'符号链接不会展开或读取，以免离开当前工作区。'**
+  String get browserSymlink;
+
+  /// No description provided for @browserUnsupported.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂不支持预览此类文件。'**
+  String get browserUnsupported;
+
+  /// No description provided for @browserCommitDetails.
+  ///
+  /// In zh, this message translates to:
+  /// **'提交详情'**
+  String get browserCommitDetails;
+
+  /// No description provided for @browserCommitFilesEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'此次提交没有当前工作区内的文件改动。'**
+  String get browserCommitFilesEmpty;
+
+  /// No description provided for @browserGraphScope.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示当前仓库的本地分支、远程跟踪分支和标签；不会联网拉取。'**
+  String get browserGraphScope;
+
+  /// No description provided for @browserFileScope.
+  ///
+  /// In zh, this message translates to:
+  /// **'只读浏览当前工作区；包含隐藏和忽略文件，不显示 .git。状态标记可悬停查看说明。'**
+  String get browserFileScope;
+
+  /// No description provided for @browserClean.
+  ///
+  /// In zh, this message translates to:
+  /// **'已提交 · 无改动'**
+  String get browserClean;
+
+  /// No description provided for @browserModified.
+  ///
+  /// In zh, this message translates to:
+  /// **'已修改'**
+  String get browserModified;
+
+  /// No description provided for @browserStatusStaged.
+  ///
+  /// In zh, this message translates to:
+  /// **'已暂存'**
+  String get browserStatusStaged;
+
+  /// No description provided for @browserAdded.
+  ///
+  /// In zh, this message translates to:
+  /// **'新增'**
+  String get browserAdded;
+
+  /// No description provided for @browserDeleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已删除'**
+  String get browserDeleted;
+
+  /// No description provided for @browserRenamed.
+  ///
+  /// In zh, this message translates to:
+  /// **'已重命名'**
+  String get browserRenamed;
+
+  /// No description provided for @browserUntracked.
+  ///
+  /// In zh, this message translates to:
+  /// **'未跟踪'**
+  String get browserUntracked;
+
+  /// No description provided for @browserIgnored.
+  ///
+  /// In zh, this message translates to:
+  /// **'已忽略'**
+  String get browserIgnored;
+
+  /// No description provided for @browserConflict.
+  ///
+  /// In zh, this message translates to:
+  /// **'存在冲突'**
+  String get browserConflict;
+
+  /// No description provided for @browserNoStatus.
+  ///
+  /// In zh, this message translates to:
+  /// **'无 Git 状态'**
+  String get browserNoStatus;
+
+  /// No description provided for @browserIndexStatus.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂存区：{status}'**
+  String browserIndexStatus(String status);
+
+  /// No description provided for @browserWorktreeStatus.
+  ///
+  /// In zh, this message translates to:
+  /// **'工作目录：{status}'**
+  String browserWorktreeStatus(String status);
+
+  /// No description provided for @browserUnchanged.
+  ///
+  /// In zh, this message translates to:
+  /// **'无改动'**
+  String get browserUnchanged;
+
+  /// No description provided for @tabsChat.
+  ///
+  /// In zh, this message translates to:
+  /// **'聊天'**
+  String get tabsChat;
+
+  /// No description provided for @tabsClose.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭标签页（Ctrl+W）'**
+  String get tabsClose;
+
+  /// No description provided for @tabsAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'所有标签页'**
+  String get tabsAll;
+
+  /// No description provided for @tabsSplit.
+  ///
+  /// In zh, this message translates to:
+  /// **'移到右侧新分组'**
+  String get tabsSplit;
+
+  /// No description provided for @tabsMerge.
+  ///
+  /// In zh, this message translates to:
+  /// **'合并所有标签页'**
+  String get tabsMerge;
+
+  /// No description provided for @tabsActions.
+  ///
+  /// In zh, this message translates to:
+  /// **'标签页操作'**
+  String get tabsActions;
+
+  /// No description provided for @tabsCloseOthers.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭其他文件标签页'**
+  String get tabsCloseOthers;
+
+  /// No description provided for @tabsReadOnly.
+  ///
+  /// In zh, this message translates to:
+  /// **'只读'**
+  String get tabsReadOnly;
+
+  /// No description provided for @tabsRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新读取此预览'**
+  String get tabsRefresh;
 }
 
 class _AppLocalizationsDelegate

@@ -355,7 +355,7 @@
   "appearanceGlass": "桌面毛玻璃",
   "appearanceGlassHint": "顶部与侧栏、主界面和卡片分别设置。桌面模糊由 Windows 控制，卡片模糊应用内背景，文字保持清晰。明暗模式共用设置，需要 Windows 11 22H2 或更新版本。",
   "appearanceGlassSidebar": "顶部与侧边栏毛玻璃",
-  "appearanceGlassSidebarHint": "标题栏、左侧导航和拖拽区一起变化。",
+  "appearanceGlassSidebarHint": "标题栏、左右侧栏和拖拽区一起变化。",
   "appearanceGlassCanvas": "主界面毛玻璃",
   "appearanceGlassCanvasHint": "用于聊天与设置页的主背景；输入框和其他卡片由下方的卡片毛玻璃单独控制。",
   "appearanceGlassSidebarOpacity": "顶部与侧边栏底色不透明度",
@@ -368,5 +368,71 @@
   "appearanceGlassOff": "关闭",
   "appearanceGlassSystemDisabled": "系统暂未允许透明效果，正在显示纯色。请检查 Windows 的“透明效果”、对比度主题和节电模式。",
   "appearanceGlassUnsupported": "当前系统不支持此材质，正在显示纯色。需要 Windows 11 22H2 或更新版本。",
-  "appearanceGlassUnavailable": "原生毛玻璃暂不可用，正在显示纯色。更新并重新打开应用后可重试；热重载无法载入原生改动。"
+  "appearanceGlassUnavailable": "原生毛玻璃暂不可用，正在显示纯色。更新并重新打开应用后可重试；热重载无法载入原生改动。",
+  "browserTitle": "文件与 Git",
+  "browserFiles": "文件",
+  "browserGraph": "Git graph",
+  "browserRefresh": "刷新文件与 Git",
+  "browserCollapse": "折叠全部文件夹",
+  "browserLoading": "正在读取…",
+  "browserEmptyFolder": "空文件夹",
+  "browserNoGit": "当前文件夹不在 Git 仓库中。",
+  "browserNoCommits": "仓库还没有提交。",
+  "browserGitMissing": "找不到 Git。安装 Git 后刷新，仍可浏览文件。",
+  "browserReadFailed": "读取失败，请检查文件夹权限后重试。",
+  "browserGitFailed": "无法读取 Git 状态，请检查仓库后刷新。",
+  "browserOldBackend": "此窗口的后端尚不支持文件浏览。下次正常启动更新后的应用即可使用，当前聊天不受影响。",
+  "browserWorkspaceChanged": "工作区已切换，请关闭后重新选择。",
+  "browserRetry": "重试",
+  "browserMore": "加载更多",
+  "browserLimit": "已达到预览上限，请在外部工具中查看其余内容。",
+  "browserContent": "文件内容",
+  "browserStaged": "已暂存的改动",
+  "browserUnstaged": "未暂存的改动",
+  "browserCommitDiff": "与首个父提交比较（首次提交与空内容比较）",
+  "browserBinary": "此文件是二进制或不是 UTF-8 文本，暂不预览。",
+  "browserLargeFile": "文件超过 256 KiB，暂不预览。",
+  "browserMissingFile": "文件已删除，可在 Diff 中查看改动。",
+  "browserSymlink": "符号链接不会展开或读取，以免离开当前工作区。",
+  "browserUnsupported": "暂不支持预览此类文件。",
+  "browserCommitDetails": "提交详情",
+  "browserCommitFilesEmpty": "此次提交没有当前工作区内的文件改动。",
+  "browserGraphScope": "显示当前仓库的本地分支、远程跟踪分支和标签；不会联网拉取。",
+  "browserFileScope": "只读浏览当前工作区；包含隐藏和忽略文件，不显示 .git。状态标记可悬停查看说明。",
+  "browserClean": "已提交 · 无改动",
+  "browserModified": "已修改",
+  "browserStatusStaged": "已暂存",
+  "browserAdded": "新增",
+  "browserDeleted": "已删除",
+  "browserRenamed": "已重命名",
+  "browserUntracked": "未跟踪",
+  "browserIgnored": "已忽略",
+  "browserConflict": "存在冲突",
+  "browserNoStatus": "无 Git 状态",
+  "browserIndexStatus": "暂存区：{status}",
+  "@browserIndexStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "browserWorktreeStatus": "工作目录：{status}",
+  "@browserWorktreeStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "browserUnchanged": "无改动",
+  "tabsChat": "聊天",
+  "tabsClose": "关闭标签页（Ctrl+W）",
+  "tabsAll": "所有标签页",
+  "tabsSplit": "移到右侧新分组",
+  "tabsMerge": "合并所有标签页",
+  "tabsActions": "标签页操作",
+  "tabsCloseOthers": "关闭其他文件标签页",
+  "tabsReadOnly": "只读",
+  "tabsRefresh": "重新读取此预览"
 }

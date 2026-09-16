@@ -1,6 +1,6 @@
 ---
 title: "RPC 对话、Markdown 与文件改动"
-version: "1.4.0"
+version: "1.5.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, chat, markdown, diff]
@@ -44,17 +44,16 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 - 输入栏左上角的处理状态、工具的“执行中”和正在生成的“思考过程”统一使用工具原有的文字微光扫描。动画只扫文字，不扫整行；思考收起时也能看到。思考结束或开始输出正文/工具参数时立刻停止，旧思考不动；减弱动态模式全部显示静态文字。
 - 内容可以选择复制。网页与本地文件链接只有点击后才通过系统默认程序打开；Markdown 本地/内嵌图片、RPC 图片块可以预览，网络图片需点击后加载。选图、限制与路径规则见 [图片附件与文件链接](images_and_links.md)。
 
-### 文件改动面板与抽屉交互
+### 右栏与工具 Diff
 
-对话顶部的“文件改动”与“同步对话”按钮靠右对齐。文件改动按钮采用精致纯图标形式（`AppIconButton`），去除长文本标签；当存在改动文件时通过右上角数字角标（`Badge.count`）提示变更数量，悬停展示完整 Tooltip。也可以从时间线中已完成的文件工具卡片直接点击进入。
+右上角入口现为 **文件与 Git**，以“文件 / Git graph”两个图标页签替代原来的会话编辑记录汇总；空会话也可打开。右栏读取当前工作区的真实目录、Git 状态和提交历史，支持只读文件 / Diff / 提交详情，并沿用侧边栏毛玻璃。操作、限制、只读 RPC 与绘制边界见 [右侧工作区浏览](workspace_browser.md)。
 
-- **侧边栏式可拖拽抽屉**：展开后采用全高抽屉面板样式（`ColoredBox` 与主题侧边栏底色一致），左侧接入 `AppResizeDivider`，支持左右拖拽调节宽度、双击复位（默认 360px）。
-- **流畅动效**：遵循 transitions.dev 动效体系（展开 slow 400ms，收起 medium 350ms，配合 `AppCurves.smoothOut` 减速曲线，拖拽时 60fps 无延迟即时响应）。在极窄屏幕下自适应切换为右侧滑入浮层。
-- **改动汇总**：按路径汇总**当前会话成功文件工具调用的编辑记录**，同一文件多次编辑按发生顺序显示。
-- 优先显示 Pi 返回的 `details.patch`，支持旧式带行号的 `details.diff`。显示旧/新行号、增删符号和主题适配的背景色。
-- `write` 现在由随 GUI 启动的 Pi 扩展补充写入前后 Diff，新建文件显示“新建文件”，覆盖写显示实际增删。时间线和面板复用同一份后端证据。
-- 旧历史、取不到基线、文件过大或并发修改无法确认时，显示“没有旧内容”，并复用 Diff 视图展示**中性行号的写入内容**；不伪造新增文件、`+` 行或增删统计。
-- 面板不是 Git 工作区扫描，也不是从基线到当前的净 Diff。终端命令产生的文件变化不自动纳入，没有提交、接受、回滚或检查点按钮。
+时间线中的工具 Diff 不被 Git 替代：
+
+- 每次编辑仍优先显示 Pi 返回的 `details.patch`，兼容旧式 `details.diff`。
+- `write` 由随 GUI 启动的观察扩展补充真实前后 Diff，新建文件显示“新建文件”。无基线 / 冲突 / 旧历史时仍显示中性写入内容，不伪造新增行。
+- 工具上的右栏图标打开文件页并展开目标文件的祖先；每次调用的原始编辑记录继续在工具展开区查看。
+- 右栏现在是 Git 工作区快照，包含终端或外部编辑器的变化；不能把它与某一次工具调用的 Diff 混为一谈。两者都没有接受、回滚、提交等写按钮。
 
 ### 会话与恢复
 
@@ -64,7 +63,7 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 
 ## 架构与代码入口
 
-工具行参考用户给出的 Pi 原版截图及 Pi 0.85.1 的工具 renderer：工具名与目标同一行、简短预览、按需展开；只保留内容，不搬运 TUI 的整块背景和外框。改动面板参考 [VS Code 的改动查看](https://code.visualstudio.com/docs/copilot/chat/review-code-edits)，不照搬其 Git / 检查点后端。协议按本机 Pi 0.85.1 官方 `docs/rpc.md`、`docs/extensions.md` 与工具返回值核对。
+工具行参考用户给出的 Pi 原版截图及 Pi 0.85.1 的工具 renderer：工具名与目标同一行、简短预览、按需展开；只保留内容，不搬运 TUI 的整块背景和外框。原改动面板参考 VS Code 的改动查看；当前双页签右栏见 [工作区浏览](workspace_browser.md)，不实现检查点或仓库写操作。协议按本机 Pi 0.85.1 官方 `docs/rpc.md`、`docs/extensions.md` 与工具返回值核对。
 
 | 层 | 路径 | 职责 |
 | --- | --- | --- |
@@ -75,14 +74,14 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 | 时间线投影 | `lib/core/models/chat_timeline.dart` | 按内容索引拼接、最终消息替换、toolCallId 关联、历史重建；`assistantNumbers` 按正序生成与消息列表对齐的编号 |
 | Diff 解析 | `lib/core/models/diff_document.dart` | patch/带行号 Diff、中性写入后视图；隐藏重复文件头但保留真实内容，无文件 I/O、无补丁执行 |
 | write Diff 后端 | `assets/backend/gui_tool_diff.mjs` | 公共 `tool_call/tool_result` 中间件，有限快照、冲突降级、补充结果 details，不接管工具执行 |
-| 扩展装载 | `lib/core/rpc/pi_workspace_transport.dart`、`assets/backend/workspace_rpc.mjs` | 发布两个 assets，`PiChild` 以 `--extension` 装载 Diff 观察扩展 |
-| 交互状态 | `lib/ui/features/home/controllers/chat_controller.dart` | 发送互斥、停止、恢复、会话书签、改动分组与选择 |
-| 主工作区 | `lib/ui/features/home/widgets/home_chat_panel.dart` | 两态布局、时间线、草稿、回到最新、响应式改动面板 |
+| 扩展装载 | `lib/core/rpc/pi_workspace_transport.dart`、`assets/backend/workspace_rpc.mjs` | 发布适配层、工作区浏览模块和 Diff 扩展三个 assets；`PiChild` 以 `--extension` 装载 Diff 观察扩展 |
+| 交互状态 | `lib/ui/features/home/controllers/chat_controller.dart` | 发送互斥、停止、恢复、会话书签与成功文件记录投影 |
+| 主工作区 | `lib/ui/features/home/widgets/home_chat_panel.dart` | 两态布局、时间线、草稿、回到最新、响应式文件 / Git 右栏 |
 | 输入组件 | `lib/ui/features/home/widgets/home_starter_panel.dart` | 共用输入卡片、键盘/IME、紧凑模型入口 |
 | 消息 | `lib/ui/features/home/widgets/chat_message_view.dart` | 角色/发言编号、Markdown、思考和工具块的有序渲染，连续步骤分组 |
 | 显示文本 | `lib/core/utils/terminal_text.dart` | `stripTerminalControls` 线性扫描 CSI/OSC/控制字符串，兼容流式半截序列，仅在思考显示入口使用 |
 | 工具注册表 | `lib/ui/features/home/widgets/tool_card_registry.dart` | `ToolCardRegistry.register` / `unregister`，默认回退与共享 `ToolChangeDetails` |
-| 改动面板 | `lib/ui/features/home/widgets/chat_changes_panel.dart` | 按文件选择编辑记录、展示 Diff/写入内容 |
+| 工作区右栏 | `lib/ui/features/home/widgets/workspace_browser_panel.dart` | 文件树、Git graph、只读预览；详见独立文档 |
 
 连续步骤参考 [Vercel AI Elements 的 Chain of Thought](https://elements.ai-sdk.dev/components/chain-of-thought)：内联折叠步骤加左侧竖线；不增加新的交互层级，也不接管工具注册表。
 
@@ -234,7 +233,7 @@ dart run tool/check_session_performance.dart 1000 5000
 
 ## 扩展槽位
 
-`aboveEditor/belowEditor` 跟随同一个输入组件；`statusBar` 占据布局底部，不再覆盖输入；`dialogOverlay/notificationToast` 继续使用原扩展桥。改动面板保留 `sidebarPanel` 插槽。时间线通过工具注册表分派，未知工具走通用渲染器。
+`aboveEditor/belowEditor` 跟随同一个输入组件；`statusBar` 占据布局底部，不再覆盖输入；`dialogOverlay/notificationToast` 继续使用原扩展桥。文件 / Git 右栏保留 `sidebarPanel` 插槽。时间线通过工具注册表分派，未知工具走通用渲染器。
 
 ## 验证
 
@@ -269,4 +268,4 @@ dart run tool/check_chat_rpc.dart --with-model
 
 ## 当前边界
 
-暂不包含 LaTeX/Mermaid、Git 净改动扫描、编辑审批/回滚及执行中的插队发送。图片上传/预览与文件链接已接入，见 [图片附件与文件链接](images_and_links.md)；历史会话列表由工作区后端提供。已有扩展弹窗仍由 Pi 的 extension_ui 机制处理，不由 Flutter 重写权限或 Agent 逻辑。
+暂不包含 LaTeX/Mermaid、编辑审批/回滚及执行中的插队发送。Git 状态、Diff 和提交图已接入只读工作区右栏。图片上传/预览与文件链接已接入，见 [图片附件与文件链接](images_and_links.md)；历史会话列表由工作区后端提供。已有扩展弹窗仍由 Pi 的 extension_ui 机制处理，不由 Flutter 重写权限或 Agent 逻辑。

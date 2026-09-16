@@ -14,6 +14,7 @@ import {
 import { homedir } from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
+import { WorkspaceBrowser } from "./workspace_browser.mjs";
 
 const exec = promisify(execFile);
 // A short-lived SDK summary, not a second session database or a polling timer.
@@ -618,6 +619,7 @@ export class WorkspaceAdapter {
   constructor(service, createChild, emit, onFatal = () => {}) {
     this.onFatal = onFatal;
     this.service = service;
+    this.browser = new WorkspaceBrowser(() => service.current);
     this.createChild = createChild;
     this.emit = emit;
     this.pi = null;
@@ -627,6 +629,7 @@ export class WorkspaceAdapter {
   }
   async start(sessionPath) {
     this.service.invalidateSessions();
+    this.browser.invalidate();
     const child = this.createChild(
       this.service.current,
       (line, message) => {
@@ -643,6 +646,9 @@ export class WorkspaceAdapter {
           ) {
             this.service.invalidateSessions();
           }
+        }
+        if (["tool_execution_end", "agent_settled"].includes(message?.type)) {
+          this.browser.invalidate();
         }
         if (message?.type === "agent_start") this.agentBusy = true;
         if (message?.type === "agent_settled") this.agentBusy = false;
@@ -746,6 +752,18 @@ export class WorkspaceAdapter {
       if (mutation) await this.ensureIdle();
       let data;
       switch (request.type) {
+        case "gui_list_files":
+          data = await this.browser.listFiles(request);
+          break;
+        case "gui_get_git_graph":
+          data = await this.browser.graph(request);
+          break;
+        case "gui_get_git_commit":
+          data = await this.browser.details(request);
+          break;
+        case "gui_get_file_preview":
+          data = await this.browser.preview(request);
+          break;
         case "gui_get_workspace":
           data = await this.service.snapshot();
           break;

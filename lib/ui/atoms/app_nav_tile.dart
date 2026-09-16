@@ -13,6 +13,7 @@ class AppNavTile extends StatelessWidget {
   final VoidCallback? onTap;
   final EdgeInsetsGeometry? padding;
   final double height;
+  final Color? foregroundColor;
 
   const AppNavTile({
     super.key,
@@ -25,6 +26,7 @@ class AppNavTile extends StatelessWidget {
     this.onTap,
     this.padding,
     this.height = 32.0,
+    this.foregroundColor,
   });
 
   @override
@@ -33,6 +35,8 @@ class AppNavTile extends StatelessWidget {
     final textTheme = context.textTheme;
     final textColor = onTap == null
         ? colors.textMuted
+        : foregroundColor != null
+        ? foregroundColor!
         : isSelected
         ? colors.primary
         : isFolder

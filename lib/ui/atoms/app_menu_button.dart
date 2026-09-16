@@ -1,5 +1,7 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
 import '../core/theme/app_tokens.dart';
 import '../core/theme/theme_context_extensions.dart';
 
@@ -39,7 +41,7 @@ class AppMenuButton<T> extends StatelessWidget {
         (style.height ?? 1.4);
     return PopupMenuButton<T>(
       tooltip: tooltip,
-      enabled: onSelected != null && !isBusy,
+      enabled: onSelected != null && !isBusy && options.isNotEmpty,
       onSelected: onSelected,
       position: PopupMenuPosition.over,
       constraints: const BoxConstraints(minWidth: 180, maxWidth: 260),

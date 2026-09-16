@@ -836,7 +836,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appearanceGlassSidebar => '顶部与侧边栏毛玻璃';
 
   @override
-  String get appearanceGlassSidebarHint => '标题栏、左侧导航和拖拽区一起变化。';
+  String get appearanceGlassSidebarHint => '标题栏、左右侧栏和拖拽区一起变化。';
 
   @override
   String get appearanceGlassCanvas => '主界面毛玻璃';
@@ -881,4 +881,164 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get appearanceGlassUnavailable =>
       '原生毛玻璃暂不可用，正在显示纯色。更新并重新打开应用后可重试；热重载无法载入原生改动。';
+
+  @override
+  String get browserTitle => '文件与 Git';
+
+  @override
+  String get browserFiles => '文件';
+
+  @override
+  String get browserGraph => 'Git graph';
+
+  @override
+  String get browserRefresh => '刷新文件与 Git';
+
+  @override
+  String get browserCollapse => '折叠全部文件夹';
+
+  @override
+  String get browserLoading => '正在读取…';
+
+  @override
+  String get browserEmptyFolder => '空文件夹';
+
+  @override
+  String get browserNoGit => '当前文件夹不在 Git 仓库中。';
+
+  @override
+  String get browserNoCommits => '仓库还没有提交。';
+
+  @override
+  String get browserGitMissing => '找不到 Git。安装 Git 后刷新，仍可浏览文件。';
+
+  @override
+  String get browserReadFailed => '读取失败，请检查文件夹权限后重试。';
+
+  @override
+  String get browserGitFailed => '无法读取 Git 状态，请检查仓库后刷新。';
+
+  @override
+  String get browserOldBackend => '此窗口的后端尚不支持文件浏览。下次正常启动更新后的应用即可使用，当前聊天不受影响。';
+
+  @override
+  String get browserWorkspaceChanged => '工作区已切换，请关闭后重新选择。';
+
+  @override
+  String get browserRetry => '重试';
+
+  @override
+  String get browserMore => '加载更多';
+
+  @override
+  String get browserLimit => '已达到预览上限，请在外部工具中查看其余内容。';
+
+  @override
+  String get browserContent => '文件内容';
+
+  @override
+  String get browserStaged => '已暂存的改动';
+
+  @override
+  String get browserUnstaged => '未暂存的改动';
+
+  @override
+  String get browserCommitDiff => '与首个父提交比较（首次提交与空内容比较）';
+
+  @override
+  String get browserBinary => '此文件是二进制或不是 UTF-8 文本，暂不预览。';
+
+  @override
+  String get browserLargeFile => '文件超过 256 KiB，暂不预览。';
+
+  @override
+  String get browserMissingFile => '文件已删除，可在 Diff 中查看改动。';
+
+  @override
+  String get browserSymlink => '符号链接不会展开或读取，以免离开当前工作区。';
+
+  @override
+  String get browserUnsupported => '暂不支持预览此类文件。';
+
+  @override
+  String get browserCommitDetails => '提交详情';
+
+  @override
+  String get browserCommitFilesEmpty => '此次提交没有当前工作区内的文件改动。';
+
+  @override
+  String get browserGraphScope => '显示当前仓库的本地分支、远程跟踪分支和标签；不会联网拉取。';
+
+  @override
+  String get browserFileScope => '只读浏览当前工作区；包含隐藏和忽略文件，不显示 .git。状态标记可悬停查看说明。';
+
+  @override
+  String get browserClean => '已提交 · 无改动';
+
+  @override
+  String get browserModified => '已修改';
+
+  @override
+  String get browserStatusStaged => '已暂存';
+
+  @override
+  String get browserAdded => '新增';
+
+  @override
+  String get browserDeleted => '已删除';
+
+  @override
+  String get browserRenamed => '已重命名';
+
+  @override
+  String get browserUntracked => '未跟踪';
+
+  @override
+  String get browserIgnored => '已忽略';
+
+  @override
+  String get browserConflict => '存在冲突';
+
+  @override
+  String get browserNoStatus => '无 Git 状态';
+
+  @override
+  String browserIndexStatus(String status) {
+    return '暂存区：$status';
+  }
+
+  @override
+  String browserWorktreeStatus(String status) {
+    return '工作目录：$status';
+  }
+
+  @override
+  String get browserUnchanged => '无改动';
+
+  @override
+  String get tabsChat => '聊天';
+
+  @override
+  String get tabsClose => '关闭标签页（Ctrl+W）';
+
+  @override
+  String get tabsAll => '所有标签页';
+
+  @override
+  String get tabsSplit => '移到右侧新分组';
+
+  @override
+  String get tabsMerge => '合并所有标签页';
+
+  @override
+  String get tabsActions => '标签页操作';
+
+  @override
+  String get tabsCloseOthers => '关闭其他文件标签页';
+
+  @override
+  String get tabsReadOnly => '只读';
+
+  @override
+  String get tabsRefresh => '重新读取此预览';
 }

@@ -1,5 +1,7 @@
 import 'dart:io';
+
 import 'package:flutter/services.dart';
+
 import 'pi_rpc_transport.dart';
 
 /// Ships the adapter with the app; no dependency on the app's launch directory.
@@ -12,11 +14,14 @@ class PiWorkspaceTransport implements PiRpcTransport {
   static Future<PiWorkspaceTransport> start() async {
     final directory = await Directory.systemTemp.createTemp('pi-gui-rpc-');
     try {
-      for (final name in ['workspace_rpc.mjs', 'gui_tool_diff.mjs']) {
+      for (final name in [
+        'workspace_rpc.mjs',
+        'workspace_browser.mjs',
+        'gui_tool_diff.mjs',
+      ]) {
         final script = await rootBundle.loadString('assets/backend/$name');
-        await File(
-          '${directory.path}/$name',
-        ).writeAsString(script, flush: true);
+        await File('${directory.path}/$name')
+            .writeAsString(script, flush: true);
       }
       final file = File('${directory.path}/workspace_rpc.mjs');
       return PiWorkspaceTransport._(

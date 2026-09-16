@@ -5,6 +5,7 @@ import 'pi_rpc_transport.dart';
 import 'pi_chat_types.dart';
 import 'pi_rpc_types.dart';
 import 'pi_workspace_types.dart';
+import 'pi_browser_types.dart';
 
 class _PendingRequest {
   _PendingRequest(this.command);
@@ -25,7 +26,12 @@ class _PendingRequest {
 }
 
 /// 单个长期存活的 Pi 子进程；Widget 不接触进程或协议 JSON。
-class PiRpcClient implements PiModelGateway, PiChatGateway, PiWorkspaceGateway {
+class PiRpcClient
+    implements
+        PiModelGateway,
+        PiChatGateway,
+        PiWorkspaceGateway,
+        PiBrowserGateway {
   PiRpcClient({
     String? workingDirectory,
     List<String> extraArguments = const [],
@@ -442,6 +448,56 @@ class PiRpcClient implements PiModelGateway, PiChatGateway, PiWorkspaceGateway {
   Future<void> removeWorktree(String path) async {
     await _request('gui_remove_worktree', {'path': path});
   }
+
+  @override
+  Future<PiDirectoryListing> listFiles(
+    String workspace,
+    String path, {
+    bool force = false,
+    int limit = 500,
+  }) async => PiDirectoryListing.fromJson(
+    await _request('gui_list_files', {
+      'workspace': workspace,
+      'path': path,
+      'force': force,
+      'limit': limit,
+    }),
+  );
+
+  @override
+  Future<PiGitGraph> getGitGraph(
+    String workspace, {
+    bool force = false,
+    int limit = 100,
+  }) async => PiGitGraph.fromJson(
+    await _request('gui_get_git_graph', {
+      'workspace': workspace,
+      'force': force,
+      'limit': limit,
+    }),
+  );
+
+  @override
+  Future<PiCommitDetails> getGitCommit(String workspace, String commit) async =>
+      PiCommitDetails.fromJson(
+        await _request('gui_get_git_commit', {
+          'workspace': workspace,
+          'commit': commit,
+        }),
+      );
+
+  @override
+  Future<PiFilePreview> getFilePreview(
+    String workspace,
+    String path, {
+    String? commit,
+  }) async => PiFilePreview.fromJson(
+    await _request('gui_get_file_preview', {
+      'workspace': workspace,
+      'path': path,
+      'commit': ?commit,
+    }),
+  );
 
   Future<void> respondToExtension(
     String id, {

@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:pi_gui/core/models/chat_timeline.dart';
 import 'package:pi_gui/core/rpc/pi_chat_types.dart';
@@ -44,8 +45,6 @@ class ChatController extends ChangeNotifier {
   ChatFailure? failure;
   PiSessionState? state;
   PiPromptQueue queue = const PiPromptQueue();
-  String? selectedChangePath;
-  bool changesOpen = false;
 
   bool get isRunning => activity != ChatActivity.idle;
   bool get canSend =>
@@ -80,17 +79,6 @@ class ChatController extends ChangeNotifier {
 
   void setWorkspaceLocked(bool locked) {
     workspaceLocked = locked;
-    _notify();
-  }
-
-  void showChanges([String? path]) {
-    changesOpen = path != null || !changesOpen;
-    if (path != null) selectedChangePath = path;
-    _notify();
-  }
-
-  void selectChange(String path) {
-    selectedChangePath = path;
     _notify();
   }
 
@@ -239,7 +227,6 @@ class ChatController extends ChangeNotifier {
         _awaitingSettled = false;
         timeline.load([]);
         queue = const PiPromptQueue();
-        selectedChangePath = null;
         state = null;
         isReady = false;
       } else {
@@ -269,8 +256,6 @@ class ChatController extends ChangeNotifier {
       sessions.clear();
       state = null;
       queue = const PiPromptQueue();
-      selectedChangePath = null;
-      changesOpen = false;
       activity = ChatActivity.idle;
       isReady = false;
       failure = null;

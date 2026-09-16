@@ -1,6 +1,6 @@
 ---
 title: "工作区、历史会话与 Git Worktree"
-version: "1.2.0"
+version: "1.3.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, session, workspace, git-worktree]
@@ -35,7 +35,7 @@ tags: [flutter, pi-rpc, session, workspace, git-worktree]
 
 实现复用 `AppDialog(anchorKey, placement: AppDialogPlacement.beside)`。`HomeSidebar` 分别给三个入口保存 `GlobalKey`，经 `HomeView._chooseWorkspace` 传给 `WorkspaceDialog`；`showAppDialog(anchored: true)` 只做路由淡入淡出，卡片在自身位置轻微缩放，避免从整屏中心飞入。位置、尺寸和阴影都属于 UI，不增加 RPC，也不更改创建 / 切换 / 删除行为。
 
-本轮仅调整项目 / Worktree 与扩展问答。**设置保持整页，图片 lightbox 保持全屏**，模型选择器与 Diff 面板布局不变。问答卡片见 [扩展槽位](extension_ui_slots.md#问答小卡片)。参考 [VS Code Quick Picks](https://code.visualstudio.com/api/ux-guidelines/quick-picks) 的紧凑选择及多步输入方式。
+本轮仅调整项目 / Worktree 与扩展问答。**设置保持整页，图片 lightbox 保持全屏**，模型选择器布局不变；右栏后续调整见工作区浏览文档。问答卡片见 [扩展槽位](extension_ui_slots.md#问答小卡片)。参考 [VS Code Quick Picks](https://code.visualstudio.com/api/ux-guidelines/quick-picks) 的紧凑选择及多步输入方式。
 
 ## Worktree 的安全边界
 
@@ -60,7 +60,8 @@ HomeView（唯一 PiRpcClient）
   ├─ ModelPickerController
   ├─ ChatController
   ├─ WorkspaceController
-  └─ PiExtensionUiBridge
+  ├─ PiExtensionUiBridge
+  └─ WorkspaceBrowserController（只读文件 / Git 右栏）
           │ stdin/stdout strict JSONL
           ▼
 assets/backend/workspace_rpc.mjs（Node.js）
@@ -71,11 +72,13 @@ assets/backend/workspace_rpc.mjs（Node.js）
 
 需要 PATH 中的 **Node.js**，以及 npm 安装的 `@earendil-works/pi-coding-agent`。Worktree 另外需要 Git。适配层通过本地模块解析和 PATH 中的 npm 安装位置定位官方包；特殊安装位置可以设置 `PI_GUI_PI_PACKAGE_DIR` 指向该包目录。纯独立 Pi 二进制不提供所需的 JS SDK，当前不能代替 npm 包。
 
-GUI 以 Flutter asset 携带 `workspace_rpc.mjs` 和 `gui_tool_diff.mjs`，启动时复制到同一独立临时目录，不依赖从源码仓库目录启动。`PiChild` 使用 `--extension` 装载 write Diff 观察扩展，并通过 `PI_GUI_PI_PACKAGE_ROOT` 告诉它当前 Pi 包位置以复用 jsdiff；扩展只补充工具结果证据，不替换用户工具。详见 [工具调用与 write Diff](rpc_chat.md#write-diff-的后端边界)。Windows 通过 Node 直接启动包的 CLI，不把路径或分支拼进 shell 命令。关闭窗口清理 GUI 自己启动的进程树和临时脚本，不影响用户独立启动的 Pi。
+GUI 以 Flutter asset 携带 `workspace_rpc.mjs`、`workspace_browser.mjs` 和 `gui_tool_diff.mjs`，启动时复制到同一独立临时目录，不依赖从源码仓库目录启动。`PiChild` 使用 `--extension` 装载 write Diff 观察扩展，并通过 `PI_GUI_PI_PACKAGE_ROOT` 告诉它当前 Pi 包位置以复用 jsdiff；扩展只补充工具结果证据，不替换用户工具。详见 [工具调用与 write Diff](rpc_chat.md#write-diff-的后端边界)。Windows 通过 Node 直接启动包的 CLI，不把路径或分支拼进 shell 命令。关闭窗口清理 GUI 自己启动的进程树和临时脚本，不影响用户独立启动的 Pi。
 
 最近使用列表写入 **GUI 自有文件**：Windows `%APPDATA%/pi-gui/workspaces.json`；其他系统使用 `$XDG_CONFIG_HOME/pi-gui/workspaces.json` 或 `~/.config/pi-gui/workspaces.json`。可用 `PI_GUI_WORKSPACE_STORE` 覆盖，方便隔离验证。该文件不是 Pi 配置。保存失败会提示，不把已完成的文件操作误报为失败。
 
 Flutter 不扫描、解析或改写 Pi 私有会话文件。适配层通过官方 SDK 读取摘要，会话内容仍使用官方 RPC；`get_messages` 返回 Pi 当前活动分支/压缩后的投影，不是自行拼接所有树分支的原始日志。
+
+右上角的文件 / Git graph 双页签、工作区状态及提交预览见 [只读工作区浏览](workspace_browser.md)。同样复用当前客户端和适配层，不启动第二个 Pi。
 
 ### 历史缓存与加载顺序
 

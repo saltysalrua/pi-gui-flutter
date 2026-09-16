@@ -900,7 +900,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appearanceGlassSidebarHint =>
-      'Applies to the title bar, left navigation and resize strip together.';
+      'Applies to the title bar, both sidebars and resize strips together.';
 
   @override
   String get appearanceGlassCanvas => 'Main area glass';
@@ -947,4 +947,178 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get appearanceGlassUnavailable =>
       'Native glass is unavailable. Showing solid colors. Update and reopen the app to retry; hot reload cannot load native changes.';
+
+  @override
+  String get browserTitle => 'Files and Git';
+
+  @override
+  String get browserFiles => 'Files';
+
+  @override
+  String get browserGraph => 'Git graph';
+
+  @override
+  String get browserRefresh => 'Refresh files and Git';
+
+  @override
+  String get browserCollapse => 'Collapse all folders';
+
+  @override
+  String get browserLoading => 'Loading…';
+
+  @override
+  String get browserEmptyFolder => 'Empty folder';
+
+  @override
+  String get browserNoGit => 'This folder is not in a Git repository.';
+
+  @override
+  String get browserNoCommits => 'This repository has no commits yet.';
+
+  @override
+  String get browserGitMissing =>
+      'Git was not found. Install Git and refresh. Files are still available.';
+
+  @override
+  String get browserReadFailed =>
+      'Could not read this folder. Check access permissions and retry.';
+
+  @override
+  String get browserGitFailed =>
+      'Could not read Git. Check the repository and refresh.';
+
+  @override
+  String get browserOldBackend =>
+      'This window has an older backend. Available the next time you launch the updated app; your current chat is unaffected.';
+
+  @override
+  String get browserWorkspaceChanged =>
+      'The workspace changed. Close this view and select again.';
+
+  @override
+  String get browserRetry => 'Retry';
+
+  @override
+  String get browserMore => 'Load more';
+
+  @override
+  String get browserLimit =>
+      'Preview limit reached. Use an external tool for the remaining content.';
+
+  @override
+  String get browserContent => 'File contents';
+
+  @override
+  String get browserStaged => 'Staged changes';
+
+  @override
+  String get browserUnstaged => 'Unstaged changes';
+
+  @override
+  String get browserCommitDiff =>
+      'Compared with the first parent (empty content for the initial commit)';
+
+  @override
+  String get browserBinary =>
+      'Binary or non-UTF-8 file. Text preview is unavailable.';
+
+  @override
+  String get browserLargeFile =>
+      'This file exceeds 256 KiB. Preview is unavailable.';
+
+  @override
+  String get browserMissingFile =>
+      'This file was deleted. Inspect its changes in the Diff.';
+
+  @override
+  String get browserSymlink =>
+      'Symbolic links are not followed, to keep browsing within this workspace.';
+
+  @override
+  String get browserUnsupported => 'This file type cannot be previewed.';
+
+  @override
+  String get browserCommitDetails => 'Commit details';
+
+  @override
+  String get browserCommitFilesEmpty =>
+      'This commit has no file changes inside this workspace.';
+
+  @override
+  String get browserGraphScope =>
+      'Local branches, remote-tracking branches and tags in this repository. No network fetch.';
+
+  @override
+  String get browserFileScope =>
+      'Read-only workspace tree, including hidden and ignored files, excluding .git. Hover status marks for details.';
+
+  @override
+  String get browserClean => 'Committed · unchanged';
+
+  @override
+  String get browserModified => 'Modified';
+
+  @override
+  String get browserStatusStaged => 'Staged';
+
+  @override
+  String get browserAdded => 'Added';
+
+  @override
+  String get browserDeleted => 'Deleted';
+
+  @override
+  String get browserRenamed => 'Renamed';
+
+  @override
+  String get browserUntracked => 'Untracked';
+
+  @override
+  String get browserIgnored => 'Ignored';
+
+  @override
+  String get browserConflict => 'Conflicted';
+
+  @override
+  String get browserNoStatus => 'No Git status';
+
+  @override
+  String browserIndexStatus(String status) {
+    return 'Index: $status';
+  }
+
+  @override
+  String browserWorktreeStatus(String status) {
+    return 'Working tree: $status';
+  }
+
+  @override
+  String get browserUnchanged => 'Unchanged';
+
+  @override
+  String get tabsChat => 'Chat';
+
+  @override
+  String get tabsClose => 'Close tab (Ctrl+W)';
+
+  @override
+  String get tabsAll => 'All tabs';
+
+  @override
+  String get tabsSplit => 'Move to new group on the right';
+
+  @override
+  String get tabsMerge => 'Merge all tabs';
+
+  @override
+  String get tabsActions => 'Tab actions';
+
+  @override
+  String get tabsCloseOthers => 'Close other file tabs';
+
+  @override
+  String get tabsReadOnly => 'Read-only';
+
+  @override
+  String get tabsRefresh => 'Reload this preview';
 }

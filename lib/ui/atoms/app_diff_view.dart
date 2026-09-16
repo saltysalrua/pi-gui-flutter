@@ -1,6 +1,8 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:pi_gui/core/models/diff_document.dart';
+
 import 'app_card.dart';
 import 'app_copy_button.dart';
 import '../core/context_l10n.dart';
@@ -94,28 +96,37 @@ class _AppDiffViewState extends State<AppDiffView> {
       children: [
         Row(
           children: [
-            Text(
-              widget.label ??
-                  (widget.written
-                      ? context.l10n.chatWrittenContent
-                      : context.l10n.chatDiff),
-              style: context.textTheme.labelSmall?.copyWith(
-                color: colors.textMuted,
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      widget.label ??
+                          (widget.written
+                              ? context.l10n.chatWrittenContent
+                              : context.l10n.chatDiff),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.textTheme.labelSmall?.copyWith(
+                        color: colors.textMuted,
+                      ),
+                    ),
+                  ),
+                  if (!widget.written) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      '+${_document.added}',
+                      style: style.copyWith(color: colors.success),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      '−${_document.removed}',
+                      style: style.copyWith(color: colors.error),
+                    ),
+                  ],
+                ],
               ),
             ),
-            if (!widget.written) ...[
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                '+${_document.added}',
-                style: style.copyWith(color: colors.success),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                '−${_document.removed}',
-                style: style.copyWith(color: colors.error),
-              ),
-            ],
-            const Spacer(),
             if (widget.previewLines == null) AppCopyButton(text: widget.source),
           ],
         ),

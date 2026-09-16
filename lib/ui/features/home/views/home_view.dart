@@ -21,6 +21,8 @@ import '../controllers/chat_controller.dart';
 import '../controllers/model_picker_controller.dart';
 import '../controllers/pi_extension_ui_bridge.dart';
 import '../controllers/workspace_controller.dart';
+import '../controllers/workspace_browser_controller.dart';
+import '../controllers/workspace_tabs_controller.dart';
 import '../widgets/home_chat_panel.dart';
 import '../widgets/home_sidebar.dart';
 import '../widgets/tool_card_registry.dart';
@@ -42,6 +44,10 @@ class _HomeViewState extends State<HomeView> with WindowListener {
   late final PiExtensionUiBridge _extensionUi;
   late final ChatController _chat;
   late final WorkspaceController _workspace;
+  late final _browser = WorkspaceBrowserController(_pi)
+    ..setWorkspace(_workspace.snapshot?.current.path);
+  late final _tabs = WorkspaceTabsController(_browser);
+  Object? _browserSnapshot;
   late final StreamSubscription<PiRpcEvent> _events;
   final _drafts = <String, TextEditingValue>{};
   String? _draftWorkspace;
@@ -55,6 +61,7 @@ class _HomeViewState extends State<HomeView> with WindowListener {
     _extensionUi = PiExtensionUiBridge(_pi, _input);
     _chat = ChatController(_pi);
     _workspace = WorkspaceController(_pi, _chat, _modelPicker);
+    _browser.setWorkspace(null);
     _workspace.addListener(_workspaceUpdated);
     _events = _pi.events.listen((event) {
       if (event is PiRpcWorkspaceChanged) {
@@ -70,6 +77,11 @@ class _HomeViewState extends State<HomeView> with WindowListener {
   }
 
   void _workspaceUpdated() {
+    final snapshot = _workspace.snapshot;
+    if (snapshot != null && !identical(snapshot, _browserSnapshot)) {
+      _browserSnapshot = snapshot;
+      _browser.setWorkspace(snapshot.current.path);
+    }
     _draftWorkspace ??= _workspace.snapshot?.current.path;
     if (_draftWorkspace case final path?) _attachments.setWorkspace(path);
   }
@@ -102,10 +114,14 @@ class _HomeViewState extends State<HomeView> with WindowListener {
     if (await _chat.changeSession(path: path) && mounted) {
       _input.clear();
       _attachments.clear();
+      _tabs.showChat();
       unawaited(_workspace.refreshSessions());
       unawaited(_modelPicker.refresh());
     }
   }
+
+  @override
+  void onWindowFocus() => _browser.refreshIfOpen();
 
   @override
   void onWindowClose() async {
@@ -122,6 +138,8 @@ class _HomeViewState extends State<HomeView> with WindowListener {
     unawaited(_events.cancel());
     _workspace.removeListener(_workspaceUpdated);
     _workspace.dispose();
+    _tabs.dispose();
+    _browser.dispose();
     _chat.dispose();
     _extensionUi.dispose();
     _modelPicker.dispose();
@@ -150,11 +168,9 @@ class _HomeViewState extends State<HomeView> with WindowListener {
             colors.sidebarBackground,
             preferences.sidebarGlass,
           ),
-          contentBackground: WindowMaterialScope.tint(
-            context,
-            colors.canvasBackground,
-            preferences.canvasGlass,
-          ),
+          // HomeChatPanel paints the main/right regions side by side. Do not
+          // put a main-area tint underneath the translucent right sidebar.
+          contentBackground: Colors.transparent,
           animate:
               WindowMaterialScope.statusOf(context) ==
               WindowMaterialStatus.active,
@@ -177,6 +193,22 @@ class _HomeViewState extends State<HomeView> with WindowListener {
           child: ChatResourceScope(
             directory: _workspace.snapshot?.current.path,
             child: HomeChatPanel(
+              browser: _browser,
+              // One persistent host; tab changes never recreate the RPC client.
+              tabs: _tabs,
+              contentBackground: WindowMaterialScope.tint(
+                context,
+                colors.canvasBackground,
+                preferences.canvasGlass,
+              ),
+              panelBackground: WindowMaterialScope.tint(
+                context,
+                colors.sidebarBackground,
+                preferences.sidebarGlass,
+              ),
+              animateMaterial:
+                  WindowMaterialScope.statusOf(context) ==
+                  WindowMaterialStatus.active,
               chat: _chat,
               modelPicker: _modelPicker,
               input: _input,

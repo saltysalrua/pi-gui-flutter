@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pi_gui/core/services/file_attachments.dart';
 import 'package:pi_gui/ui/atoms/app_action_button.dart';
@@ -7,14 +8,20 @@ import 'package:pi_gui/ui/atoms/app_card.dart';
 import 'package:pi_gui/ui/atoms/app_composer_layout.dart';
 import 'package:pi_gui/ui/atoms/app_disclosure.dart';
 import 'package:pi_gui/ui/atoms/app_icon_button.dart';
-import 'package:pi_gui/ui/atoms/app_resize_divider.dart';
+import 'package:pi_gui/ui/atoms/app_split_panel.dart';
+import 'package:pi_gui/ui/atoms/app_document_tabs.dart';
+import 'package:pi_gui/ui/atoms/app_tab_workspace.dart';
 import 'package:pi_gui/ui/core/context_l10n.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
+
 import '../controllers/chat_controller.dart';
 import '../controllers/model_picker_controller.dart';
 import '../controllers/image_attachment_controller.dart';
-import 'chat_changes_panel.dart';
+import '../controllers/workspace_browser_controller.dart';
+import '../controllers/workspace_tabs_controller.dart';
+import 'workspace_browser_panel.dart';
+import 'workspace_document_view.dart';
 import 'chat_message_view.dart';
 import 'home_starter_panel.dart';
 import 'tool_card_registry.dart';
@@ -28,6 +35,11 @@ class HomeChatPanel extends StatefulWidget {
     required this.attachments,
     required this.project,
     required this.registry,
+    required this.browser,
+    required this.tabs,
+    required this.contentBackground,
+    required this.panelBackground,
+    this.animateMaterial = true,
   });
   final ChatController chat;
   final ModelPickerController modelPicker;
@@ -35,6 +47,10 @@ class HomeChatPanel extends StatefulWidget {
   final ImageAttachmentController attachments;
   final String project;
   final ToolCardRegistry registry;
+  final WorkspaceBrowserController browser;
+  final WorkspaceTabsController tabs;
+  final Color contentBackground, panelBackground;
+  final bool animateMaterial;
   @override
   State<HomeChatPanel> createState() => _HomeChatPanelState();
 }
@@ -43,10 +59,6 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
   final _scroll = ScrollController();
   bool _following = true;
   String? _session;
-  double _changesDrawerWidth = 360.0;
-  bool _isDraggingDrawer = false;
-  static const double _minChangesDrawerWidth = 260.0;
-  static const double _maxChangesDrawerWidth = 720.0;
   @override
   void initState() {
     super.initState();
@@ -112,7 +124,6 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
     final chat = widget.chat;
     final l10n = context.l10n;
     final colors = context.colors;
-    final hasChanges = chat.changes.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xl,
@@ -139,26 +150,17 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
             tooltip: l10n.chatRefresh,
             onPressed: chat.isLoading || chat.isSending ? null : chat.refresh,
           ),
-          const SizedBox(width: AppSpacing.xs),
-          Badge.count(
-            count: chat.changes.length,
-            isLabelVisible: hasChanges,
-            backgroundColor: colors.primary,
-            textColor: Theme.of(context).colorScheme.onPrimary,
-            child: AppIconButton(
-              icon: Icons.difference_outlined,
-              tooltip: l10n.chatFileCount(chat.changes.length),
-              variant: chat.changesOpen
-                  ? AppIconButtonVariant.ghost
-                  : AppIconButtonVariant.subtle,
-              color: chat.changesOpen ? colors.primary : null,
-              onPressed: chat.showChanges,
-            ),
-          ),
         ],
       ),
     );
   }
+
+  Widget _browserButton(BuildContext context) => AppIconButton(
+    icon: Icons.snippet_folder_outlined,
+    tooltip: context.l10n.browserTitle,
+    color: widget.browser.isOpen ? context.colors.primary : null,
+    onPressed: widget.browser.toggle,
+  );
 
   Widget _timeline(BuildContext context) {
     final chat = widget.chat;
@@ -189,7 +191,7 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
                   thinkingIndex: chat.timeline.thinkingIndexFor(index),
                   tools: chat.timeline.tools,
                   registry: widget.registry,
-                  onShowChanges: chat.showChanges,
+                  onShowChanges: (path) => widget.browser.showFiles(path),
                 ),
               ),
             );
@@ -351,131 +353,89 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
     );
   }
 
+  AppDocumentTab<WorkspaceDocument> _describeTab(
+    BuildContext context,
+    WorkspaceDocument doc,
+  ) {
+    final l10n = context.l10n;
+    if (doc.kind == WorkspaceDocumentKind.chat) {
+      return AppDocumentTab(
+        id: doc,
+        label: l10n.tabsChat,
+        tooltip: widget.chat.title.isEmpty ? l10n.tabsChat : widget.chat.title,
+        icon: Icons.chat_bubble_outline,
+        closable: false,
+        busy: widget.chat.isRunning,
+      );
+    }
+    final short = doc.commit?.substring(0, 7);
+    if (doc.kind == WorkspaceDocumentKind.commit) {
+      return AppDocumentTab(
+        id: doc,
+        label: '${l10n.browserCommitDetails} · $short',
+        tooltip: '${l10n.browserCommitDetails}\n${doc.commit}',
+        icon: Icons.commit,
+      );
+    }
+    final parts = doc.path!.split('/');
+    var label = parts.last;
+    if (parts.length > 1 &&
+        widget.tabs.tabs.any(
+          (other) =>
+              other.path != null &&
+              other.path != doc.path &&
+              other.path!.split('/').last == parts.last,
+        )) {
+      label = parts.skip(parts.length - 2).join('/');
+    }
+    return AppDocumentTab(
+      id: doc,
+      label: short == null ? label : '$label · $short',
+      tooltip: [doc.path!, if (doc.commit != null) doc.commit!].join('\n'),
+      icon: doc.commit == null
+          ? Icons.description_outlined
+          : Icons.difference_outlined,
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: widget.chat,
+    listenable: Listenable.merge([widget.chat, widget.browser]),
     builder: (context, _) {
       final chat = widget.chat;
-      final colors = context.colors;
-      final reduceMotion = MediaQuery.disableAnimationsOf(context);
-      // The first submitted prompt starts the conversation; rejection returns to the empty layout.
+      // Keep the original centered empty composer. Only an accepted/submitting
+      // first prompt enters the bottom-docked conversation layout.
       final started =
           chat.timeline.messages.isNotEmpty || chat.isSending || chat.isRunning;
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 640;
-          final maxDrawerWidth = (constraints.maxWidth * 0.75).clamp(
-            _minChangesDrawerWidth,
-            _maxChangesDrawerWidth,
-          );
-          final drawerWidth = _changesDrawerWidth.clamp(
-            _minChangesDrawerWidth,
-            maxDrawerWidth,
-          );
-          final conversation = AppComposerLayout(
-            started: started,
-            content: Column(
-              children: [
-                _header(context),
-                Expanded(child: _timeline(context)),
-              ],
-            ),
-            editor: _editor(context, started),
-          );
-          final panel = ChatChangesPanel(controller: chat);
-
-          if (isNarrow) {
-            return Stack(
-              children: [
-                conversation,
-                Positioned.fill(
-                  child: IgnorePointer(
-                    ignoring: !chat.changesOpen,
-                    child: AnimatedSwitcher(
-                      duration: reduceMotion
-                          ? Duration.zero
-                          : AppDurations.fast,
-                      child: !chat.changesOpen
-                          ? const SizedBox.shrink()
-                          : Stack(
-                              key: const ValueKey('changes-overlay'),
-                              children: [
-                                ModalBarrier(
-                                  color: Theme.of(
-                                    context,
-                                  ).shadowColor.withValues(alpha: 0.12),
-                                  onDismiss: chat.showChanges,
-                                  semanticsLabel: context.l10n.close,
-                                  dismissible: true,
-                                ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: SizedBox(
-                                    width: drawerWidth,
-                                    child: panel,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }
-
-          final duration = _isDraggingDrawer || reduceMotion
-              ? Duration.zero
-              : (chat.changesOpen ? AppDurations.slow : AppDurations.medium);
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: conversation),
-              AnimatedContainer(
-                duration: duration,
-                curve: AppCurves.smoothOut,
-                width: chat.changesOpen ? (drawerWidth + 10.0) : 0.0,
-                child: ClipRect(
-                  child: OverflowBox(
-                    minWidth: drawerWidth + 10.0,
-                    maxWidth: drawerWidth + 10.0,
-                    alignment: Alignment.centerRight,
-                    child: IgnorePointer(
-                      ignoring: !chat.changesOpen,
-                      child: ExcludeFocus(
-                        excluding: !chat.changesOpen,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            AppResizeDivider(
-                              leftColor: colors.canvasBackground,
-                              rightColor: colors.sidebarBackground,
-                              onDragStart: () =>
-                                  setState(() => _isDraggingDrawer = true),
-                              onDragEnd: () =>
-                                  setState(() => _isDraggingDrawer = false),
-                              onDelta: (dx) => setState(() {
-                                _changesDrawerWidth = (_changesDrawerWidth - dx)
-                                    .clamp(
-                                      _minChangesDrawerWidth,
-                                      maxDrawerWidth,
-                                    );
-                              }),
-                              onReset: () =>
-                                  setState(() => _changesDrawerWidth = 360.0),
-                            ),
-                            SizedBox(width: drawerWidth, child: panel),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+      final conversation = AppComposerLayout(
+        started: started,
+        content: Column(
+          children: [
+            _header(context),
+            Expanded(child: _timeline(context)),
+          ],
+        ),
+        editor: _editor(context, started),
+      );
+      return AppSplitPanel(
+        isOpen: widget.browser.isOpen,
+        onDismiss: widget.browser.toggle,
+        contentBackground: widget.contentBackground,
+        panelBackground: widget.panelBackground,
+        animateMaterial: widget.animateMaterial,
+        panel: WorkspaceBrowserPanel(
+          controller: widget.browser,
+          onOpenFile: widget.tabs.openFile,
+          onOpenCommit: widget.tabs.openCommit,
+        ),
+        child: AppTabWorkspace<WorkspaceDocument>(
+          controller: widget.tabs,
+          describeTab: (doc) => _describeTab(context, doc),
+          trailing: _browserButton(context),
+          builder: (context, doc) => doc.kind == WorkspaceDocumentKind.chat
+              ? conversation
+              : WorkspaceDocumentView(document: doc, tabs: widget.tabs),
+        ),
       );
     },
   );

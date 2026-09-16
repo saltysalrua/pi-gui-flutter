@@ -355,7 +355,7 @@
   "appearanceGlass": "Desktop glass",
   "appearanceGlassHint": "Separate settings for the title bar and sidebar, main area and cards. Windows blurs the desktop; cards blur in-app backgrounds while text stays clear. Shared by light and dark modes. Requires Windows 11 22H2 or newer.",
   "appearanceGlassSidebar": "Title bar and sidebar glass",
-  "appearanceGlassSidebarHint": "Applies to the title bar, left navigation and resize strip together.",
+  "appearanceGlassSidebarHint": "Applies to the title bar, both sidebars and resize strips together.",
   "appearanceGlassCanvas": "Main area glass",
   "appearanceGlassCanvasHint": "Applies to the chat and settings backgrounds. The composer and other cards use the separate Card glass setting below.",
   "appearanceGlassSidebarOpacity": "Title bar and sidebar tint opacity",
@@ -368,5 +368,71 @@
   "appearanceGlassOff": "Off",
   "appearanceGlassSystemDisabled": "Windows is not allowing transparency. Showing solid colors. Check Transparency effects, contrast themes and battery saver.",
   "appearanceGlassUnsupported": "This system does not support the material. Showing solid colors. Windows 11 22H2 or newer is required.",
-  "appearanceGlassUnavailable": "Native glass is unavailable. Showing solid colors. Update and reopen the app to retry; hot reload cannot load native changes."
+  "appearanceGlassUnavailable": "Native glass is unavailable. Showing solid colors. Update and reopen the app to retry; hot reload cannot load native changes.",
+  "browserTitle": "Files and Git",
+  "browserFiles": "Files",
+  "browserGraph": "Git graph",
+  "browserRefresh": "Refresh files and Git",
+  "browserCollapse": "Collapse all folders",
+  "browserLoading": "Loading…",
+  "browserEmptyFolder": "Empty folder",
+  "browserNoGit": "This folder is not in a Git repository.",
+  "browserNoCommits": "This repository has no commits yet.",
+  "browserGitMissing": "Git was not found. Install Git and refresh. Files are still available.",
+  "browserReadFailed": "Could not read this folder. Check access permissions and retry.",
+  "browserGitFailed": "Could not read Git. Check the repository and refresh.",
+  "browserOldBackend": "This window has an older backend. Available the next time you launch the updated app; your current chat is unaffected.",
+  "browserWorkspaceChanged": "The workspace changed. Close this view and select again.",
+  "browserRetry": "Retry",
+  "browserMore": "Load more",
+  "browserLimit": "Preview limit reached. Use an external tool for the remaining content.",
+  "browserContent": "File contents",
+  "browserStaged": "Staged changes",
+  "browserUnstaged": "Unstaged changes",
+  "browserCommitDiff": "Compared with the first parent (empty content for the initial commit)",
+  "browserBinary": "Binary or non-UTF-8 file. Text preview is unavailable.",
+  "browserLargeFile": "This file exceeds 256 KiB. Preview is unavailable.",
+  "browserMissingFile": "This file was deleted. Inspect its changes in the Diff.",
+  "browserSymlink": "Symbolic links are not followed, to keep browsing within this workspace.",
+  "browserUnsupported": "This file type cannot be previewed.",
+  "browserCommitDetails": "Commit details",
+  "browserCommitFilesEmpty": "This commit has no file changes inside this workspace.",
+  "browserGraphScope": "Local branches, remote-tracking branches and tags in this repository. No network fetch.",
+  "browserFileScope": "Read-only workspace tree, including hidden and ignored files, excluding .git. Hover status marks for details.",
+  "browserClean": "Committed · unchanged",
+  "browserModified": "Modified",
+  "browserStatusStaged": "Staged",
+  "browserAdded": "Added",
+  "browserDeleted": "Deleted",
+  "browserRenamed": "Renamed",
+  "browserUntracked": "Untracked",
+  "browserIgnored": "Ignored",
+  "browserConflict": "Conflicted",
+  "browserNoStatus": "No Git status",
+  "browserIndexStatus": "Index: {status}",
+  "@browserIndexStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "browserWorktreeStatus": "Working tree: {status}",
+  "@browserWorktreeStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "browserUnchanged": "Unchanged",
+  "tabsChat": "Chat",
+  "tabsClose": "Close tab (Ctrl+W)",
+  "tabsAll": "All tabs",
+  "tabsSplit": "Move to new group on the right",
+  "tabsMerge": "Merge all tabs",
+  "tabsActions": "Tab actions",
+  "tabsCloseOthers": "Close other file tabs",
+  "tabsReadOnly": "Read-only",
+  "tabsRefresh": "Reload this preview"
 }
