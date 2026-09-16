@@ -89,7 +89,7 @@ pi-gui 在 `assets/backend/workspace_rpc.mjs` 中注入轻量发射拦截器：
 
 - 注入 `AgentSession.prototype.bindExtensions`，对外传递 `options.mode = "tui"`，通知插件当前宿主环境具备完整的可视化交互插槽能力。
 - 拦截 `uiContext.setWidget`：当传入函数时，自动构造 `mockTui` 实例并执行初始渲染与注册 `requestRender()` 监听。
-- 当插件调用 `tui.requestRender()` 时，重新调用 `render(80)`，并以标准单行 JSONL `extension_ui_request` (method: `setWidget`) 派发至 Flutter 前端。
+- 当插件调用 `tui.requestRender()` 时，重新调用 `render(160)`，并以标准单行 JSONL `extension_ui_request` (method: `setWidget`) 派发至 Flutter 前端。每次启动 Pi 前按本机 Pi 包路径重写 `pi_launcher.mjs`（不入库），同一套注入同时服务于并行会话的每个原生子进程。
 
 ### 2. 前端事件路由与动态渲染
 
