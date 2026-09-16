@@ -1,5 +1,6 @@
 // One JSONL supervisor; each channel owns an ordinary Pi RPC process.
 import path from "node:path";
+import { existsSync } from "node:fs";
 import {
   WorkspaceService,
   WorkspaceAdapter,
@@ -194,10 +195,32 @@ export class WorkspaceManager {
       ...(error ? { error: error.code ?? "WORKSPACE_FAILED" } : { data }),
     });
   }
+  // Serialized through the same saving chain as catalog writes; never
+  // reorders the recent list the way service.remember would.
+  async rememberSession(cwd, sessionPath) {
+    const recent = this.service.recent;
+    const entry = recent.find((item) => key(item.path) === key(cwd));
+    if (entry) {
+      entry.sessionPath = sessionPath;
+    } else {
+      recent.unshift({ path: cwd, sessionPath });
+      if (recent.length > 24) recent.length = 24;
+    }
+    await this.save();
+  }
   start() {
-    return this.workspaceProjects.has(key(this.service.current))
-      ? this.launch("primary", this.service.current).ready
-      : Promise.resolve();
+    if (!this.workspaceProjects.has(key(this.service.current)))
+      return Promise.resolve();
+    // Restart should return to the last conversation, not an empty session.
+    // A persisted path is only trusted while the file still exists.
+    const recent = this.service.recent.find(
+      (item) => key(item.path) === key(this.service.current),
+    );
+    const sessionFile =
+      recent?.sessionPath && existsSync(recent.sessionPath)
+        ? recent.sessionPath
+        : undefined;
+    return this.launch("primary", this.service.current, sessionFile).ready;
   }
   launch(id, cwd, sessionFile) {
     if (this.closing) fail("WORKSPACE_BUSY");
@@ -223,7 +246,17 @@ export class WorkspaceManager {
           message.command === "get_state" &&
           message.success
         ) {
+          const previous = entry.sessionFile;
           entry.sessionFile = message.data?.sessionFile ?? entry.sessionFile;
+          // Remember conversations with content so the next GUI restart can
+          // reopen them. Empty sessions never overwrite a previous bookmark.
+          if (
+            entry.sessionFile &&
+            entry.sessionFile !== previous &&
+            (message.data?.messageCount ?? 0) > 0
+          ) {
+            void this.rememberSession(entry.cwd, entry.sessionFile);
+          }
         }
         if (["tool_execution_end", "agent_settled"].includes(message?.type))
           this.scope(cwd).browser?.invalidate();

@@ -259,6 +259,106 @@ test("background worktree jobs retain branches and reject live/ignored directori
     assert.equal(service.catalog.projects.length, 1);
 });
 
+test("restart relaunches the current workspace on its persisted last conversation", async (t) => {
+    const { root, repo, manager, children, service } = await fixture(t);
+    const conversation = path.join(repo, "conversation.jsonl");
+    await writeFile(conversation, "{}\n");
+    // The GUI reads state after chatting; the forwarded response carries the
+    // live session file and its message count.
+    children[0].receive({
+        id: "state",
+        type: "response",
+        command: "get_state",
+        success: true,
+        data: { sessionFile: conversation, messageCount: 3 },
+    });
+    await manager.saving;
+    const store = JSON.parse(
+        await readFile(path.join(root, "gui.json"), "utf8"),
+    );
+    const saved = store.recent.find(
+        (item) =>
+            path.normalize(item.path).toLowerCase() ===
+            path.normalize(repo).toLowerCase(),
+    );
+    assert.equal(saved?.sessionPath, conversation);
+    // Empty sessions never overwrite the bookmark.
+    const fresh = path.join(repo, "fresh.jsonl");
+    await writeFile(fresh, "{}\n");
+    children[0].receive({
+        id: "state2",
+        type: "response",
+        command: "get_state",
+        success: true,
+        data: { sessionFile: fresh, messageCount: 0 },
+    });
+    await manager.saving;
+    assert.equal(
+        JSON.parse(
+            await readFile(path.join(root, "gui.json"), "utf8"),
+        ).recent.find(
+            (item) =>
+                path.normalize(item.path).toLowerCase() ===
+                path.normalize(repo).toLowerCase(),
+        ).sessionPath,
+        conversation,
+    );
+    // A fresh GUI launch restores the same conversation on the same workspace.
+    const launched = [];
+    const second = new WorkspaceManager(
+        service,
+        (cwd, emit, sessionPath) => {
+            launched.push(sessionPath);
+            return {
+                cwd,
+                sent: [],
+                send(request) {
+                    this.sent.push(request);
+                },
+                request: async () => ({
+                    isStreaming: false,
+                    messageCount: 3,
+                    sessionFile: sessionPath,
+                }),
+                async stop() {},
+            };
+        },
+        () => {},
+    );
+    await second.initialize();
+    await second.start();
+    assert.equal(launched[0], conversation);
+    await second.close();
+    // A deleted session file falls back to a new conversation instead of
+    // handing Pi a stale path.
+    await rm(conversation);
+    const third = new WorkspaceManager(
+        service,
+        (cwd, emit, sessionPath) => {
+            launched.push(sessionPath);
+            return {
+                cwd,
+                sent: [],
+                send(request) {
+                    this.sent.push(request);
+                },
+                request: async () => ({
+                    isStreaming: false,
+                    messageCount: 0,
+                    sessionFile: sessionPath,
+                }),
+                async stop() {},
+            };
+        },
+        () => {},
+    );
+    await third.initialize();
+    await third.start();
+    assert.equal(launched[1], undefined);
+    await third.close();
+    assert.equal(service.persistenceWarning, false);
+});
+
 test("repository lock covers sibling worktree opens, folder projects persist and forgotten projects stay forgotten", async (t) => {
     const { repo, root, manager, service } = await fixture(t);
     const created = await service.createWorktree("feat/lock", "main");

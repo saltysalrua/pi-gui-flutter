@@ -32,7 +32,7 @@ tags: [flutter, pi-rpc, session, workspace, git-worktree, parallel]
 - 关闭最后一个标签后显示新建会话入口，不关闭应用。
 - 同一份历史在本 GUI 内只允许一个运行实例；重复点击或并发打开会定位已经存在的会话。
 - 单个 Pi 退出只影响该通道，其余会话继续；不会自动重放 Prompt。关闭失败会保留会话条目，避免把未确认停止误报为已结束。
-- 打开的标签、草稿和扩展状态是本次运行的内存状态，不承诺跨重启保留。重启恢复注册项目和最后打开的目录，从空会话开始，已保存内容从历史显式打开。
+- 打开的标签、草稿和扩展状态是本次运行的内存状态，不承诺跨重启保留。重启恢复注册项目、最后打开的目录，并自动重开该目录**最近一次有内容的会话**（见下“重启回到上一个对话”）；找不到已保存内容时才从空会话开始，其余历史仍从侧边栏显式打开。
 
 ## Worktree 生命周期与安全
 
@@ -84,6 +84,12 @@ workspace_rpc.mjs --gui-multiplex
 需要 PATH 中的 Node.js、npm 安装的 Pi；Git 功能需要 Git。`PiWorkspaceTransport` 携带四个脚本：`workspace_rpc.mjs`、`workspace_manager.mjs`、`workspace_browser.mjs`、`gui_tool_diff.mjs`，解包到同一临时目录。关闭应用只清理它自己的进程树和脚本。
 
 不带 `--gui-multiplex` 的适配器继续提供原单会话协议，供兼容性回归 / 探针使用；旧 `WorkspaceController`、`WorkspaceDialog`、`HomeSidebar` 不再是生产首页入口。
+
+### 重启回到上一个对话
+
+重启后 `WorkspaceManager.start()` 不再从空会话启动：它在 `workspaces.json` 的 `recent` 里查最后打开目录（`service.current`）记录的 `sessionPath`，文件仍存在时直接把该会话作为 `--session` 参数传给 primary 通道的 Pi，GUI 收到 catalog 后自动重开标签并 hydrate 出完整时间线；文件已删除或还没有记录时仍从新会话开始。
+
+记录的写入点在 `workspace_manager.mjs` 的子进程行过滤器：凡是通过通道转发的 `get_state` 成功响应，只要返回的 `sessionFile` 与之前不同且 `messageCount > 0`，就把该会话路径写入所属目录的 `recent` 条目（不重排顺序，新建条目时插到队首并保留 24 条上限），随后走同一条串行 `save()` 链持久化。GUI 在 hydrate、agent_settled 后都会读状态，所以每轮对话结束就会落盘；空的全新会话不会覆盖旧记录。旧版本保存的 `workspaces.json` 没有 `sessionPath`，因此**升级后的第一次重启仍是新会话**，聊过一轮之后的重启才会自动回到上次对话。同时打开多个会话时，最后回读状态的通道胜出；重启后只恢复 primary 一个会话，其余历史仍从侧边栏打开。回归见 `test/workspace_manager.test.mjs`。
 
 ## 协议
 
