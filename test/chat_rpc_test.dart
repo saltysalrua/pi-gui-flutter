@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_gui/core/models/chat_timeline.dart';
 import 'package:pi_gui/core/models/diff_document.dart';
@@ -6,6 +7,7 @@ import 'package:pi_gui/core/rpc/pi_chat_types.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_client.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_types.dart';
 import 'package:pi_gui/ui/features/home/controllers/chat_controller.dart';
+
 import 'pi_rpc_client_test.dart' show TestTransport;
 
 PiChatEvent event(String type, [Map<String, dynamic> fields = const {}]) =>
@@ -303,502 +305,525 @@ void main() {
     },
   );
 
-  test(
-    'ordered deltas assemble without snapshots; message_end replaces the live draft',
-    () {
-      final timeline = ChatTimeline();
-      timeline.apply(
-        event('message_start', {'message': message('user', '你好')}),
-      );
-      timeline.apply(event('message_end', {'message': message('user', '你好')}));
-      timeline.apply(
-        event('message_start', {'message': message('assistant', [], 2)}),
-      );
-      void delta(String type, int index, Map<String, Object?> fields) =>
-          timeline.apply(
-            event('message_update', {
-              'assistantMessageEvent': {
-                'type': type,
-                'contentIndex': index,
-                ...fields,
-              },
-            }),
-          );
-      delta('thinking_delta', 0, {'delta': '分析'});
-      delta('text_delta', 1, {'delta': '**中'});
-      delta('text_delta', 1, {'delta': '文**\u2028😀'});
-      delta('toolcall_start', 2, {'id': 'c1', 'toolName': 'edit'});
-      delta('toolcall_delta', 2, {'delta': '{"path":'});
-      final call = {
-        'type': 'toolCall',
-        'id': 'c1',
-        'name': 'edit',
-        'arguments': {'path': 'x.dart', 'edits': []},
-      };
-      delta('toolcall_end', 2, {'toolCall': call});
-      expect(timeline.messages.length, 2);
-      expect(timeline.messages.last.content.map((b) => b.kind), [
-        PiContentKind.thinking,
-        PiContentKind.text,
-        PiContentKind.toolCall,
-      ]);
-      expect(timeline.messages.last.text, '**中文**\u2028😀');
-      expect(timeline.tools['c1']!.path, 'x.dart');
-      timeline.apply(
-        event('message_end', {
-          'message': message('assistant', [text('authoritative'), call], 2),
-        }),
-      );
-      expect(timeline.messages.length, 2);
-      expect(timeline.messages.last.text, 'authoritative');
-      expect(timeline.messages.last.isStreaming, false);
-    },
-  );
-
-  test(
-    'tool output is accumulated replacement; final result correlates once and history restores diff',
-    () {
-      final timeline = ChatTimeline();
-      const patch = '--- a\n+++ a\n@@ -1 +1 @@\n-old\n+new\n';
-      final call = {
-        'type': 'toolCall',
-        'id': 'c1',
-        'name': 'edit',
-        'arguments': {'path': 'a'},
-      };
-      timeline.load([
-        PiChatMessage.fromJson(message('assistant', [call])),
-      ]);
-      for (final output in ['a', 'ab']) {
+  test('ordered deltas assemble without snapshots; message_end replaces the live draft', () {
+    final timeline = ChatTimeline();
+    timeline.apply(event('message_start', {'message': message('user', '你好')}));
+    timeline.apply(event('message_end', {'message': message('user', '你好')}));
+    timeline.apply(
+      event('message_start', {'message': message('assistant', [], 2)}),
+    );
+    void delta(String type, int index, Map<String, Object?> fields) =>
         timeline.apply(
-          event('tool_execution_update', {
-            'toolCallId': 'c1',
-            'toolName': 'edit',
-            'partialResult': {
-              'content': [text(output)],
+          event('message_update', {
+            'assistantMessageEvent': {
+              'type': type,
+              'contentIndex': index,
+              ...fields,
             },
           }),
         );
-      }
-      expect(timeline.tools['c1']!.result!.text, 'ab');
+    delta('thinking_delta', 0, {'delta': '分析'});
+    delta('text_delta', 1, {'delta': '**中'});
+    delta('text_delta', 1, {'delta': '文**\u2028😀'});
+    delta('toolcall_start', 2, {'id': 'c1', 'toolName': 'edit'});
+    delta('toolcall_delta', 2, {'delta': '{"path":'});
+    final call = {
+      'type': 'toolCall',
+      'id': 'c1',
+      'name': 'edit',
+      'arguments': {'path': 'x.dart', 'edits': []},
+    };
+    delta('toolcall_end', 2, {'toolCall': call});
+    expect(timeline.messages.length, 2);
+    expect(timeline.messages.last.content.map((b) => b.kind), [
+      PiContentKind.thinking,
+      PiContentKind.text,
+      PiContentKind.toolCall,
+    ]);
+    expect(timeline.messages.last.text, '**中文**\u2028😀');
+    expect(timeline.tools['c1']!.path, 'x.dart');
+    timeline.apply(
+      event('message_end', {
+        'message': message('assistant', [text('authoritative'), call], 2),
+      }),
+    );
+    expect(timeline.messages.length, 2);
+    expect(timeline.messages.last.text, 'authoritative');
+    expect(timeline.messages.last.isStreaming, false);
+  });
+
+  test('tool reference index tracks replacement, duplicate references and orphan resets', () {
+    Map<String, dynamic> call(String id) => {
+      'type': 'toolCall',
+      'id': id,
+      'name': 'read',
+      'arguments': {'path': id},
+    };
+    Map<String, dynamic> result(String id) => {
+      'role': 'toolResult',
+      'toolCallId': id,
+      'toolName': 'read',
+      'content': [text('result')],
+    };
+    final timeline = ChatTimeline();
+    timeline.load([
+      PiChatMessage.fromJson(message('assistant', [call('shared')])),
+    ]);
+    timeline.apply(
+      event('message_start', {
+        'message': message('assistant', [call('shared'), call('removed')], 2),
+      }),
+    );
+    timeline.apply(
+      event('message_end', {
+        'message': message('assistant', [text('authoritative')], 2),
+      }),
+    );
+    timeline.apply(event('message_end', {'message': result('shared')}));
+    expect(
+      timeline.messages.length,
+      2,
+    ); // The earlier shared reference remains.
+    timeline.apply(event('message_end', {'message': result('removed')}));
+    timeline.apply(event('message_end', {'message': result('removed')}));
+    expect(
+      timeline.messages.length,
+      3,
+    ); // Removed draft becomes exactly one orphan.
+    expect(timeline.messages.last.role, 'toolResult');
+    timeline.load([]);
+    timeline.apply(event('message_end', {'message': result('shared')}));
+    expect(timeline.messages.single.role, 'toolResult');
+    timeline.load([]);
+    timeline.apply(
+      event('message_start', {
+        'message': message('assistant', [call('delta')]),
+      }),
+    );
+    timeline.apply(
+      event('message_update', {
+        'assistantMessageEvent': {'type': 'text_start', 'contentIndex': 0},
+      }),
+    );
+    timeline.apply(event('message_end', {'message': result('delta')}));
+    expect(
+      timeline.messages.length,
+      2,
+    ); // Block replacement also drops its reference.
+    expect(timeline.messages.last.toolCallId, 'delta');
+    expect(timeline.assistantNumbers, [1, null]);
+  });
+
+  test('tool output is accumulated replacement; final result correlates once and history restores diff', () {
+    final timeline = ChatTimeline();
+    const patch = '--- a\n+++ a\n@@ -1 +1 @@\n-old\n+new\n';
+    final call = {
+      'type': 'toolCall',
+      'id': 'c1',
+      'name': 'edit',
+      'arguments': {'path': 'a'},
+    };
+    timeline.load([
+      PiChatMessage.fromJson(message('assistant', [call])),
+    ]);
+    for (final output in ['a', 'ab']) {
       timeline.apply(
-        event('tool_execution_end', {
+        event('tool_execution_update', {
           'toolCallId': 'c1',
-          'result': {
-            'content': [text('done')],
-            'details': {'patch': patch},
+          'toolName': 'edit',
+          'partialResult': {
+            'content': [text(output)],
           },
-          'isError': false,
         }),
       );
-      final result = PiChatMessage.fromJson({
-        'role': 'toolResult',
+    }
+    expect(timeline.tools['c1']!.result!.text, 'ab');
+    timeline.apply(
+      event('tool_execution_end', {
         'toolCallId': 'c1',
-        'toolName': 'edit',
-        'content': [text('done')],
-        'timestamp': 2,
-      });
-      timeline.apply(
-        event('message_end', {
-          'message': {
-            'role': 'toolResult',
-            'toolCallId': 'c1',
-            'content': [text('done')],
-            'details': {'patch': patch},
-          },
-        }),
-      );
-      timeline.load([
-        PiChatMessage.fromJson(message('assistant', [call])),
-        result,
-      ]);
-      expect(timeline.tools['c1']!.result!.patch, patch);
-      expect(timeline.tools['c1']!.isFileChange, true);
-      expect(timeline.messages.length, 1);
-      timeline.apply(
-        event('tool_execution_end', {
+        'result': {
+          'content': [text('done')],
+          'details': {'patch': patch},
+        },
+        'isError': false,
+      }),
+    );
+    final result = PiChatMessage.fromJson({
+      'role': 'toolResult',
+      'toolCallId': 'c1',
+      'toolName': 'edit',
+      'content': [text('done')],
+      'timestamp': 2,
+    });
+    timeline.apply(
+      event('message_end', {
+        'message': {
+          'role': 'toolResult',
           'toolCallId': 'c1',
-          'result': {'content': []},
-          'isError': true,
-        }),
-      );
-      expect(timeline.tools['c1']!.isFileChange, false);
-    },
-  );
+          'content': [text('done')],
+          'details': {'patch': patch},
+        },
+      }),
+    );
+    timeline.load([
+      PiChatMessage.fromJson(message('assistant', [call])),
+      result,
+    ]);
+    expect(timeline.tools['c1']!.result!.patch, patch);
+    expect(timeline.tools['c1']!.isFileChange, true);
+    expect(timeline.messages.length, 1);
+    timeline.apply(
+      event('tool_execution_end', {
+        'toolCallId': 'c1',
+        'result': {'content': []},
+        'isError': true,
+      }),
+    );
+    expect(timeline.tools['c1']!.isFileChange, false);
+  });
 
-  test(
-    'unified diff excludes file headers, keeps real +++ content, and numbers multiple hunks',
-    () {
-      final doc = DiffDocument(
-        '--- a\r\n+++ b\r\n@@ -3,2 +3,2 @@\r\n-old\r\n+++new\r\n same\r\n@@ -10 +12 @@\r\n-x\r\n+y\r\n\\ No newline at end of file\r\n',
-      );
-      expect(doc.added, 2);
-      expect(doc.removed, 2);
-      expect(
-        doc.lines.firstWhere((l) => l.kind == DiffLineKind.added).text,
-        '++new',
-      );
-      expect(
-        doc.lines.where((l) => l.kind == DiffLineKind.added).last.newLine,
-        12,
-      );
-      final numbered = DiffDocument(
-        '-12 old\n+12 new\n 13 same\n    ...',
-        numbered: true,
-      );
-      expect(numbered.added, 1);
-      expect(numbered.removed, 1);
-      expect(numbered.lines[1].newLine, 12);
-      expect(doc.displayLines.length, doc.lines.length - 2);
-      expect(
-        doc.displayLines
-            .where((line) => line.kind == DiffLineKind.added)
-            .first
-            .text,
-        '++new',
-      );
-      final written = DiffDocument.written(
-        '--- literal content\r\n\r\n+not an addition\r\n',
-      );
-      expect(written.displayLines.length, 3);
-      expect(written.added, 0);
-      expect(written.removed, 0);
-      expect(written.lines.map((line) => line.newLine), [1, 2, 3]);
-      expect(written.lines.every((line) => line.oldLine == null), true);
-      expect(DiffDocument.written('').lines, isEmpty);
-    },
-  );
+  test('unified diff excludes file headers, keeps real +++ content, and numbers multiple hunks', () {
+    final doc = DiffDocument(
+      '--- a\r\n+++ b\r\n@@ -3,2 +3,2 @@\r\n-old\r\n+++new\r\n same\r\n@@ -10 +12 @@\r\n-x\r\n+y\r\n\\ No newline at end of file\r\n',
+    );
+    expect(doc.added, 2);
+    expect(doc.removed, 2);
+    expect(
+      doc.lines.firstWhere((l) => l.kind == DiffLineKind.added).text,
+      '++new',
+    );
+    expect(
+      doc.lines.where((l) => l.kind == DiffLineKind.added).last.newLine,
+      12,
+    );
+    final numbered = DiffDocument(
+      '-12 old\n+12 new\n 13 same\n    ...',
+      numbered: true,
+    );
+    expect(numbered.added, 1);
+    expect(numbered.removed, 1);
+    expect(numbered.lines[1].newLine, 12);
+    expect(doc.displayLines.length, doc.lines.length - 2);
+    expect(
+      doc.displayLines
+          .where((line) => line.kind == DiffLineKind.added)
+          .first
+          .text,
+      '++new',
+    );
+    final written = DiffDocument.written(
+      '--- literal content\r\n\r\n+not an addition\r\n',
+    );
+    expect(written.displayLines.length, 3);
+    expect(written.added, 0);
+    expect(written.removed, 0);
+    expect(written.lines.map((line) => line.newLine), [1, 2, 3]);
+    expect(written.lines.every((line) => line.oldLine == null), true);
+    expect(DiffDocument.written('').lines, isEmpty);
+  });
 
-  test(
-    'write patch survives live events and persisted history without changing tool output',
-    () {
-      const patch =
-          '--- note.txt\n+++ note.txt\n@@ -1 +1 @@\n-before\n+after\n';
-      final details = {
-        'patch': patch,
-        'guiWrite': {'kind': 'modified'},
-        'custom': 42,
-      };
-      final call = {
-        'type': 'toolCall',
-        'id': 'write-1',
-        'name': 'write',
-        'arguments': {'path': 'note.txt', 'content': 'after\n'},
-      };
-      final result = {
-        'role': 'toolResult',
+  test('write patch survives live events and persisted history without changing tool output', () {
+    const patch = '--- note.txt\n+++ note.txt\n@@ -1 +1 @@\n-before\n+after\n';
+    final details = {
+      'patch': patch,
+      'guiWrite': {'kind': 'modified'},
+      'custom': 42,
+    };
+    final call = {
+      'type': 'toolCall',
+      'id': 'write-1',
+      'name': 'write',
+      'arguments': {'path': 'note.txt', 'content': 'after\n'},
+    };
+    final result = {
+      'role': 'toolResult',
+      'toolCallId': 'write-1',
+      'toolName': 'write',
+      'content': [text('Successfully wrote to note.txt')],
+      'details': details,
+    };
+    final timeline = ChatTimeline()
+      ..load([
+        PiChatMessage.fromJson(message('assistant', [call])),
+      ]);
+    timeline.apply(
+      event('tool_execution_end', {
         'toolCallId': 'write-1',
         'toolName': 'write',
-        'content': [text('Successfully wrote to note.txt')],
-        'details': details,
-      };
-      final timeline = ChatTimeline()
-        ..load([
-          PiChatMessage.fromJson(message('assistant', [call])),
-        ]);
-      timeline.apply(
-        event('tool_execution_end', {
-          'toolCallId': 'write-1',
-          'toolName': 'write',
-          'result': result,
-          'isError': false,
-        }),
-      );
-      expect(timeline.tools['write-1']!.result!.patch, patch);
-      timeline.load([
-        PiChatMessage.fromJson(message('assistant', [call])),
-        PiChatMessage.fromJson(result),
-      ]);
-      final restored = timeline.tools['write-1']!;
-      expect(restored.isFileChange, true);
-      expect(restored.result!.text, 'Successfully wrote to note.txt');
-      expect(restored.result!.details, details);
-      expect(restored.result!.writeKind, PiWriteKind.modified);
-      expect(
-        PiToolResult.fromJson({
-          'details': {'guiWrite': 'unknown'},
-        }).writeKind,
-        isNull,
-      );
-      expect(DiffDocument(restored.result!.patch!).added, 1);
-      expect(DiffDocument(restored.result!.patch!).removed, 1);
-    },
-  );
+        'result': result,
+        'isError': false,
+      }),
+    );
+    expect(timeline.tools['write-1']!.result!.patch, patch);
+    timeline.load([
+      PiChatMessage.fromJson(message('assistant', [call])),
+      PiChatMessage.fromJson(result),
+    ]);
+    final restored = timeline.tools['write-1']!;
+    expect(restored.isFileChange, true);
+    expect(restored.result!.text, 'Successfully wrote to note.txt');
+    expect(restored.result!.details, details);
+    expect(restored.result!.writeKind, PiWriteKind.modified);
+    expect(
+      PiToolResult.fromJson({
+        'details': {'guiWrite': 'unknown'},
+      }).writeKind,
+      isNull,
+    );
+    expect(DiffDocument(restored.result!.patch!).added, 1);
+    expect(DiffDocument(restored.result!.patch!).removed, 1);
+  });
 
-  test(
-    'RPC prompt ack is not completion; typed deltas, invalid-event isolation, queue and cancel responses',
-    () async {
-      final transport = TestTransport();
-      final pi = PiRpcClient(transportFactory: () async => transport);
-      addTearDown(pi.close);
-      final events = <PiRpcEvent>[];
-      final sub = pi.events.listen(events.add);
-      addTearDown(sub.cancel);
-      transport.onSend = (request) {
-        switch (request['type']) {
-          case 'prompt':
-            transport.reply(request, null);
-            transport.emit({
-              'type': 'message_update',
-              'assistantMessageEvent': {
-                'type': 'text_delta',
-                'contentIndex': -1,
-                'delta': 'invalid',
-              },
-            });
-            transport.emit({
-              'type': 'message_update',
-              'assistantMessageEvent': {
-                'type': 'text_delta',
-                'contentIndex': 0,
-                'delta': 'valid',
-              },
-            });
-          case 'clear_queue':
-            transport.reply(request, {
-              'steering': ['s'],
-              'followUp': ['f'],
-            });
-          case 'new_session':
-            transport.reply(request, {'cancelled': true});
-          case 'get_messages':
-            transport.reply(request, {
-              'messages': [
-                message('user', [text('saved')]),
-              ],
-            });
-        }
-      };
-      await pi.prompt('hello\nworld');
-      await tick();
-      expect(transport.commands.single['message'], 'hello\nworld');
-      expect(events.whereType<PiChatEvent>().single.delta!.delta, 'valid');
-      expect(
-        events.whereType<PiRpcDiagnostic>().single.kind,
-        PiRpcDiagnosticKind.invalidEvent,
-      );
-      expect(pi.isConnected, true);
-      expect((await pi.clearQueue()).all, ['s', 'f']);
-      expect(await pi.newSession(), false);
-      expect((await pi.getMessages()).single.text, 'saved');
-    },
-  );
+  test('RPC prompt ack is not completion; typed deltas, invalid-event isolation, queue and cancel responses', () async {
+    final transport = TestTransport();
+    final pi = PiRpcClient(transportFactory: () async => transport);
+    addTearDown(pi.close);
+    final events = <PiRpcEvent>[];
+    final sub = pi.events.listen(events.add);
+    addTearDown(sub.cancel);
+    transport.onSend = (request) {
+      switch (request['type']) {
+        case 'prompt':
+          transport.reply(request, null);
+          transport.emit({
+            'type': 'message_update',
+            'assistantMessageEvent': {
+              'type': 'text_delta',
+              'contentIndex': -1,
+              'delta': 'invalid',
+            },
+          });
+          transport.emit({
+            'type': 'message_update',
+            'assistantMessageEvent': {
+              'type': 'text_delta',
+              'contentIndex': 0,
+              'delta': 'valid',
+            },
+          });
+        case 'clear_queue':
+          transport.reply(request, {
+            'steering': ['s'],
+            'followUp': ['f'],
+          });
+        case 'new_session':
+          transport.reply(request, {'cancelled': true});
+        case 'get_messages':
+          transport.reply(request, {
+            'messages': [
+              message('user', [text('saved')]),
+            ],
+          });
+      }
+    };
+    await pi.prompt('hello\nworld');
+    await tick();
+    expect(transport.commands.single['message'], 'hello\nworld');
+    expect(events.whereType<PiChatEvent>().single.delta!.delta, 'valid');
+    expect(
+      events.whereType<PiRpcDiagnostic>().single.kind,
+      PiRpcDiagnosticKind.invalidEvent,
+    );
+    expect(pi.isConnected, true);
+    expect((await pi.clearQueue()).all, ['s', 'f']);
+    expect(await pi.newSession(), false);
+    expect((await pi.getMessages()).single.text, 'saved');
+  });
 
-  test(
-    'timed-out prompt blocks replay but permits stop/read until late acknowledgement',
-    () async {
-      final transport = TestTransport();
-      final pi = PiRpcClient(
-        transportFactory: () async => transport,
-        requestTimeout: const Duration(milliseconds: 30),
-      );
-      addTearDown(pi.close);
-      await expectLater(
-        pi.prompt('once'),
-        throwsA(
-          isA<PiRpcException>().having(
-            (e) => e.outcomeUnknown,
-            'uncertain',
-            true,
-          ),
+  test('timed-out prompt blocks replay but permits stop/read until late acknowledgement', () async {
+    final transport = TestTransport();
+    final pi = PiRpcClient(
+      transportFactory: () async => transport,
+      requestTimeout: const Duration(milliseconds: 30),
+    );
+    addTearDown(pi.close);
+    await expectLater(
+      pi.prompt('once'),
+      throwsA(
+        isA<PiRpcException>().having(
+          (e) => e.outcomeUnknown,
+          'uncertain',
+          true,
         ),
-      );
-      final first = transport.commands.single;
-      expect(pi.hasUnsettledConversationMutation, true);
-      transport.onSend = (request) => transport.reply(
-        request,
-        request['type'] == 'get_messages' ? {'messages': []} : null,
-      );
-      await pi.abort();
-      await pi.getMessages();
-      expect(transport.commands.map((c) => c['type']), [
-        'prompt',
-        'abort',
-        'get_messages',
-      ]);
-      transport.reply(first, null);
-      await tick();
-      expect(pi.hasUnsettledConversationMutation, false);
-      expect(pi.connectionCount, 1);
-    },
-  );
+      ),
+    );
+    final first = transport.commands.single;
+    expect(pi.hasUnsettledConversationMutation, true);
+    transport.onSend = (request) => transport.reply(
+      request,
+      request['type'] == 'get_messages' ? {'messages': []} : null,
+    );
+    await pi.abort();
+    await pi.getMessages();
+    expect(transport.commands.map((c) => c['type']), [
+      'prompt',
+      'abort',
+      'get_messages',
+    ]);
+    transport.reply(first, null);
+    await tick();
+    expect(pi.hasUnsettledConversationMutation, false);
+    expect(pi.connectionCount, 1);
+  });
 
-  test(
-    'malformed prompt acknowledgement retains the safety barrier; stop bypasses selection writes',
-    () async {
-      final transport = TestTransport();
-      final pi = PiRpcClient(transportFactory: () async => transport);
-      addTearDown(pi.close);
-      transport.onSend = (request) => transport.emit({
-        'id': request['id'],
-        'type': 'response',
-        'command': 'wrong',
-        'success': true,
-      });
-      await expectLater(
-        pi.prompt('only once'),
-        throwsA(
-          isA<PiRpcException>().having(
-            (e) => e.outcomeUnknown,
-            'outcome unknown',
-            true,
-          ),
+  test('malformed prompt acknowledgement retains the safety barrier; stop bypasses selection writes', () async {
+    final transport = TestTransport();
+    final pi = PiRpcClient(transportFactory: () async => transport);
+    addTearDown(pi.close);
+    transport.onSend = (request) => transport.emit({
+      'id': request['id'],
+      'type': 'response',
+      'command': 'wrong',
+      'success': true,
+    });
+    await expectLater(
+      pi.prompt('only once'),
+      throwsA(
+        isA<PiRpcException>().having(
+          (e) => e.outcomeUnknown,
+          'outcome unknown',
+          true,
         ),
-      );
-      expect(pi.hasUnsettledConversationMutation, true);
-      final prompt = transport.commands.single;
-      transport.reply(prompt, null);
-      await tick();
-      expect(pi.hasUnsettledConversationMutation, false);
-      transport.onSend = null;
-      final selecting = pi.setThinkingLevel(PiThinkingLevel.low);
-      await tick();
-      final selection = transport.commands.last;
-      transport.onSend = (request) =>
-          transport.reply(request, {'steering': [], 'followUp': []});
-      await pi.clearQueue();
-      await pi.abort();
-      transport.reply(selection, null);
-      await selecting;
-      expect(transport.commands.where((c) => c['type'] == 'prompt').length, 1);
-    },
-  );
+      ),
+    );
+    expect(pi.hasUnsettledConversationMutation, true);
+    final prompt = transport.commands.single;
+    transport.reply(prompt, null);
+    await tick();
+    expect(pi.hasUnsettledConversationMutation, false);
+    transport.onSend = null;
+    final selecting = pi.setThinkingLevel(PiThinkingLevel.low);
+    await tick();
+    final selection = transport.commands.last;
+    transport.onSend = (request) =>
+        transport.reply(request, {'steering': [], 'followUp': []});
+    await pi.clearQueue();
+    await pi.abort();
+    transport.reply(selection, null);
+    await selecting;
+    expect(transport.commands.where((c) => c['type'] == 'prompt').length, 1);
+  });
 
-  test(
-    'empty reconnect skips nonexistent session files; a failed read still permits an explicit new session',
-    () async {
-      final pi = FakeChatGateway();
-      final chat = ChatController(pi);
-      addTearDown(() async {
-        chat.dispose();
-        await pi.stream.close();
-      });
-      await chat.refresh();
-      pi.stream.add(const PiRpcDisconnected());
-      pi.stream.add(const PiRpcConnected());
-      await tick();
-      expect(
-        pi.commands.where((c) => c.startsWith('switch_session:')),
-        isEmpty,
-      );
-      pi.pendingHistory = Completer<List<PiChatMessage>>();
-      final refresh = chat.refresh();
-      await tick();
-      pi.pendingHistory!.completeError(const PiRpcException('Missing session'));
-      await refresh;
-      expect(chat.canSend, false);
-      expect(chat.canSwitch, true);
-      pi.pendingHistory = null;
-      expect(await chat.changeSession(), true);
-      expect(chat.timeline.messages, isEmpty);
-      expect(chat.canSend, true);
-    },
-  );
+  test('empty reconnect skips nonexistent session files; a failed read still permits an explicit new session', () async {
+    final pi = FakeChatGateway();
+    final chat = ChatController(pi);
+    addTearDown(() async {
+      chat.dispose();
+      await pi.stream.close();
+    });
+    await chat.refresh();
+    pi.stream.add(const PiRpcDisconnected());
+    pi.stream.add(const PiRpcConnected());
+    await tick();
+    expect(pi.commands.where((c) => c.startsWith('switch_session:')), isEmpty);
+    pi.pendingHistory = Completer<List<PiChatMessage>>();
+    final refresh = chat.refresh();
+    await tick();
+    pi.pendingHistory!.completeError(const PiRpcException('Missing session'));
+    await refresh;
+    expect(chat.canSend, false);
+    expect(chat.canSwitch, true);
+    pi.pendingHistory = null;
+    expect(await chat.changeSession(), true);
+    expect(chat.timeline.messages, isEmpty);
+    expect(chat.canSend, true);
+  });
 
-  test(
-    'controller holds busy through agent_end/retry, refresh keeps live deltas, stops queue first',
-    () async {
-      final pi = FakeChatGateway();
-      final chat = ChatController(pi);
-      addTearDown(() async {
-        chat.dispose();
-        await pi.stream.close();
-      });
-      await chat.refresh();
-      pi.pendingPrompt = Completer<void>();
-      final sending = chat.send('one');
-      expect(await chat.send('duplicate'), false);
-      pi.stream.add(event('agent_start'));
-      pi.stream.add(
-        event('message_start', {'message': message('assistant', [], 3)}),
-      );
-      pi.stream.add(
-        event('message_update', {
-          'assistantMessageEvent': {
-            'type': 'text_delta',
-            'contentIndex': 0,
-            'delta': 'live',
-          },
-        }),
-      );
-      pi.pendingPrompt!.complete();
-      expect(await sending, true);
-      pi.stream.add(event('agent_end', {'willRetry': true}));
-      pi.stream.add(event('auto_retry_start'));
-      await chat.refresh();
-      expect(chat.activity, ChatActivity.retrying);
-      expect(chat.timeline.messages.last.text, 'live');
-      expect(chat.canSend, false);
-      expect(await chat.stop(), ['next']);
-      expect(
-        pi.commands.indexOf('clear_queue'),
-        lessThan(pi.commands.indexOf('abort')),
-      );
-      await tick();
-      expect(chat.activity, ChatActivity.idle);
-    },
-  );
+  test('controller holds busy through agent_end/retry, refresh keeps live deltas, stops queue first', () async {
+    final pi = FakeChatGateway();
+    final chat = ChatController(pi);
+    addTearDown(() async {
+      chat.dispose();
+      await pi.stream.close();
+    });
+    await chat.refresh();
+    pi.pendingPrompt = Completer<void>();
+    final sending = chat.send('one');
+    expect(await chat.send('duplicate'), false);
+    pi.stream.add(event('agent_start'));
+    pi.stream.add(
+      event('message_start', {'message': message('assistant', [], 3)}),
+    );
+    pi.stream.add(
+      event('message_update', {
+        'assistantMessageEvent': {
+          'type': 'text_delta',
+          'contentIndex': 0,
+          'delta': 'live',
+        },
+      }),
+    );
+    pi.pendingPrompt!.complete();
+    expect(await sending, true);
+    pi.stream.add(event('agent_end', {'willRetry': true}));
+    pi.stream.add(event('auto_retry_start'));
+    await chat.refresh();
+    expect(chat.activity, ChatActivity.retrying);
+    expect(chat.timeline.messages.last.text, 'live');
+    expect(chat.canSend, false);
+    expect(await chat.stop(), ['next']);
+    expect(
+      pi.commands.indexOf('clear_queue'),
+      lessThan(pi.commands.indexOf('abort')),
+    );
+    await tick();
+    expect(chat.activity, ChatActivity.idle);
+  });
 
-  test(
-    'history hydration racing deltas cannot overwrite live content; settled re-syncs',
-    () async {
-      final pi = FakeChatGateway();
-      final chat = ChatController(pi);
-      addTearDown(() async {
-        chat.dispose();
-        await pi.stream.close();
-      });
-      pi.pendingHistory = Completer<List<PiChatMessage>>();
-      final loading = chat.refresh();
-      await tick();
-      pi.stream.add(event('agent_start'));
-      pi.stream.add(
-        event('message_start', {'message': message('assistant', [], 1)}),
-      );
-      pi.stream.add(
-        event('message_update', {
-          'assistantMessageEvent': {
-            'type': 'text_delta',
-            'contentIndex': 0,
-            'delta': 'new',
-          },
-        }),
-      );
-      pi.pendingHistory!.complete([]);
-      await loading;
-      expect(chat.timeline.messages.last.text, 'new');
-      pi.pendingHistory = null;
-      pi.history = [
-        PiChatMessage.fromJson(message('assistant', [text('final')])),
-      ];
-      pi.stream.add(event('agent_settled'));
-      await tick();
-      expect(chat.timeline.messages.single.text, 'final');
-      expect(chat.canSend, true);
-    },
-  );
+  test('history hydration racing deltas cannot overwrite live content; settled re-syncs', () async {
+    final pi = FakeChatGateway();
+    final chat = ChatController(pi);
+    addTearDown(() async {
+      chat.dispose();
+      await pi.stream.close();
+    });
+    pi.pendingHistory = Completer<List<PiChatMessage>>();
+    final loading = chat.refresh();
+    await tick();
+    pi.stream.add(event('agent_start'));
+    pi.stream.add(
+      event('message_start', {'message': message('assistant', [], 1)}),
+    );
+    pi.stream.add(
+      event('message_update', {
+        'assistantMessageEvent': {
+          'type': 'text_delta',
+          'contentIndex': 0,
+          'delta': 'new',
+        },
+      }),
+    );
+    pi.pendingHistory!.complete([]);
+    await loading;
+    expect(chat.timeline.messages.last.text, 'new');
+    pi.pendingHistory = null;
+    pi.history = [
+      PiChatMessage.fromJson(message('assistant', [text('final')])),
+    ];
+    pi.stream.add(event('agent_settled'));
+    await tick();
+    expect(chat.timeline.messages.single.text, 'final');
+    expect(chat.canSend, true);
+  });
 
-  test(
-    'cancelled session switch preserves history; reconnect restores saved session without replay',
-    () async {
-      final pi = FakeChatGateway();
-      final chat = ChatController(pi);
-      addTearDown(() async {
-        chat.dispose();
-        await pi.stream.close();
-      });
-      pi.history = [PiChatMessage.fromJson(message('user', 'persisted'))];
-      await chat.refresh();
-      pi.cancelled = true;
-      expect(await chat.changeSession(), false);
-      expect(chat.timeline.messages.single.text, 'persisted');
-      pi.cancelled = false;
-      pi.stream.add(const PiRpcDisconnected());
-      pi.stream.add(const PiRpcConnected());
-      await tick();
-      expect(pi.commands, contains('switch_session:/first.jsonl'));
-      expect(pi.commands.where((c) => c.startsWith('prompt:')), isEmpty);
-      expect(chat.isReady, true);
-    },
-  );
+  test('cancelled session switch preserves history; reconnect restores saved session without replay', () async {
+    final pi = FakeChatGateway();
+    final chat = ChatController(pi);
+    addTearDown(() async {
+      chat.dispose();
+      await pi.stream.close();
+    });
+    pi.history = [PiChatMessage.fromJson(message('user', 'persisted'))];
+    await chat.refresh();
+    pi.cancelled = true;
+    expect(await chat.changeSession(), false);
+    expect(chat.timeline.messages.single.text, 'persisted');
+    pi.cancelled = false;
+    pi.stream.add(const PiRpcDisconnected());
+    pi.stream.add(const PiRpcConnected());
+    await tick();
+    expect(pi.commands, contains('switch_session:/first.jsonl'));
+    expect(pi.commands.where((c) => c.startsWith('prompt:')), isEmpty);
+    expect(chat.isReady, true);
+  });
 }

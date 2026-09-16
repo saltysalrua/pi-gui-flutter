@@ -4,19 +4,28 @@ import 'dart:io';
 
 /// 只按 LF 分帧；不把 JSON 字符串里的 CR / U+2028 / U+2029 当换行。
 Stream<String> decodePiJsonl(Stream<List<int>> bytes) async* {
-  var buffer = '';
+  final fragments = StringBuffer();
   await for (final chunk in bytes.transform(utf8.decoder)) {
-    buffer += chunk;
+    var start = 0;
     int newline;
-    while ((newline = buffer.indexOf('\n')) >= 0) {
-      var line = buffer.substring(0, newline);
-      buffer = buffer.substring(newline + 1);
+    // Scan each decoded chunk once. A large get_messages line must not copy
+    // and rescan its entire accumulated prefix whenever another chunk arrives.
+    while ((newline = chunk.indexOf('\n', start)) >= 0) {
+      var line = chunk.substring(start, newline);
+      start = newline + 1;
+      if (fragments.isNotEmpty) {
+        fragments.write(line);
+        line = fragments.toString();
+        fragments.clear();
+      }
       if (line.endsWith('\r')) line = line.substring(0, line.length - 1);
       if (line.isNotEmpty) yield line;
     }
+    if (start < chunk.length) fragments.write(chunk.substring(start));
   }
-  if (buffer.endsWith('\r')) buffer = buffer.substring(0, buffer.length - 1);
-  if (buffer.isNotEmpty) yield buffer;
+  var tail = fragments.toString();
+  if (tail.endsWith('\r')) tail = tail.substring(0, tail.length - 1);
+  if (tail.isNotEmpty) yield tail;
 }
 
 abstract interface class PiRpcTransport {

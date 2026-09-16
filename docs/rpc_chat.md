@@ -1,6 +1,6 @@
 ---
 title: "RPC 对话、Markdown 与文件改动"
-version: "1.3.0"
+version: "1.4.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, chat, markdown, diff]
@@ -201,6 +201,36 @@ assistantNumbers: null,       null, 1,         2,         null, 3
 - 迟到确认派发 `PiRpcConversationSettled`，只回读，不重新发送。会话切换确认派发 `PiRpcSessionChanged`，模型选择器重新读取模型/等级。
 - `clear_queue/abort` 不等待模型选择写入屏障，停止路径不会被未确认的模型选择卡住。
 - 顶层错误提示使用本地化的人话，不直接输出原始异常堆栈。原始工具返回仍可在明确展开的输出区域查看。
+
+## 加载性能与验证方式
+
+仍采用 Flutter/Dart → Node 适配层 → Pi RPC，不引入 Rust、不直接解析 Pi 私有历史，也不改变空会话居中 / 有消息底部输入的两态布局。
+
+- **按数据块分帧**：`lib/core/rpc/pi_rpc_transport.dart` 的 `decodePiJsonl` 只扫描当前 UTF-8 解码块，把未结束的一行放入 `StringBuffer`；遇到 LF 才合并。`assets/backend/workspace_rpc.mjs` 的 `lines` 同样用片段数组处理，避免大 `get_messages` 每收到一块就复制、重扫整个前缀。LF/CRLF、跨块 UTF-8、U+2028/U+2029、空行行为不变；Dart 保留原来的 EOF 尾行读取行为，Node 仍只派发完整 LF 帧。
+- **Node 只解码一次**：`routePiOutput` 把解析结果一并交给 `WorkspaceAdapter` 做响应关联和运行状态维护，公开输出仍转发原始 JSON 行，不二次解析或重新序列化。内部探测响应不外泄，未知事件、旁路文字和坏行继续交给 Dart 隔离，`agent_end` 仍不解除运行锁。
+- **工具引用索引**：`lib/core/models/chat_timeline.dart` 用 `toolCallId → 可见引用数` 判断结果是否已有消息引用，避免每个工具结果都扫描全部前文。最终消息替换、内容块替换、历史重载会维护/清空引用数；不能使用只增不减的 Set，否则被最终消息删除的草稿工具会错误隐藏后续孤立结果。流式更新只维护变化的内容块，不反复登记整条消息的工具。孤立结果、编号、累计输出与 Diff 证据保持原行为。
+- **摘要缓存与加载调度**：见 [工作区历史缓存](workspaces_sessions.md#历史缓存与加载顺序)。消息本身不做跨会话缓存，不绕过 Pi 的当前分支/压缩投影。
+
+用纯合成数据运行分段探针，不启动 Pi、不读用户历史、不消耗模型额度：
+
+```bash
+dart run tool/check_session_performance.dart
+# 可选：指定每组工具调用数；默认 1000 和 5000
+dart run tool/check_session_performance.dart 1000 5000
+```
+
+探针分别记录 JSONL 分帧、`jsonDecode`、强类型映射与时间线重建；预热后取 5 次中位数，不设置易波动的耗时测试阈值。对比前版本 `1685e2f` 与本次代码时，在独立临时目录放置相同探针和对应的纯 Dart 文件，本机 Dart JIT 的一轮结果如下：
+
+| 合成数据 | 阶段 | 修改前 | 修改后 |
+| --- | --- | --- | --- |
+| 5,000 次工具调用 / 10,000 条记录，约 3.75 MiB | Dart JSONL 分帧（64 KiB 块） | 200.1 ms | 14.8 ms |
+| 同上 | 时间线重建 | 437.5 ms | 3.8 ms |
+
+这不是 GUI 首帧或整个会话切换耗时。另一次通过官方 SDK **只读**测量本项目 23 个会话，强制扫描约 179–231 ms，适配层缓存命中约 0.01 ms；此值不含 SDK 导入、IPC 和界面渲染。
+
+本次未改变 SDK 冷启动、`get_messages` 整包传输、Dart 主 isolate 的整包 JSON 解码或 Markdown 渲染。上述大样本的 `jsonDecode` 仍约 57 ms；若继续优化超长会话，应针对真实 GUI 的分段/帧耗时评估后台 isolate 或官方分页接口，不能把合成测试结果宣传成整个页面“瞬间加载”。
+
+回归集中在 `test/pi_rpc_client_test.dart` 的大帧/UTF-8/尾行与协议隔离，`test/chat_rpc_test.dart` 的草稿/最终引用替换、重复引用、孤立结果与重载，以及工作区文档列出的缓存状态机。验证全程不热重启或切换当前活动聊天，新后端资源在下次正常启动更新后的 GUI 时装载。
 
 ## 扩展槽位
 

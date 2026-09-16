@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_client.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_transport.dart';
@@ -63,6 +64,23 @@ void main() {
       expect(jsonDecode(result.first)['text'], '中文😀\u2028\u2029\r\n');
     },
   );
+
+  test('JSONL handles a large fragmented record, split CRLF, empty lines and an EOF tail', () async {
+    final large = jsonEncode({'text': '中文😀\u2028\u2029' * 20000});
+    final chunks = <List<int>>[utf8.encode('\n\r\n')];
+    final bytes = utf8.encode(large);
+    for (var i = 0; i < bytes.length; i += 8191) {
+      chunks.add(
+        bytes.sublist(i, i + 8191 < bytes.length ? i + 8191 : bytes.length),
+      );
+    }
+    chunks.addAll([utf8.encode('\r'), utf8.encode('\n\nsmall\r\nlast\r')]);
+    expect(await decodePiJsonl(Stream.fromIterable(chunks)).toList(), [
+      large,
+      'small',
+      'last',
+    ]);
+  });
 
   test(
     'correlates reversed responses and preserves extension UI events',
@@ -149,26 +167,23 @@ void main() {
     },
   );
 
-  test(
-    'read timeout does not kill Pi; late responses cannot change later requests',
-    () async {
-      final transport = TestTransport();
-      final pi = PiRpcClient(
-        transportFactory: () async => transport,
-        requestTimeout: const Duration(milliseconds: 30),
-      );
-      addTearDown(pi.close);
-      await expectLater(pi.getState(), throwsA(isA<PiRpcException>()));
-      final old = transport.commands.single;
-      transport.onSend = (request) {
-        transport.reply(old, {'model': modelJson, 'thinkingLevel': 'high'});
-        transport.reply(request, {'model': null, 'thinkingLevel': 'off'});
-      };
-      expect((await pi.getState()).model, isNull);
-      expect(transport.closed, isFalse);
-      expect(pi.connectionCount, 1);
-    },
-  );
+  test('read timeout does not kill Pi; late responses cannot change later requests', () async {
+    final transport = TestTransport();
+    final pi = PiRpcClient(
+      transportFactory: () async => transport,
+      requestTimeout: const Duration(milliseconds: 30),
+    );
+    addTearDown(pi.close);
+    await expectLater(pi.getState(), throwsA(isA<PiRpcException>()));
+    final old = transport.commands.single;
+    transport.onSend = (request) {
+      transport.reply(old, {'model': modelJson, 'thinkingLevel': 'high'});
+      transport.reply(request, {'model': null, 'thinkingLevel': 'off'});
+    };
+    expect((await pi.getState()).model, isNull);
+    expect(transport.closed, isFalse);
+    expect(pi.connectionCount, 1);
+  });
 
   test(
     'stdout noise and one invalid UI event do not interrupt valid responses',

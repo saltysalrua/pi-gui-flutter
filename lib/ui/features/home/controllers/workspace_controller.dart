@@ -1,7 +1,10 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:pi_gui/core/rpc/pi_chat_types.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_types.dart';
 import 'package:pi_gui/core/rpc/pi_workspace_types.dart';
+
 import 'chat_controller.dart';
 import 'model_picker_controller.dart';
 
@@ -19,8 +22,9 @@ class WorkspaceController extends ChangeNotifier {
   List<PiSessionSummary> sessions = const [];
   bool isBusy = false, isLoadingSessions = false;
   String? failureCode, sessionsFailure, createdPath;
-  bool _disposed = false, _refreshAgain = false;
-  int _generation = 0;
+  bool _disposed = false, _forceSessionsAgain = false;
+  int _generation = 0, _sessionsRevision = 0;
+  Future<void>? _sessionRefresh;
   String? _lastSession, _lastTitle;
 
   bool get canSwitch =>
@@ -43,6 +47,7 @@ class WorkspaceController extends ChangeNotifier {
   void _onEvent(PiRpcEvent event) {
     if (event is PiRpcWorkspaceChanged) {
       _generation++;
+      _sessionsRevision++;
       sessions = const [];
       sessionsFailure = null;
       _lastSession = null;
@@ -51,7 +56,13 @@ class WorkspaceController extends ChangeNotifier {
       // Also handles acknowledgements arriving after a request timeout.
       if (!isBusy) unawaited(refresh());
     } else if (event is PiRpcConversationSettled || event is PiRpcConnected) {
+      _sessionsRevision++;
       if (!isBusy) unawaited(refresh());
+    } else if (event is PiChatEvent &&
+        const {'agent_settled', 'compaction_end'}.contains(event.type)) {
+      // Refresh timestamps/counts even when the session path/title is unchanged.
+      _sessionsRevision++;
+      if (!chat.workspaceLocked) unawaited(refreshSessions());
     }
   }
 
@@ -66,49 +77,85 @@ class WorkspaceController extends ChangeNotifier {
     if (_lastSession != chat.sessionFile || _lastTitle != chat.title) {
       _lastSession = chat.sessionFile;
       _lastTitle = chat.title;
+      _sessionsRevision++;
       unawaited(refreshSessions());
     }
   }
 
-  Future<void> refreshSessions() async {
-    if (_disposed) return;
-    if (isLoadingSessions) {
-      _refreshAgain = true;
-      return;
-    }
+  Future<void> refreshSessions({bool force = false}) {
+    if (_disposed) return Future.value();
+    _forceSessionsAgain |= force;
+    if (_sessionRefresh case final loading?) return loading;
+    // Assign before notifying listeners so reentrant callers share this load.
+    final completion = Completer<void>();
+    _sessionRefresh = completion.future;
+    unawaited(
+      _loadSessions().then<void>(
+        (_) => completion.complete(),
+        onError: completion.completeError,
+      ),
+    );
+    return completion.future;
+  }
+
+  Future<void> _loadSessions() async {
     isLoadingSessions = true;
-    final generation = _generation;
     _notify();
     try {
-      final result = await _pi.listSessions();
-      if (!_disposed && generation == _generation) {
-        sessions = result;
-        sessionsFailure = null;
-      }
-    } catch (_) {
-      if (generation == _generation) sessionsFailure = 'SESSIONS_UNAVAILABLE';
+      int revision;
+      do {
+        revision = _sessionsRevision;
+        final generation = _generation;
+        final force = _forceSessionsAgain;
+        _forceSessionsAgain = false;
+        try {
+          final result = await _pi.listSessions(force: force);
+          if (!_disposed &&
+              !_forceSessionsAgain &&
+              generation == _generation &&
+              revision == _sessionsRevision) {
+            sessions = result;
+            sessionsFailure = null;
+          }
+        } catch (_) {
+          if (!_disposed &&
+              !_forceSessionsAgain &&
+              generation == _generation &&
+              revision == _sessionsRevision) {
+            sessionsFailure = 'SESSIONS_UNAVAILABLE';
+          }
+        }
+        // Duplicate readers share one request. A real change or explicit
+        // refresh during that request gets one trailing read, awaited by all.
+      } while (!_disposed &&
+          (revision != _sessionsRevision || _forceSessionsAgain));
     } finally {
+      _sessionRefresh = null;
       isLoadingSessions = false;
       _notify();
-      if (_refreshAgain && !_disposed) {
-        _refreshAgain = false;
-        unawaited(refreshSessions());
-      }
     }
   }
 
-  Future<void> refresh({bool loadConversation = true}) async {
+  Future<void> _refreshConversation() async {
+    await chat.refresh();
+    await models.refresh();
+  }
+
+  Future<void> refresh({
+    bool loadConversation = true,
+    bool forceSessions = false,
+  }) async {
     if (_disposed || isBusy) return;
     isBusy = true;
     _notify();
     try {
       snapshot = await _pi.getWorkspace();
       failureCode = null;
-      await refreshSessions();
-      if (loadConversation) {
-        await chat.refresh();
-        await models.refresh();
-      }
+      // Sidebar enumeration must not delay hydrating the active conversation.
+      await Future.wait([
+        refreshSessions(force: forceSessions),
+        if (loadConversation) _refreshConversation(),
+      ]);
     } catch (error) {
       failureCode = _errorCode(error);
     } finally {
@@ -187,9 +234,7 @@ class WorkspaceController extends ChangeNotifier {
       chat.setWorkspaceLocked(false);
       models.setWorkspaceLocked(false);
       if (!_disposed && !_pi.hasUnsettledConversationMutation) {
-        await chat.refresh();
-        await models.refresh();
-        await refreshSessions();
+        await Future.wait([refreshSessions(), _refreshConversation()]);
       }
       isBusy = false;
       _notify();

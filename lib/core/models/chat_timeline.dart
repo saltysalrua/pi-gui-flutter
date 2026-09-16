@@ -48,6 +48,9 @@ class ChatToolCall {
 class ChatTimeline {
   final messages = <PiChatMessage>[];
   final tools = <String, ChatToolCall>{};
+  // Count visible references, including orphan placeholders. A final message
+  // may remove a draft tool call, so a grow-only set would hide later results.
+  final _toolReferences = <String, int>{};
   int? _active;
   int? _thinkingContentIndex;
   int _fallbackTimestamp = -1;
@@ -72,6 +75,7 @@ class ChatTimeline {
     final previous = Map<String, ChatToolCall>.of(tools);
     messages.clear();
     tools.clear();
+    _toolReferences.clear();
     _active = null;
     _thinkingContentIndex = null;
     for (final message in history) {
@@ -134,13 +138,28 @@ class ChatTimeline {
 
   void _registerTools(PiChatMessage message) {
     for (final block in message.content) {
-      if (block.kind != PiContentKind.toolCall || block.id.isEmpty) continue;
-      final old =
-          tools[block.id] ?? ChatToolCall(id: block.id, name: block.name);
-      tools[block.id] = old.copyWith(
-        name: block.name,
-        arguments: block.arguments,
-      );
+      _registerTool(block);
+    }
+  }
+
+  void _registerTool(PiContent block) {
+    if (block.kind != PiContentKind.toolCall) return;
+    _toolReferences.update(block.id, (count) => count + 1, ifAbsent: () => 1);
+    if (block.id.isEmpty) return;
+    final old = tools[block.id] ?? ChatToolCall(id: block.id, name: block.name);
+    tools[block.id] = old.copyWith(
+      name: block.name,
+      arguments: block.arguments,
+    );
+  }
+
+  void _unregisterTool(PiContent block) {
+    if (block.kind != PiContentKind.toolCall) return;
+    final count = _toolReferences[block.id] ?? 0;
+    if (count <= 1) {
+      _toolReferences.remove(block.id);
+    } else {
+      _toolReferences[block.id] = count - 1;
     }
   }
 
@@ -158,12 +177,7 @@ class ChatTimeline {
             : ToolPhase.completed,
       );
       // Orphan results (e.g. compacted history) must still remain visible.
-      final referenced = messages.any(
-        (m) => m.content.any(
-          (b) => b.kind == PiContentKind.toolCall && b.id == id,
-        ),
-      );
-      if (!referenced) {
+      if (!_toolReferences.containsKey(id)) {
         messages.add(
           PiChatMessage(
             role: 'toolResult',
@@ -181,6 +195,7 @@ class ChatTimeline {
             timestamp: message.timestamp,
           ),
         );
+        _registerTools(messages.last);
       }
       return;
     }
@@ -189,6 +204,9 @@ class ChatTimeline {
       _active = messages.length - 1;
       _thinkingContentIndex = null;
     } else if (_active != null && messages[_active!].role == message.role) {
+      for (final block in messages[_active!].content) {
+        _unregisterTool(block);
+      }
       messages[_active!] = message;
       _active = null;
       _thinkingContentIndex = null;
@@ -259,6 +277,9 @@ class ChatTimeline {
         if (delta.toolCall != null) blocks[delta.index] = delta.toolCall!;
     }
     messages[_active!] = message.copyWith(content: List.unmodifiable(blocks));
-    _registerTools(messages[_active!]);
+    // Only the changed block needs bookkeeping, not every prior tool in this
+    // assistant message on every text/thinking delta.
+    _unregisterTool(old);
+    _registerTool(blocks[delta.index]);
   }
 }

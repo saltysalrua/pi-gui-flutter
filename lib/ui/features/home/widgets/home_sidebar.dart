@@ -122,7 +122,10 @@ class _HomeSidebarState extends State<HomeSidebar> {
                     tooltip: l10n.workspaceRefresh,
                     onPressed: workspace.isBusy
                         ? null
-                        : () => workspace.refresh(loadConversation: false),
+                        : () => workspace.refresh(
+                            forceSessions: true,
+                            loadConversation: false,
+                          ),
                   ),
                   AppIconButton.subtle(
                     key: _addProjectAnchor,

@@ -285,9 +285,8 @@ class PiRpcClient implements PiModelGateway, PiChatGateway, PiWorkspaceGateway {
           .toList();
       if (writes.isEmpty) break;
       try {
-        await Future.wait(
-          writes.map((pending) => pending.settled.future),
-        ).timeout(requestTimeout);
+        await Future.wait(writes.map((pending) => pending.settled.future))
+            .timeout(requestTimeout);
       } on TimeoutException {
         _record(PiRpcDiagnosticKind.requestTimeout, command: command);
         throw PiRpcException(
@@ -404,8 +403,10 @@ class PiRpcClient implements PiModelGateway, PiChatGateway, PiWorkspaceGateway {
       PiWorkspaceSnapshot.fromJson(await _request('gui_get_workspace'));
 
   @override
-  Future<List<PiSessionSummary>> listSessions() async {
-    final data = rpcObject(await _request('gui_list_sessions'));
+  Future<List<PiSessionSummary>> listSessions({bool force = false}) async {
+    final data = rpcObject(
+      await _request('gui_list_sessions', {if (force) 'force': true}),
+    );
     return List.unmodifiable(
       (data['sessions'] as List).map(PiSessionSummary.fromJson),
     );

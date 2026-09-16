@@ -102,7 +102,7 @@ abstract interface class PiWorkspaceGateway {
   Stream<PiRpcEvent> get events;
   bool get hasUnsettledConversationMutation;
   Future<PiWorkspaceSnapshot> getWorkspace();
-  Future<List<PiSessionSummary>> listSessions();
+  Future<List<PiSessionSummary>> listSessions({bool force = false});
   Future<PiWorkspaceSnapshot> openWorkspace(String path);
   Future<String> createWorkspace(String parent, String name);
   Future<String> createWorktree(String branch, String baseRef);

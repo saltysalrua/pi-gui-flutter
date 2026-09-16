@@ -1,6 +1,6 @@
 ---
 title: "工作区、历史会话与 Git Worktree"
-version: "1.1.0"
+version: "1.2.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, session, workspace, git-worktree]
@@ -77,6 +77,27 @@ GUI 以 Flutter asset 携带 `workspace_rpc.mjs` 和 `gui_tool_diff.mjs`，启�
 
 Flutter 不扫描、解析或改写 Pi 私有会话文件。适配层通过官方 SDK 读取摘要，会话内容仍使用官方 RPC；`get_messages` 返回 Pi 当前活动分支/压缩后的投影，不是自行拼接所有树分支的原始日志。
 
+### 历史缓存与加载顺序
+
+重复打开或刷新侧栏时，适配层会短暂复用**当前目录的官方会话摘要**，不再每次都重扫全部历史。缓存只存在于内存，不写新数据库，也不缓存消息正文或 SDK 的 `allMessagesText`。首次读取、失效或过期后的读取仍走 `SessionManager.list(cwd)`。
+
+- `WorkspaceService.listSessions({force})`：只保留一份当前目录摘要，有效期 **5 秒**，从扫描完成时起算；同目录、同版本的并发请求共用扫描。该时间不是轮询间隔，不会每 5 秒自动读磁盘。
+- `WorkspaceAdapter` 在 `message_end`、`agent_settled`、`compaction_end`、成功的非 `get_*` 转发命令确认后使缓存失效；新 Pi 启动（包括工作区切换及恢复）也失效。未知扩展写命令和迟到确认按同样规则处理，读状态/模型目录不会清缓存。
+- 旧版本、旧工作区的扫描即使晚到，也不能覆盖新缓存；失败不缓存，也不能回退成“旧数据就是刷新成功”。
+- 项目旁的**刷新按钮**通过 `WorkspaceController.refresh(forceSessions: true, loadConversation: false)` 强制读取，保留原来的 Git 刷新和“不发 Prompt”行为。外部终端改变历史时可用它立即回读；否则在下一次缓存过期后的读取中发现变化，不承诺后台自动同步。
+- Flutter 的 `refreshSessions()` 合并同时到来的读请求；读取途中有目录/会话变化或手动刷新时，追加一次最新读取，所有等待者等到它结束，不显示已过期的中间结果。聊天结束后即使标题没变，也会更新列表时间和消息数。
+- `WorkspaceController.refresh/_change` 在工作区已确认后并行读取侧栏摘要与当前对话，不再让摘要扫描挡住 `get_messages`。对话恢复和模型回读仍保持原先顺序；操作锁、迟到确认、取消切换与失败恢复逻辑不变。
+
+协议仅给已有命令增加可选字段，省略时允许命中缓存：
+
+```json
+{"id":"gui-refresh","type":"gui_list_sessions","force":true}
+```
+
+代码入口：`assets/backend/workspace_rpc.mjs` 的 `WorkspaceService` / `WorkspaceAdapter`，`lib/core/rpc/pi_workspace_types.dart` 的 `PiWorkspaceGateway.listSessions({force})`，`lib/core/rpc/pi_rpc_client.dart`，以及 `lib/ui/features/home/controllers/workspace_controller.dart`。JSONL 分帧和时间线索引的优化见 [聊天加载性能](rpc_chat.md#加载性能与验证方式)。
+
+这些后端修改随应用资源装载，需下次正常启动更新后的 GUI 才生效；不要为了验证而重启承载当前 Agent 的窗口。
+
 ### 切换生命周期
 
 1. 前端锁住聊天与模型写入，后端检查运行、压缩和待执行状态。
@@ -138,7 +159,8 @@ node tool/check_workspace_rpc.mjs
 
 - Dart 核心回归：类型映射、坏历史隔离、目录写超时屏障、切换互斥、确认前保留投影、失败后保留原目录。
 - Node 核心回归：真实临时 Git 仓库中的创建、源目录未提交改动不变、Unicode/空格、错误基线/分支、未提交/忽略文件与锁定删除保护、保留分支、失败切换恢复。
-- 真实 Pi 探针：在临时配置目录用官方 SDK 创建测试会话；RPC 发现、读取、切换空目录、执行只读 cwd 检查、恢复历史；同时只存在一个 Pi 子进程。**不发送模型请求，不改用户历史或当前项目。**
+- 真实 Pi 探针：在临时配置目录用官方 SDK 创建测试会话；RPC 发现、摘要缓存命中、通过 SDK 模拟外部改名后强制刷新、读取、切换空目录、执行只读 cwd 检查、恢复历史；同时只存在一个 Pi 子进程。**不发送模型请求，不改用户历史或当前项目。**
+- 缓存/竞态回归：`test/workspace_backend.test.mjs` 覆盖合并扫描、时钟推进过期、强制刷新、失败重试、旧扫描晚到、工作区隔离及事件失效；`test/workspace_rpc_test.dart` 覆盖前端读合并、强制尾随读取、过期结果隔离、聊天不被侧栏读取阻塞，以及标题不变时的 settled 刷新。
 
 UI 通过 Windows 真机启动与操作走查验证，不增加纯展示型 Widget 测试。
 

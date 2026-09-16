@@ -2,7 +2,7 @@
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createRequire } from "node:module";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import {
   readFile,
   writeFile,
@@ -16,6 +16,8 @@ import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
 const exec = promisify(execFile);
+// A short-lived SDK summary, not a second session database or a polling timer.
+const SESSION_CACHE_TTL_MS = 5000;
 const isWindows = process.platform === "win32";
 const key = (value) =>
   isWindows ? path.normalize(value).toLowerCase() : path.normalize(value);
@@ -44,16 +46,23 @@ export async function directory(value) {
 
 // Strictly LF framing; Unicode line separators inside JSON strings are not records.
 export function lines(stream, onLine) {
-  let buffer = "";
+  let fragments = [];
   stream.setEncoding("utf8");
   stream.on("data", (chunk) => {
-    buffer += chunk;
-    let index;
-    while ((index = buffer.indexOf("\n")) >= 0) {
-      const line = buffer.slice(0, index).replace(/\r$/, "");
-      buffer = buffer.slice(index + 1);
+    let start = 0,
+      index;
+    while ((index = chunk.indexOf("\n", start)) >= 0) {
+      let line = chunk.slice(start, index);
+      start = index + 1;
+      if (fragments.length) {
+        fragments.push(line);
+        line = fragments.join("");
+        fragments = [];
+      }
+      if (line.endsWith("\r")) line = line.slice(0, -1);
       if (line) onLine(line);
     }
+    if (start < chunk.length) fragments.push(chunk.slice(start));
   });
 }
 
@@ -175,12 +184,21 @@ export async function gitInfo(cwd) {
 }
 
 export class WorkspaceService {
-  constructor(SessionManager, storePath, initialPath) {
+  constructor(
+    SessionManager,
+    storePath,
+    initialPath,
+    { now = () => performance.now() } = {},
+  ) {
     this.sessions = SessionManager;
     this.storePath = storePath;
     this.current = initialPath;
     this.recent = [];
     this.persistenceWarning = false;
+    this.now = now;
+    this.sessionRevision = 0;
+    this.sessionCache = null;
+    this.sessionLoad = null;
   }
   async initialize() {
     try {
@@ -232,25 +250,64 @@ export class WorkspaceService {
     ].slice(0, 24);
     await this.save();
   }
-  async listSessions() {
-    let sessions;
+  invalidateSessions() {
+    this.sessionRevision++;
+    this.sessionCache = null;
+  }
+  listSessions({ force = false } = {}) {
+    const cwd = this.current;
+    const revision = this.sessionRevision;
+    const matches = (entry) =>
+      entry?.cwd === cwd && entry.revision === revision;
+    // Even explicit refreshes share an already fresh scan. Invalidated scans
+    // belong to an older revision and can neither satisfy nor cache a new read.
+    if (matches(this.sessionLoad)) return this.sessionLoad.promise;
+    if (
+      !force &&
+      matches(this.sessionCache) &&
+      this.now() < this.sessionCache.expiresAt
+    ) {
+      return Promise.resolve(this.sessionCache.data);
+    }
+    this.sessionCache = null;
+    const load = { cwd, revision, promise: null };
+    load.promise = this.loadSessionSummaries(cwd)
+      .then((data) => {
+        if (this.current === cwd && this.sessionRevision === revision) {
+          this.sessionCache = {
+            cwd,
+            revision,
+            data,
+            expiresAt: this.now() + SESSION_CACHE_TTL_MS,
+          };
+        }
+        return data;
+      })
+      .finally(() => {
+        if (this.sessionLoad === load) this.sessionLoad = null;
+      });
+    this.sessionLoad = load;
+    return load.promise;
+  }
+  async loadSessionSummaries(cwd) {
     try {
-      sessions = await this.sessions.list(this.current);
+      const sessions = await this.sessions.list(cwd);
+      // Retain only GUI summaries; release SDK allMessagesText/full-text data.
+      return {
+        sessions: sessions
+          .map((item) => ({
+            path: item.path,
+            id: item.id,
+            cwd: item.cwd,
+            title: item.name || item.firstMessage?.split("\n")[0] || "",
+            modified: new Date(item.modified).toISOString(),
+            messageCount: item.messageCount,
+          }))
+          .sort((a, b) => b.modified.localeCompare(a.modified)),
+      };
     } catch {
       fail("SESSIONS_UNAVAILABLE");
     }
-    return {
-      sessions: sessions
-        .map((item) => ({
-          path: item.path,
-          id: item.id,
-          cwd: item.cwd,
-          title: item.name || item.firstMessage?.split("\n")[0] || "",
-          modified: new Date(item.modified).toISOString(),
-          messageCount: item.messageCount,
-        }))
-        .sort((a, b) => b.modified.localeCompare(a.modified)),
-    };
   }
   async snapshot() {
     let repository = null,
@@ -431,6 +488,37 @@ main(process.argv.slice(2));
   return launcherPath;
 }
 
+// Decode once for internal probes and adapter bookkeeping. Public output keeps
+// its original bytes/text: unknown events and malformed lines still reach Dart.
+export function routePiOutput(line, pendingRequests, emit) {
+  let message;
+  try {
+    message = JSON.parse(line);
+  } catch {
+    emit(line);
+    return;
+  }
+  if (
+    !message ||
+    typeof message !== "object" ||
+    Array.isArray(message) ||
+    typeof message.type !== "string"
+  ) {
+    emit(line);
+    return;
+  }
+  const pending =
+    message.type === "response" && pendingRequests.get(message.id);
+  if (pending) {
+    pendingRequests.delete(message.id);
+    clearTimeout(pending.timer);
+    if (message.success) pending.resolve(message.data);
+    else pending.reject(new WorkspaceError("PI_REJECTED"));
+  } else {
+    emit(line, message);
+  }
+}
+
 // One Pi process at a time. Internal probes never enter the public response namespace.
 export class PiChild {
   constructor(
@@ -469,25 +557,7 @@ export class PiChild {
     );
     this.child.stderr.resume(); // Never leak credentials or raw startup errors into the GUI.
     this.child.stdin.on("error", () => {});
-    lines(this.child.stdout, (line) => {
-      let message;
-      try {
-        message = JSON.parse(line);
-      } catch {
-        emit(line);
-        return;
-      }
-      const pending =
-        message.type === "response" && this.pending.get(message.id);
-      if (pending) {
-        this.pending.delete(message.id);
-        clearTimeout(pending.timer);
-        if (message.success) pending.resolve(message.data);
-        else pending.reject(new WorkspaceError("PI_REJECTED"));
-      } else {
-        emit(line);
-      }
-    });
+    lines(this.child.stdout, (line) => routePiOutput(line, this.pending, emit));
     const ended = () => {
       this.exited = true;
       for (const item of this.pending.values()) {
@@ -556,20 +626,33 @@ export class WorkspaceAdapter {
     this.forwarded = new Map();
   }
   async start(sessionPath) {
+    this.service.invalidateSessions();
     const child = this.createChild(
       this.service.current,
-      (line) => {
+      (line, message) => {
         if (this.pi !== child) return;
-        let message;
-        try {
-          message = JSON.parse(line);
-        } catch {
-          this.emit(line);
-          return;
+        if (message?.type === "response") {
+          const command = this.forwarded.get(message.id);
+          this.forwarded.delete(message.id);
+          // Include extension commands and late write acknowledgements, not
+          // just prompt/new_session. Read-only queries leave the cache intact.
+          if (
+            command &&
+            !command.startsWith("get_") &&
+            message.success === true
+          ) {
+            this.service.invalidateSessions();
+          }
         }
-        if (message.type === "response") this.forwarded.delete(message.id);
-        if (message.type === "agent_start") this.agentBusy = true;
-        if (message.type === "agent_settled") this.agentBusy = false;
+        if (message?.type === "agent_start") this.agentBusy = true;
+        if (message?.type === "agent_settled") this.agentBusy = false;
+        if (
+          ["message_end", "agent_settled", "compaction_end"].includes(
+            message?.type,
+          )
+        ) {
+          this.service.invalidateSessions();
+        }
         this.emit(line);
       },
       sessionPath,
@@ -667,7 +750,9 @@ export class WorkspaceAdapter {
           data = await this.service.snapshot();
           break;
         case "gui_list_sessions":
-          data = await this.service.listSessions();
+          data = await this.service.listSessions({
+            force: request.force === true,
+          });
           break;
         case "gui_open_workspace":
           data = await this.open(request.path);

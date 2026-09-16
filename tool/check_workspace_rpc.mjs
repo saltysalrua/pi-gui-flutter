@@ -1,6 +1,6 @@
 // No model requests, no changes to the user's Pi history or project checkout.
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -43,8 +43,14 @@ session.appendMessage({
   timestamp: 2,
 });
 session.appendSessionInfo("真实 SDK 历史");
+let sdkScans = 0;
 const service = new WorkspaceService(
-  SessionManager,
+  {
+    list: (cwd) => {
+      sdkScans++;
+      return SessionManager.list(cwd);
+    },
+  },
   path.join(root, "prefs.json"),
   repo,
 );
@@ -101,6 +107,17 @@ try {
   const listed = await request("gui_list_sessions");
   assert.equal(listed.sessions.length, 1);
   assert.equal(listed.sessions[0].title, "真实 SDK 历史");
+  const scans = sdkScans;
+  await Promise.all([
+    request("gui_list_sessions"),
+    request("gui_list_sessions"),
+  ]);
+  assert.equal(sdkScans, scans);
+  // Simulate another client renaming a saved session, using only the SDK.
+  session.appendSessionInfo("外部重命名");
+  const refreshed = await request("gui_list_sessions", { force: true });
+  assert.equal(refreshed.sessions[0].title, "外部重命名");
+  assert.equal(sdkScans, scans + 1);
   assert.equal(
     (await request("switch_session", { sessionPath: session.getSessionFile() }))
       .cancelled,
@@ -133,8 +150,8 @@ try {
     events.filter((e) => e.type === "gui_workspace_changed").length,
     2,
   );
-  console.log(
-    "PASS: SDK history discovery, RPC content, Unicode/spaces, actual cwd switch, restore, one Pi process; no model calls.",
+  process.stdout.write(
+    "PASS: SDK history discovery/cache/forced rename refresh, RPC content, Unicode/spaces, actual cwd switch, restore, one Pi process; no model calls.\n",
   );
 } finally {
   for (const pending of replies.values()) clearTimeout(pending.timer);
