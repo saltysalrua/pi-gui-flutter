@@ -1,9 +1,14 @@
-name: Windows release
+name: Release
 
 on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      linux-only:
+        description: "Build Linux only; skip Windows build and publish"
+        type: boolean
+        default: false
 
 # Different commits must not cancel a version build already in flight.
 concurrency:
@@ -16,7 +21,9 @@ permissions:
 jobs:
   version:
     name: Check version
-    if: github.ref == 'refs/heads/master'
+    if: >-
+      github.ref == 'refs/heads/master' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -36,7 +43,7 @@ jobs:
   build:
     name: Build Windows x64
     needs: version
-    if: needs.version.outputs.changed == 'true'
+    if: needs.version.outputs.changed == 'true' && inputs.linux-only != true
     runs-on: windows-2022
     timeout-minutes: 45
     steps:
@@ -70,9 +77,52 @@ jobs:
           compression-level: 0
           retention-days: 30
 
+  build-linux:
+    name: Build Linux x64
+    needs: version
+    if: needs.version.outputs.changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install GTK and native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev
+      # subosito/flutter-action v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: stable
+          flutter-version: 3.47.4
+          architecture: x64
+          cache: true
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Build production entrypoint
+        run: flutter build linux --release -t lib/main.dart
+      - name: Package complete application and SHA-256
+        run: python3 tool/ci_release.py package-linux
+      # actions/upload-artifact v7.0.1 (Node 24)
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: linux-x64-${{ needs.version.outputs.version }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
   publish:
     name: Publish GitHub Release
-    needs: [version, build]
+    needs: [version, build, build-linux]
+    if: >-
+      needs.version.outputs.changed == 'true' &&
+      github.ref == 'refs/heads/master' &&
+      inputs.linux-only != true
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -95,6 +145,11 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: windows-x64-${{ needs.version.outputs.version }}
+          path: dist
+      # actions/download-artifact v8.0.1 (Node 24)
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: linux-x64-${{ needs.version.outputs.version }}
           path: dist
       - name: Verify downloaded archive
         working-directory: dist
@@ -133,7 +188,8 @@ jobs:
             gh release create "$RELEASE_TAG" "${args[@]}"
           fi
           # Resume a partially uploaded draft after a failed run.
-          gh release upload "$RELEASE_TAG" dist/*.zip dist/*.sha256 --clobber
+          gh release upload "$RELEASE_TAG" \
+            dist/*.zip dist/*.tar.gz dist/*.sha256 --clobber
           gh release edit "$RELEASE_TAG" --draft=false
           gh release view "$RELEASE_TAG" --json url --jq .url \
             >> "$GITHUB_STEP_SUMMARY"

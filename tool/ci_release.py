@@ -1,14 +1,18 @@
-"""Version gate and complete Windows ZIP packaging for GitHub Actions (stdlib only)."""
+"""Version gate plus complete Windows ZIP and Linux tar packaging for GitHub
+Actions (stdlib only)."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -101,6 +105,22 @@ def release_notes(root: Path) -> str:
     return body.lstrip("\n")
 
 
+# Files from the repository that ship inside every release archive next to the
+# application itself.
+SHARED_FILES = (
+    ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
+    ("assets/fonts/MiSans/LICENSE.pdf", "licenses/MiSans-LICENSE.pdf"),
+)
+
+
+def write_checksum(archive: Path) -> None:
+    with archive.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    archive.with_name(archive.name + ".sha256").write_text(
+        f"{digest}  {archive.name}\n", encoding="utf-8"
+    )
+
+
 def package(root: Path, source: Path, output: Path) -> Path:
     version = parse_version((root / "pubspec.yaml").read_text(encoding="utf-8-sig"))
     for name in ("pi_gui.exe", "flutter_windows.dll", "data/icudtl.dat", "data/app.so"):
@@ -120,22 +140,62 @@ def package(root: Path, source: Path, output: Path) -> Path:
             if path.is_file():
                 bundle.write(path, path.relative_to(source).as_posix())
         bundle.writestr("README.md", release_notes(root).encode("utf-8"))
-        for original, destination in (
-            ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
-            ("assets/fonts/MiSans/LICENSE.pdf", "licenses/MiSans-LICENSE.pdf"),
-        ):
+        for original, destination in SHARED_FILES:
             bundle.write(root / original, destination)
-    with archive.open("rb") as stream:
-        digest = hashlib.file_digest(stream, "sha256").hexdigest()
-    archive.with_suffix(".zip.sha256").write_text(
-        f"{digest}  {archive.name}\n", encoding="utf-8"
-    )
+    write_checksum(archive)
+    return archive
+
+
+def linux_executables(source: Path) -> set[str]:
+    """Top-level files that still carry a POSIX executable bit after the build."""
+    return {
+        p.name
+        for p in source.iterdir()
+        if p.is_file() and p.stat().st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    }
+
+
+def package_linux(root: Path, source: Path, output: Path) -> Path:
+    """Package the Flutter Linux bundle as a tar.gz that keeps the executable bit."""
+    version = parse_version((root / "pubspec.yaml").read_text(encoding="utf-8-sig"))
+    for name in (
+        "pi_gui",
+        "data/icudtl.dat",
+        "lib/libapp.so",
+        "lib/libflutter_linux_gtk.so",
+    ):
+        if not (source / name).is_file():
+            raise ValueError(f"Incomplete Linux release: missing {name}")
+    if not (source / "data/flutter_assets").is_dir():
+        raise ValueError("Incomplete Linux release: missing Flutter assets")
+    executables = linux_executables(source)
+    if executables != {"pi_gui"}:
+        raise ValueError(f"Unexpected executable in release directory: {sorted(executables)}")
+    output.mkdir(parents=True, exist_ok=True)
+    archive = output / f"pi-gui-flutter-{version}-linux-x64.tar.gz"
+    with tarfile.open(archive, "w:gz") as bundle:
+        for path in sorted(source.rglob("*")):
+            if path.is_file() or path.is_symlink():
+                bundle.add(
+                    path,
+                    arcname=path.relative_to(source).as_posix(),
+                    recursive=False,
+                )
+        readme = release_notes(root).encode("utf-8")
+        info = tarfile.TarInfo("README.md")
+        info.size = len(readme)
+        bundle.addfile(info, io.BytesIO(readme))
+        for original, destination in SHARED_FILES:
+            bundle.add(root / original, arcname=destination, recursive=False)
+    write_checksum(archive)
     return archive
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("detect", "package", "notes"))
+    parser.add_argument(
+        "command", choices=("detect", "package", "package-linux", "notes")
+    )
     args = parser.parse_args()
     if args.command == "detect":
         try:
@@ -161,6 +221,12 @@ def main() -> None:
                 )
     elif args.command == "notes":
         sys.stdout.buffer.write(release_notes(ROOT).encode("utf-8"))
+    elif args.command == "package-linux":
+        print(
+            package_linux(
+                ROOT, ROOT / "build/linux/x64/release/bundle", ROOT / "dist"
+            )
+        )
     else:
         print(package(ROOT, ROOT / "build/windows/x64/runner/Release", ROOT / "dist"))
 

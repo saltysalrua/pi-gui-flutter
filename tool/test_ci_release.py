@@ -2,12 +2,15 @@
 
 import hashlib
 import subprocess
+import tarfile
 import tempfile
 import unittest
 import zipfile
+from contextlib import ExitStack
 from pathlib import Path
+from unittest import mock
 
-from ci_release import detect, git, package, parse_version, release_notes
+from ci_release import detect, git, package, package_linux, parse_version, release_notes
 
 
 class ReleaseTest(unittest.TestCase):
@@ -137,6 +140,79 @@ class ReleaseTest(unittest.TestCase):
         (source / "data/app.so").unlink()
         with self.assertRaises(ValueError):
             package(self.root, source, self.root / "dist")
+
+    def test_linux_tarball_checksum_and_qa_rejection(self):
+        self.commit("1.0.0+1")
+        source = self.root / "bundle"
+        for name in (
+            "pi_gui",
+            "data/icudtl.dat",
+            "data/flutter_assets/font.ttf",
+            "lib/libapp.so",
+            "lib/libflutter_linux_gtk.so",
+        ):
+            path = source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"fixture")
+        for name in (
+            "docs/release_usage.md",
+            "THIRD_PARTY_NOTICES.md",
+            "assets/fonts/MiSans/LICENSE.pdf",
+        ):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"notice")
+        body = "---\ntitle: 使用说明\n---\n\n# 使用说明\n\n正文。\n"
+        (self.root / "docs/release_usage.md").write_text(body, encoding="utf-8-sig")
+        # Windows stat cannot express the POSIX executable bit, so the
+        # validation set is stubbed for every host; CI exercises the real
+        # chmod-derived mode on ubuntu.
+        with ExitStack() as stack:
+            stack.enter_context(
+                mock.patch("ci_release.linux_executables", return_value={"pi_gui"})
+            )
+            archive = package_linux(self.root, source, self.root / "dist")
+        self.assertEqual(archive.name, "pi-gui-flutter-1.0.0+1-linux-x64.tar.gz")
+        with tarfile.open(archive) as bundle:
+            names = bundle.getnames()
+            for expected in (
+                "pi_gui",
+                "lib/libflutter_linux_gtk.so",
+                "data/flutter_assets/font.ttf",
+                "README.md",
+                "licenses/MiSans-LICENSE.pdf",
+            ):
+                self.assertIn(expected, names)
+            readme_handle = bundle.extractfile("README.md")
+            self.assertIsNotNone(readme_handle)
+            self.assertEqual(
+                readme_handle.read().decode("utf-8"), release_notes(self.root)
+            )
+        checksum = (self.root / "dist" / (archive.name + ".sha256")).read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(
+            checksum,
+            f"{hashlib.sha256(archive.read_bytes()).hexdigest()}  {archive.name}\n",
+        )
+        with (
+            mock.patch(
+                "ci_release.linux_executables", return_value={"pi_gui", "qa_tool"}
+            ),
+            self.assertRaises(ValueError),
+        ):
+            package_linux(self.root, source, self.root / "dist")
+        with (
+            mock.patch("ci_release.linux_executables", return_value=set()),
+            self.assertRaises(ValueError),
+        ):
+            package_linux(self.root, source, self.root / "dist")
+        (source / "lib/libapp.so").unlink()
+        with (
+            mock.patch("ci_release.linux_executables", return_value={"pi_gui"}),
+            self.assertRaises(ValueError),
+        ):
+            package_linux(self.root, source, self.root / "dist")
 
 
 if __name__ == "__main__":

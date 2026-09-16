@@ -6,13 +6,13 @@ type: "project"
 
 # Pi GUI
 
-[![Windows release](https://github.com/saltysalrua/pi-gui-flutter/actions/workflows/release.yml/badge.svg)](https://github.com/saltysalrua/pi-gui-flutter/actions/workflows/release.yml)
+[![Release](https://github.com/saltysalrua/pi-gui-flutter/actions/workflows/release.yml/badge.svg)](https://github.com/saltysalrua/pi-gui-flutter/actions/workflows/release.yml)
 
 基于 Flutter 的桌面 Pi RPC 客户端。Flutter 负责界面与交互，独立的 `pi --mode rpc` 进程负责模型、会话和工具执行。
 
 ## 下载
 
-在 [GitHub Releases](https://github.com/saltysalrua/pi-gui-flutter/releases) 下载 Windows x64 便携 ZIP，完整解压后运行 `pi_gui.exe`。需要已安装并配置的 Node.js 和 Pi；ZIP 不含模型凭据，也未做代码签名。详细要求见 [便携版使用说明](docs/release_usage.md)。
+在 [GitHub Releases](https://github.com/saltysalrua/pi-gui-flutter/releases) 下载 Windows x64 便携 ZIP 或 Linux x64 tar.gz，完整解压后运行 `pi_gui.exe` / `./pi_gui`。需要已安装并配置的 Node.js 和 Pi；包内不含模型凭据，也未做代码签名。详细要求见 [便携版使用说明](docs/release_usage.md)。
 
 ## 从源码运行
 
@@ -66,7 +66,7 @@ dart run tool/check_chat_rpc.dart --with-model
 
 ## 自动发布
 
-修改 `pubspec.yaml` 的 `version` 并推送到 `master`，GitHub Actions 会在版本实际变化时构建，并自动创建带 ZIP / SHA-256 的 Release；仅修改依赖或普通源码不会触发 Windows 构建。首次推送也会构建，可在 Actions 手动重跑。见 [GitHub 自动构建与发布](docs/github_release.md)。
+修改 `pubspec.yaml` 的 `version` 并推送到 `master`，GitHub Actions 会在版本实际变化时构建 Windows 与 Linux，并自动创建带压缩包 / SHA-256 的 Release；仅修改依赖或普通源码不会触发构建。首次推送也会构建，可在 Actions 手动重跑。见 [GitHub 自动构建与发布](docs/github_release.md)。
 
 ## 文档
 

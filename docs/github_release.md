@@ -1,9 +1,9 @@
 ---
 title: "GitHub 自动构建与发布"
-version: "1.1.1"
+version: "1.2.0"
 status: "implemented"
 type: "developer-guide"
-tags: [github-actions, windows, flutter, release]
+tags: [github-actions, windows, linux, flutter, release]
 ---
 
 # GitHub 自动构建与发布
@@ -14,12 +14,12 @@ tags: [github-actions, windows, flutter, release]
 
 1. 修改根目录 `pubspec.yaml` 的 `version`，例如从 `1.0.0+1` 改为 `1.0.1+2`。
 2. 将本次源码、版本号和文档提交并推送到 `master`。
-3. 打开 GitHub → **Actions → Windows release** 查看进度。
-4. 构建、打包成功后，**Releases** 自动出现标签 `v1.0.1+2`，附完整 Windows x64 ZIP 和 `.zip.sha256`。
+3. 打开 GitHub → **Actions → Release** 查看进度。
+4. 构建、打包成功后，**Releases** 自动出现标签 `v1.0.1+2`，附完整 Windows x64 ZIP、Linux x64 tar.gz 和各自的 `.sha256`。
 
 完整版本号是唯一来源：修改 `+` 后的构建号也会触发，预发布示例为 `1.1.0-beta.1+3`，会创建 GitHub Pre-release。Windows 的四段数值都限制为 0–65535；不支持用文字作为构建号。
 
-每次 `master` push 都运行几秒的版本检查，但只有版本真的变化才使用 Windows Runner。比较的是 **push 前的提交与整个 push 最后的提交**，不是简单检查 `pubspec.yaml` 是否变动，也不是只看 `HEAD^`：
+每次 `master` push 都运行几秒的版本检查，但只有版本真的变化才会启动 Windows / Linux Runner。比较的是 **push 前的提交与整个 push 最后的提交**，不是简单检查 `pubspec.yaml` 是否变动，也不是只看 `HEAD^`：
 
 - 只改依赖、注释、工作流或普通源码：跳过构建和发布。
 - 一次推送多个提交，版本在较早提交中变更：仍构建。
@@ -30,27 +30,29 @@ tags: [github-actions, windows, flutter, release]
 
 不需要手工打 Git 标签，也不需要配置个人 PAT 或模型 API Key。只有发布 Job 拥有 `contents: write`，使用仓库自带的 `GITHUB_TOKEN`。
 
+手动 **Run workflow** 可在任意分支上执行：默认与 push 一样走完整流程但只允许 `master` 发布；勾选 **linux-only** 输入则跳过 Windows 构建和发布，只构建 Linux，适合没有本地 Linux 环境时验证 `linux/` runner 或依赖变更（例如 Cargokit / super_clipboard 升级）能否在 Linux 上编过。
+
 ## 失败后怎么处理
 
 - 网络或 Runner 临时故障：在该次运行中点 **Re-run failed jobs** / **Re-run all jobs**。
-- 版本未变但需要主动构建：在 `master` 上使用 **Run workflow**。
+- 版本未变但需要主动构建：在 `master` 上使用 **Run workflow**；分支上勾选 **linux-only** 可单独验证 Linux 构建。
 - 同一提交的 Release 已发布：重跑可再次构建，但不会替换已发布附件。
 - 标签已经指向别的提交：发布明确失败；应增加版本号，不能强移旧标签或覆盖旧版本。
 - 上传中途失败：Release 先保留为 Draft，同一提交重跑会补齐附件后公开。Draft 即使尚未创建标签，也校验目标提交，不能被另一提交接管。
 
-不同提交不会相互取消正在构建的版本；同一版本的发布步骤串行执行。失败的构建或打包不会产生公开 Release，成功构建的 ZIP 还会在 Actions Artifacts 中保存 30 天。
+不同提交不会相互取消正在构建的版本；同一版本的发布步骤串行执行。失败的构建或打包不会产生公开 Release，成功构建的压缩包还会在 Actions Artifacts 中保存 30 天。
 
 发布流水线只负责版本检测、构建、打包和发布。不安装 Pi，不运行 Diff / RPC 探针、Flutter 测试或其他业务回归；不要将无关的集成验证加成发布前置条件。
 
 ## 构建内容与边界
 
-- Runner：`windows-2022` / x64；原生构建使用其 Visual Studio C++ 工具链。
+- Runner：Windows 为 `windows-2022` / x64，原生构建使用其 Visual Studio C++ 工具链；Linux 为 `ubuntu-24.04` / x64，先装 `clang cmake ninja-build pkg-config libgtk-3-dev`，再用同一 Flutter 版本构建。
 - Flutter：固定 **3.47.4 / stable**（Dart **3.13.3**），Windows 默认使用 Impeller。升级时显式更新 `.github/workflows/release.yml`，连同 SDK 约束和 `pubspec.lock` 一起验证；不要使用会自动漂移的最新 stable/beta。迁移结果与回退方式见 [Flutter 版本与渲染器](flutter_renderer.md)。
-- 依赖：提交 `pubspec.lock`，使用 `flutter pub get --enforce-lockfile`，随后执行已有 Cargokit 隐藏目录修复。
-- 构建：`flutter build windows --release -t lib/main.dart`。CI 在全新目录构建，不接触开发机活动 GUI。
-- 包装：完整 `build/windows/x64/runner/Release`，包括 EXE、DLL、`data/`、用户说明和第三方声明；缺少 AOT/资源或发现额外 QA EXE 时拒绝包装。
-- 产物：`pi-gui-flutter-1.0.0+1-windows-x64.zip`、同名 `.zip.sha256`；发布前再次校验哈希。
-- 不提供安装器、代码签名、macOS/Linux/ARM64 构建；不打包 Node.js、Pi、模型密钥或个人会话。
+- 依赖：提交 `pubspec.lock`，使用 `flutter pub get --enforce-lockfile`；Windows 随后执行已有 Cargokit 隐藏目录修复，Linux 不需要该修复。
+- 构建：`flutter build windows --release -t lib/main.dart` 与 `flutter build linux --release -t lib/main.dart`。CI 在全新目录构建，不接触开发机活动 GUI。
+- 包装：Windows 打包完整 `build/windows/x64/runner/Release`；Linux 打包完整 `build/linux/x64/release/bundle`，用 tar.gz 保留可执行位。两者都包含用户说明和第三方声明；缺少 AOT/资源、执行位丢失或发现额外 QA 可执行文件时拒绝包装。
+- 产物：`pi-gui-flutter-1.0.0+1-windows-x64.zip` 与 `pi-gui-flutter-1.0.0+1-linux-x64.tar.gz`，各带同名 `.sha256`；发布前再次校验哈希。
+- 不提供安装器、代码签名、macOS / ARM64 构建；不打包 Node.js、Pi、模型密钥或个人会话。
 
 用户运行方式及 VC++ 运行库要求见 [便携版使用说明](release_usage.md)，原生构建问题见 [Windows 构建说明](windows_build.md)，字体许可见 [第三方声明](../THIRD_PARTY_NOTICES.md)。公开仓库本身不等于授予开源许可；本次未擅自为项目代码选择 MIT/Apache 等许可证。
 
@@ -58,9 +60,10 @@ tags: [github-actions, windows, flutter, release]
 
 | 路径 | 职责 |
 | --- | --- |
-| `.github/workflows/release.yml` | 三阶段版本检查 → Windows 构建 → 最小权限发布，Action 固定提交 SHA |
-| `tool/ci_release.py` | `detect` 读取事件 / Git 旧版本；`notes` 输出去掉 YAML 头的使用说明；`package` 校验产物、制作 ZIP / SHA-256，README 复用同一正文 |
-| `tool/test_ci_release.py` | 秒级临时 Git 仓库回归：首次推送、多提交、纯依赖、回退、构建号、手动触发与包装 |
+| `.github/workflows/release.yml` | 版本检查 → Windows / Linux 并行构建 → 最小权限发布，Action 固定提交 SHA；`linux-only` 输入支持单独验证 Linux |
+| `tool/ci_release.py` | `detect` 读取事件 / Git 旧版本；`notes` 输出去掉 YAML 头的使用说明；`package` / `package-linux` 校验产物、制作 ZIP / tar.gz 与 SHA-256，README 复用同一正文 |
+| `tool/test_ci_release.py` | 秒级临时 Git 仓库回归：首次推送、多提交、纯依赖、回退、构建号、手动触发与两平台包装 |
+| `linux/` | Flutter 生成的 GTK runner 模板，`BINARY_NAME` 为 `pi_gui`、`APPLICATION_ID` 为 `works.earendil.pi_gui` |
 | `pubspec.yaml` / `pubspec.lock` | 应用版本与确定的依赖解析 |
 | `tool/fix_cargokit_windows.ps1` | 按实际 Pub 包路径修复上游已知问题 |
 | `docs/release_usage.md` | Release 正文与 ZIP 内 README 的共同来源；源码保留 YAML Frontmatter，发布时只输出 Markdown 正文 |
