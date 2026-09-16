@@ -176,6 +176,12 @@ Windows 设置中开启“从背景自动选取强调色”后，应用可间接
 
 原生请求串行执行，中间的过时配置可合并；迟到响应不能把刚关闭的透明背景重新开启。系统策略事件若与请求并发，确认回读后才接受结果。拖动不透明度只更新 Flutter 的分区底色和本地偏好，不重复设置 DWM，不经过 Pi。
 
+### 启动后第一次开玻璃自动补一轮“关 → 开”
+
+现象：重启应用后毛玻璃不生效，到设置里手动关一次再开一次就恢复。原因是 **DWM 对已经等于目标值的 backdrop 属性不会再重绘**：启动时窗口先由 `window_manager` 提前 `show()`，玻璃的首次 `setAcrylic` 紧跟着第一次帧应用，此时 DWM 可能已把 backdrop 置为“已设置但未绘制”的状态；后续任何同值重设（包括窗口激活时的重应用）都不会触发重绘，只有先设回 `DWMSBT_NONE` / 空 margins 再重新启用才会重画——这正是手动开关有效的原理。且启动时唯一的 `WM_ACTIVATE` 发生在 `AppearanceController.initialize()` 之前的提前 `show()` 阶段，`enabled_` 尚未置位，激活路径不会补救。
+
+修复在 `WindowMaterialController._drain()`（纯 Dart，`lib/ui/core/window_material_controller.dart`）：当本次应用是**从关到开的首次启用**、返回 `active`、没有系统策略事件并发（`_refreshAfterApply` 未置位）、且期望值未被更新覆盖时，自动再执行一次 `apply(false)` + `apply(true)`，即把用户验证过的手动恢复路径自动化。仅明暗切换（同开不变）不触发循环；事件并发或过时配置按原有合并逻辑重排；关闭→重新开启同样补一轮。回归见 `test/window_material_test.dart`。原生 Runner 无需改动，不需要重建 C++ 部分。
+
 ### 隐藏标题栏不能丢掉 Windows 激活状态
 
 `window_manager 0.5.2` 的 `windows/window_manager_plugin.cpp` 在隐藏标题栏时，会为 `WM_NCACTIVATE` 发出 Dart focus/blur 事件后直接返回 `1`。这会跳过 `DefWindowProc` 对 Windows 自身“活动标题栏”状态的更新。结果可能是：应用已在前台、Flutter 背景 alpha 正常、材质通道返回 `active`、DWM 类型也是 `3`，但 `GetWindowInfo().dwWindowStatus & WS_ACTIVECAPTION` 仍为 0，Acrylic 一直显示未激活状态的灰色回退层。

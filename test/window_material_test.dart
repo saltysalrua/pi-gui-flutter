@@ -155,6 +155,59 @@ void main() {
     },
   );
 
+  test(
+    'first enable repeats the off-on cycle that repaints the DWM backdrop',
+    () async {
+      final backend = _Backend();
+      final controller = WindowMaterialController(backend);
+      addTearDown(controller.dispose);
+      controller.configure(enabled: true, dark: false);
+      expect(backend.requests, [(true, false)]);
+      backend.results[0].complete(WindowMaterialStatus.active);
+      await Future<void>.delayed(Duration.zero);
+      // The startup apply can return active while DWM has painted nothing;
+      // the controller repeats the off-to-on recovery once.
+      expect(backend.requests, [(true, false), (false, false)]);
+      backend.results[1].complete(WindowMaterialStatus.disabled);
+      await Future<void>.delayed(Duration.zero);
+      expect(backend.requests, [(true, false), (false, false), (true, false)]);
+      backend.results[2].complete(WindowMaterialStatus.active);
+      await controller.settled;
+      expect(controller.status, WindowMaterialStatus.active);
+      // A dark-only re-apply keeps the old same-value behavior, no cycle.
+      controller.configure(enabled: true, dark: true);
+      await Future<void>.delayed(Duration.zero);
+      expect(backend.requests.length, 4);
+      backend.results[3].complete(WindowMaterialStatus.active);
+      await controller.settled;
+      expect(controller.status, WindowMaterialStatus.active);
+      // A real disable clears the cycle state; re-enabling repeats the
+      // recovery exactly like the manual toggle that is known to repaint.
+      controller.configure(enabled: false, dark: true);
+      backend.results[4].complete(WindowMaterialStatus.disabled);
+      await controller.settled;
+      controller.configure(enabled: true, dark: true);
+      backend.results[5].complete(WindowMaterialStatus.active);
+      await Future<void>.delayed(Duration.zero);
+      expect(backend.requests.sublist(4), [
+        (false, true),
+        (true, true),
+        (false, true),
+      ]);
+      backend.results[6].complete(WindowMaterialStatus.disabled);
+      await Future<void>.delayed(Duration.zero);
+      expect(backend.requests.sublist(4), [
+        (false, true),
+        (true, true),
+        (false, true),
+        (true, true),
+      ]);
+      backend.results[7].complete(WindowMaterialStatus.active);
+      await controller.settled;
+      expect(controller.status, WindowMaterialStatus.active);
+    },
+  );
+
   test('platform channel encodes flags and handles missing or unknown native implementations', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;

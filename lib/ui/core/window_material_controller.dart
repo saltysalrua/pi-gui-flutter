@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+
 import '../../core/services/window_material_service.dart';
 
 /// Serializes native transitions. Opacity is painted in Flutter and never sent
@@ -33,11 +35,30 @@ class WindowMaterialController extends ChangeNotifier {
     _running = true;
     while (!_disposed && _applied != _desired) {
       final request = _desired!;
+      final wasEnabled = _applied?.$1 == true;
       WindowMaterialStatus result;
       try {
         result = await _backend.apply(enabled: request.$1, dark: request.$2);
       } catch (_) {
         result = WindowMaterialStatus.unavailable;
+      }
+      if (_disposed) break;
+      // DWM does not repaint the backdrop when the attribute already holds
+      // the requested value, so the very first enable after launch can leave
+      // the window without its blur even though the call returned active.
+      // Repeating the off-to-on cycle once is the recovery that repaints;
+      // later re-applies keep the previous same-value behavior.
+      if (request.$1 &&
+          !wasEnabled &&
+          result == WindowMaterialStatus.active &&
+          !_refreshAfterApply &&
+          request == _desired) {
+        try {
+          await _backend.apply(enabled: false, dark: request.$2);
+          result = await _backend.apply(enabled: true, dark: request.$2);
+        } catch (_) {
+          result = WindowMaterialStatus.unavailable;
+        }
       }
       if (_disposed) break;
       _applied = _refreshAfterApply ? null : request;
