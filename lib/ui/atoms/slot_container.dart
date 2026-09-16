@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pi_gui/core/slots/slot_manager.dart';
+import 'package:pi_gui/ui/features/settings/controllers/appearance_controller.dart';
 
 /// 标准动态扩展槽位容器 (SlotContainer)
 ///
@@ -25,6 +26,12 @@ class SlotContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 阻断式弹窗槽是 Pi 扩展的必答交互，只能由设置里暴露的开关控制，
+    // 且设置页从不暴露它，因此这里统一读偏好即可（缺省开启）。
+    final preferences = AppearanceScope.maybeOf(context)?.preferences;
+    if (preferences != null && !preferences.isSlotVisible(slotId.name)) {
+      return const SizedBox.shrink();
+    }
     return ValueListenableBuilder<List<Widget>>(
       valueListenable: SlotManager.of(context).notifierFor(slotId),
       builder: (context, widgets, _) {

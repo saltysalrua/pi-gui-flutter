@@ -35,6 +35,10 @@ tags: [flutter, pi-rpc, extension-ui, slots, pi-lens, todos]
 
 ## 并行会话作用域
 
+### 显示开关
+
+在 **设置 → 外观 → 扩展显示位置** 可分别为 `aboveEditor`、`belowEditor`、`statusBar`、`sidebarPanel`、`notificationToast` 五个槽位开关（键为 `ExtensibleSlotId.name`，存于 `appearance.json` 的 `slotVisibility`）。关闭时 `lib/ui/atoms/slot_container.dart` 直接渲染零尺寸，不丢弃 `extension_ui_request` 事件；`dialogOverlay`（扩展弹窗提问）是必答交互，始终显示、不提供开关。详见 [外观设置](appearance_settings.md)。
+
 `WorkbenchSession` 为每个会话持有独立 `SlotManager`、输入控制器和 `PiExtensionUiBridge`。`SlotScope` 放在会话正文之上，`SlotContainer` 和输入框通过 `SlotManager.of(context)` 读取本会话的插槽 / editorAnchor；不能复制全局单例的 GlobalKey。单例只作为兼容默认值及全局浮层宿主。
 
 - 后台 `setWidget` / `setStatus` 更新所属会话，`set_editor_text` 只更新其草稿。

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/models/appearance_preferences.dart';
+import '../../../../core/slots/slot_manager.dart';
 import '../../../atoms/app_action_button.dart';
 import '../../../atoms/app_card.dart';
 import '../../../atoms/app_code_block.dart';
@@ -427,6 +428,75 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
             ],
             onChanged: (v) => controller.update(p.copyWith(uiScale: v)),
           ),
+        ),
+      ]);
+      group(l.appearanceToolDisplay, l.appearanceToolDisplayHint, [
+        AppSettingRow(
+          title: l.appearanceToolDensity,
+          description: switch (p.toolDisplay) {
+            ToolDisplayMode.collapsed => l.appearanceToolCollapsedHint,
+            ToolDisplayMode.compact => l.appearanceToolCompactHint,
+            ToolDisplayMode.expanded => l.appearanceToolExpandedHint,
+          },
+          control: AppSelect<ToolDisplayMode>(
+            value: p.toolDisplay,
+            label: l.appearanceToolDisplay,
+            options: [
+              AppSelectOption(
+                ToolDisplayMode.collapsed,
+                l.appearanceToolCollapsed,
+              ),
+              AppSelectOption(ToolDisplayMode.compact, l.appearanceToolCompact),
+              AppSelectOption(
+                ToolDisplayMode.expanded,
+                l.appearanceToolExpanded,
+              ),
+            ],
+            onChanged: (v) => controller.update(p.copyWith(toolDisplay: v)),
+          ),
+        ),
+      ]);
+      AppSettingRow slotRow(ExtensibleSlotId slot, String title, String hint) =>
+          AppSettingRow(
+            title: title,
+            description: hint,
+            control: AppSelect<bool>(
+              value: p.isSlotVisible(slot.name),
+              label: title,
+              options: [
+                AppSelectOption(false, l.appearanceOff),
+                AppSelectOption(true, l.appearanceOn),
+              ],
+              onChanged: (v) => controller.update(
+                p.copyWith(slotVisibility: {...p.slotVisibility, slot.name: v}),
+              ),
+            ),
+          );
+      group(l.appearanceExtensionSlots, l.appearanceExtensionSlotsHint, [
+        slotRow(
+          ExtensibleSlotId.aboveEditor,
+          l.appearanceSlotAboveEditor,
+          l.appearanceSlotAboveEditorHint,
+        ),
+        slotRow(
+          ExtensibleSlotId.belowEditor,
+          l.appearanceSlotBelowEditor,
+          l.appearanceSlotBelowEditorHint,
+        ),
+        slotRow(
+          ExtensibleSlotId.statusBar,
+          l.appearanceSlotStatusBar,
+          l.appearanceSlotStatusBarHint,
+        ),
+        slotRow(
+          ExtensibleSlotId.sidebarPanel,
+          l.appearanceSlotSidebarPanel,
+          l.appearanceSlotSidebarPanelHint,
+        ),
+        slotRow(
+          ExtensibleSlotId.notificationToast,
+          l.appearanceSlotNotificationToast,
+          l.appearanceSlotNotificationToastHint,
         ),
       ]);
       final glassStatus = WindowMaterialScope.statusOf(context);

@@ -1394,6 +1394,144 @@ abstract class AppLocalizations {
   /// **'整体缩放文字、按钮、图标和间距，叠加在系统显示缩放之上。默认 100%。'**
   String get appearanceScaleHint;
 
+  /// No description provided for @appearanceToolDisplay.
+  ///
+  /// In zh, this message translates to:
+  /// **'工具显示'**
+  String get appearanceToolDisplay;
+
+  /// No description provided for @appearanceToolDisplayHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'设置聊天里 agent 工具卡片默认显示多详细，想看细节时点开单个卡片即可。'**
+  String get appearanceToolDisplayHint;
+
+  /// No description provided for @appearanceToolDensity.
+  ///
+  /// In zh, this message translates to:
+  /// **'工具卡片'**
+  String get appearanceToolDensity;
+
+  /// No description provided for @appearanceToolCollapsed.
+  ///
+  /// In zh, this message translates to:
+  /// **'收起'**
+  String get appearanceToolCollapsed;
+
+  /// No description provided for @appearanceToolCompact.
+  ///
+  /// In zh, this message translates to:
+  /// **'简略'**
+  String get appearanceToolCompact;
+
+  /// No description provided for @appearanceToolExpanded.
+  ///
+  /// In zh, this message translates to:
+  /// **'展开'**
+  String get appearanceToolExpanded;
+
+  /// No description provided for @appearanceToolCollapsedHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'只显示一行工具标题，最省空间。'**
+  String get appearanceToolCollapsedHint;
+
+  /// No description provided for @appearanceToolCompactHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'标题加几行预览：输出 6 行、失败 3 行、文件改动 8 行。默认样式。'**
+  String get appearanceToolCompactHint;
+
+  /// No description provided for @appearanceToolExpandedHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'直接显示完整命令、输出与文件改动，最直观但占空间。'**
+  String get appearanceToolExpandedHint;
+
+  /// No description provided for @appearanceOn.
+  ///
+  /// In zh, this message translates to:
+  /// **'开'**
+  String get appearanceOn;
+
+  /// No description provided for @appearanceOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'关'**
+  String get appearanceOff;
+
+  /// No description provided for @appearanceExtensionSlots.
+  ///
+  /// In zh, this message translates to:
+  /// **'扩展显示位置'**
+  String get appearanceExtensionSlots;
+
+  /// No description provided for @appearanceExtensionSlotsHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'Pi 扩展想在界面上展示内容时，允许它出现在哪些位置。扩展弹窗提问始终显示，不受这些开关影响。'**
+  String get appearanceExtensionSlotsHint;
+
+  /// No description provided for @appearanceSlotAboveEditor.
+  ///
+  /// In zh, this message translates to:
+  /// **'输入框上方'**
+  String get appearanceSlotAboveEditor;
+
+  /// No description provided for @appearanceSlotAboveEditorHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'任务进度、待办卡片等扩展卡片。'**
+  String get appearanceSlotAboveEditorHint;
+
+  /// No description provided for @appearanceSlotBelowEditor.
+  ///
+  /// In zh, this message translates to:
+  /// **'输入框下方'**
+  String get appearanceSlotBelowEditor;
+
+  /// No description provided for @appearanceSlotBelowEditorHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'快捷建议、辅助提示等文字扩展。'**
+  String get appearanceSlotBelowEditorHint;
+
+  /// No description provided for @appearanceSlotStatusBar.
+  ///
+  /// In zh, this message translates to:
+  /// **'状态栏徽章'**
+  String get appearanceSlotStatusBar;
+
+  /// No description provided for @appearanceSlotStatusBarHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'分支、Token 用量等扩展状态徽章。'**
+  String get appearanceSlotStatusBarHint;
+
+  /// No description provided for @appearanceSlotSidebarPanel.
+  ///
+  /// In zh, this message translates to:
+  /// **'侧边栏扩展面板'**
+  String get appearanceSlotSidebarPanel;
+
+  /// No description provided for @appearanceSlotSidebarPanelHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'侧边栏底部的扩展内容（如插件面板）。'**
+  String get appearanceSlotSidebarPanelHint;
+
+  /// No description provided for @appearanceSlotNotificationToast.
+  ///
+  /// In zh, this message translates to:
+  /// **'通知浮层'**
+  String get appearanceSlotNotificationToast;
+
+  /// No description provided for @appearanceSlotNotificationToastHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'右上角的扩展通知气泡。'**
+  String get appearanceSlotNotificationToastHint;
+
   /// No description provided for @appearanceColors.
   ///
   /// In zh, this message translates to:

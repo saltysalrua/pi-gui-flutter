@@ -686,6 +686,78 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appearanceScaleHint => '整体缩放文字、按钮、图标和间距，叠加在系统显示缩放之上。默认 100%。';
 
   @override
+  String get appearanceToolDisplay => '工具显示';
+
+  @override
+  String get appearanceToolDisplayHint =>
+      '设置聊天里 agent 工具卡片默认显示多详细，想看细节时点开单个卡片即可。';
+
+  @override
+  String get appearanceToolDensity => '工具卡片';
+
+  @override
+  String get appearanceToolCollapsed => '收起';
+
+  @override
+  String get appearanceToolCompact => '简略';
+
+  @override
+  String get appearanceToolExpanded => '展开';
+
+  @override
+  String get appearanceToolCollapsedHint => '只显示一行工具标题，最省空间。';
+
+  @override
+  String get appearanceToolCompactHint =>
+      '标题加几行预览：输出 6 行、失败 3 行、文件改动 8 行。默认样式。';
+
+  @override
+  String get appearanceToolExpandedHint => '直接显示完整命令、输出与文件改动，最直观但占空间。';
+
+  @override
+  String get appearanceOn => '开';
+
+  @override
+  String get appearanceOff => '关';
+
+  @override
+  String get appearanceExtensionSlots => '扩展显示位置';
+
+  @override
+  String get appearanceExtensionSlotsHint =>
+      'Pi 扩展想在界面上展示内容时，允许它出现在哪些位置。扩展弹窗提问始终显示，不受这些开关影响。';
+
+  @override
+  String get appearanceSlotAboveEditor => '输入框上方';
+
+  @override
+  String get appearanceSlotAboveEditorHint => '任务进度、待办卡片等扩展卡片。';
+
+  @override
+  String get appearanceSlotBelowEditor => '输入框下方';
+
+  @override
+  String get appearanceSlotBelowEditorHint => '快捷建议、辅助提示等文字扩展。';
+
+  @override
+  String get appearanceSlotStatusBar => '状态栏徽章';
+
+  @override
+  String get appearanceSlotStatusBarHint => '分支、Token 用量等扩展状态徽章。';
+
+  @override
+  String get appearanceSlotSidebarPanel => '侧边栏扩展面板';
+
+  @override
+  String get appearanceSlotSidebarPanelHint => '侧边栏底部的扩展内容（如插件面板）。';
+
+  @override
+  String get appearanceSlotNotificationToast => '通知浮层';
+
+  @override
+  String get appearanceSlotNotificationToastHint => '右上角的扩展通知气泡。';
+
+  @override
   String get appearanceColors => '分区颜色';
 
   @override

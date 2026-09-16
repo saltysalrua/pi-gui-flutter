@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+
 import '../../../../core/models/appearance_preferences.dart';
 import '../../../../core/services/appearance_store.dart';
 
@@ -106,4 +108,6 @@ class AppearanceScope extends InheritedNotifier<AppearanceController> {
   }) : super(notifier: controller);
   static AppearanceController of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppearanceScope>()!.notifier!;
+  static AppearanceController? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AppearanceScope>()?.notifier;
 }

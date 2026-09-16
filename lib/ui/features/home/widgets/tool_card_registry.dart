@@ -1,6 +1,8 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:pi_gui/core/models/chat_timeline.dart';
+import 'package:pi_gui/core/models/appearance_preferences.dart';
 import 'package:pi_gui/core/models/diff_document.dart';
 import 'package:pi_gui/core/rpc/pi_chat_types.dart';
 import 'package:pi_gui/ui/atoms/app_activity_label.dart';
@@ -14,13 +16,13 @@ import 'package:pi_gui/ui/core/context_l10n.dart';
 import 'package:pi_gui/ui/core/theme/app_theme.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
+import 'package:pi_gui/ui/features/settings/controllers/appearance_controller.dart';
 
-typedef ToolCardBuilder =
-    Widget Function(
-      BuildContext context,
-      ChatToolCall call,
-      VoidCallback? showChanges,
-    );
+typedef ToolCardBuilder = Widget Function(
+  BuildContext context,
+  ChatToolCall call,
+  VoidCallback? showChanges,
+);
 
 /// Public registration point: custom tools can replace a renderer without editing the timeline.
 class ToolCardRegistry {
@@ -42,6 +44,9 @@ class ToolCardRegistry {
   ) {
     final l10n = context.l10n;
     final colors = context.colors;
+    final display =
+        AppearanceScope.maybeOf(context)?.preferences.toolDisplay ??
+        ToolDisplayMode.compact;
     final args = call.arguments;
     final shell = call.name == 'bash' || call.name == 'powershell';
     final label = shell ? r'$' : call.name;
@@ -58,9 +63,16 @@ class ToolCardRegistry {
         '$label${target.isEmpty ? '' : ' $target'}$range${stats.isEmpty ? '' : ' ($stats)'}';
     final output = call.result?.text ?? '';
     final failed = call.phase == ToolPhase.failed;
-    final preview =
+    final preview = switch (display) {
+      // 收起：只留标题一行，不渲染任何预览。
+      ToolDisplayMode.collapsed => false,
+      // 展开：直接平铺完整详情（命令、输出、Diff、图片）。
+      ToolDisplayMode.expanded => call.isFileChange || output.isNotEmpty,
+      // 简略：既有默认样式（成功 read 一行、预览 6/3 行、Diff 8 行）。
+      ToolDisplayMode.compact =>
         call.isFileChange ||
-        output.isNotEmpty && (call.name != 'read' || failed);
+            output.isNotEmpty && (call.name != 'read' || failed),
+    };
     final phase = switch (call.phase) {
       ToolPhase.preparing => l10n.chatToolPreparing,
       ToolPhase.running => l10n.chatToolRunning,
@@ -69,8 +81,67 @@ class ToolCardRegistry {
       ToolPhase.interrupted => l10n.chatToolInterrupted,
     };
     final style = AppTheme.codeStyle(Theme.of(context));
+    Widget details(BuildContext context) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (shell && args['command'] is String) ...[
+          AppCodeBlock(
+            code: args['command'] as String,
+            framed: false,
+            showHeader: false,
+          ),
+          if (args['timeout'] is num)
+            Text(
+              l10n.chatToolTimeout(args['timeout'].toString()),
+              style: context.textTheme.bodySmall,
+            ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        if (call.isFileChange)
+          ToolChangeDetails(call: call)
+        else if (output.isNotEmpty)
+          AppCodeBlock(
+            code: output,
+            label: l10n.chatOutput,
+            framed: false,
+            textColor: failed ? colors.error : colors.textSecondary,
+          )
+        else if (call.result != null &&
+            call.result!.content.every((b) => b.kind != PiContentKind.image))
+          Text(l10n.chatNoOutput, style: context.textTheme.bodySmall),
+        for (final block in call.result?.content ?? <PiContent>[])
+          if (block.kind == PiContentKind.image)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: AppImage(image: block.image),
+            ),
+        if (call.path != null || call.isFileChange && showChanges != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: AppSpacing.xs,
+              children: [
+                if (call.isFileChange && showChanges != null)
+                  AppIconButton.subtle(
+                    icon: Icons.difference_outlined,
+                    tooltip: l10n.chatViewDiff,
+                    onPressed: showChanges,
+                  ),
+                if (call.path != null)
+                  AppIconButton.subtle(
+                    icon: Icons.open_in_new,
+                    tooltip: l10n.chatOpenFile,
+                    onPressed: () =>
+                        ChatResourceScope.open(context, call.path!),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
     return AppDisclosure(
-      key: PageStorageKey('tool-${call.id}'),
+      // 挡位参与存储键：切换挡位时重置每张卡片的局部展开记忆，避免收起挡位下残留旧展开状态。
+      key: PageStorageKey('tool-${display.name}-${call.id}'),
       framed: false,
       title: title,
       titleContent: Text.rich(
@@ -118,6 +189,8 @@ class ToolCardRegistry {
       },
       previewBuilder: !preview
           ? null
+          : display == ToolDisplayMode.expanded
+          ? details
           : (_) => call.isFileChange
                 ? ToolChangeDetails(call: call, previewLines: 8)
                 : AppCodeBlock(
@@ -127,67 +200,13 @@ class ToolCardRegistry {
                     previewLines: failed ? 3 : 6,
                     textColor: failed ? colors.error : colors.textSecondary,
                   ),
-      previewHint: preview && _previewTruncated(call, failed ? 3 : 6)
+      previewHint:
+          display == ToolDisplayMode.compact &&
+              preview &&
+              _previewTruncated(call, failed ? 3 : 6)
           ? l10n.chatShowMore
           : null,
-      builder: (context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (shell && args['command'] is String) ...[
-            AppCodeBlock(
-              code: args['command'] as String,
-              framed: false,
-              showHeader: false,
-            ),
-            if (args['timeout'] is num)
-              Text(
-                l10n.chatToolTimeout(args['timeout'].toString()),
-                style: context.textTheme.bodySmall,
-              ),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-          if (call.isFileChange)
-            ToolChangeDetails(call: call)
-          else if (output.isNotEmpty)
-            AppCodeBlock(
-              code: output,
-              label: l10n.chatOutput,
-              framed: false,
-              textColor: failed ? colors.error : colors.textSecondary,
-            )
-          else if (call.result != null &&
-              call.result!.content.every((b) => b.kind != PiContentKind.image))
-            Text(l10n.chatNoOutput, style: context.textTheme.bodySmall),
-          for (final block in call.result?.content ?? <PiContent>[])
-            if (block.kind == PiContentKind.image)
-              Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.sm),
-                child: AppImage(image: block.image),
-              ),
-          if (call.path != null || call.isFileChange && showChanges != null)
-            Align(
-              alignment: Alignment.centerRight,
-              child: Wrap(
-                spacing: AppSpacing.xs,
-                children: [
-                  if (call.isFileChange && showChanges != null)
-                    AppIconButton.subtle(
-                      icon: Icons.difference_outlined,
-                      tooltip: l10n.chatViewDiff,
-                      onPressed: showChanges,
-                    ),
-                  if (call.path != null)
-                    AppIconButton.subtle(
-                      icon: Icons.open_in_new,
-                      tooltip: l10n.chatOpenFile,
-                      onPressed: () =>
-                          ChatResourceScope.open(context, call.path!),
-                    ),
-                ],
-              ),
-            ),
-        ],
-      ),
+      builder: details,
     );
   }
 

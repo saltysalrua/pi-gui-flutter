@@ -18,6 +18,8 @@ tags: [flutter, settings, material3, windows, theme]
 - **UI 比例**：80%、90%、100%、110%、125%、150%，默认 100%。整体缩放文字、按钮、图标、间距和浮层，不更改 Windows 的显示缩放。
 - **桌面毛玻璃**：顶部与侧边栏、主界面、卡片分别开关和调节底色不透明度，默认关闭。
 - **分区颜色**：强调色、主背景、顶部与侧边栏、输入框、卡片、代码区、用户消息。
+- **工具显示**：agent 工具卡片默认密度，收起 / 简略 / 展开三挡，默认简略。
+- **扩展显示位置**：输入框上方、输入框下方、状态栏徽章、侧边栏面板、通知浮层各自开关；扩展弹窗提问始终显示。
 - **高级颜色**：浮层与菜单、三层文字、边框、成功 / Diff 新增、警告、错误 / Diff 删除。默认折叠；搜索匹配其中的项目时自动展开。
 
 点击色块打开取色器，可拖动颜色面板、调整 HSV 滑块，或输入 `#RRGGBB`。点击“应用颜色”才提交，取消或 Esc 不修改原值。取色器不支持 Alpha 通道或屏幕吸管；分区毛玻璃的不透明度在单独的设置组调整。文字与背景对比度过低时提示，但允许保留用户选择。
@@ -103,6 +105,18 @@ tags: [flutter, settings, material3, windows, theme]
 Windows 设置中开启“从背景自动选取强调色”后，应用可间接随壁纸变化。启动、窗口重新获得焦点、系统明暗变化、点击“重新读取”时刷新。不轮询、不修改系统设置，也不承诺在应用始终持有焦点时实时捕获其他程序对强调色的更改。
 
 读取失败时使用默认种子色，并在设置页明确提示；自定义覆盖不会丢失。新增原生插件后需要重新构建并启动应用，仅热重载不能把插件装入旧进程。
+
+### 工具显示与扩展显示位置
+
+**工具显示**在 **设置 → 外观 → 工具显示** 选择挡位（可搜索“工具”）：
+
+- **收起**：只保留一行工具标题（工具名＋路径/命令/行号），最省空间；点击仍可展开看详情。
+- **简略**（默认）：一直是本项目的默认样式——成功 read 一行、普通输出预览 6 行、失败 3 行、文件改动 Diff 预览 8 行，截短时显示“展开”提示。
+- **展开**：直接平铺完整命令、输出、Diff 和图片，不再需要逐个点开；最直观但占空间。
+
+实现位于 `lib/ui/features/home/widgets/tool_card_registry.dart`：默认渲染器通过 `AppearanceScope.maybeOf(context).preferences.toolDisplay` 读挡位，随偏好全局响应式刷新。挡位名参与每张卡片的 `PageStorageKey`，切换挡位会重置单张卡片的局部展开记忆，避免“收起”下残留旧展开状态。自定义工具渲染器（`ToolCardRegistry.register`）不受影响，不接入挡位逻辑。
+
+**扩展显示位置**在 **设置 → 外观 → 扩展显示位置**（可搜索“扩展”）：输入框上方、输入框下方、状态栏徽章、侧边栏扩展面板、通知浮层各自开关，关闭后该槽位不渲染任何扩展内容。扩展的弹窗提问（select / confirm / input / editor）是必答交互，始终显示、不做开关。关闭只隐藏界面展示，不拒绝或丢弃 Pi 的 `extension_ui_request` 事件；重新开启后插槽内容立即恢复。实现：`lib/ui/atoms/slot_container.dart` 在 build 时按 `preferences.isSlotVisible(slotId.name)` 拦截，见 [扩展槽位](extension_ui_slots.md)。
 
 ### 明暗模式、字号和缩放的关系
 
@@ -200,6 +214,8 @@ Windows 的“在标题栏和窗口边框上显示强调色”与应用里的“
   "seed": "#0075DE",
   "baseFontSize": 14.0,
   "uiScale": 1.1,
+  "toolDisplay": "compact",
+  "slotVisibility": {"aboveEditor": false},
   "sidebarGlass": {"enabled": true, "opacity": 0.65},
   "canvasGlass": {"enabled": false, "opacity": 0.85},
   "cardGlass": {"enabled": true, "opacity": 0.75},
@@ -218,6 +234,7 @@ Windows 的“在标题栏和窗口边框上显示强调色”与应用里的“
 - 保存失败保留已经生效的内存值，显示人话提示与重试入口；不能悄悄声称已持久化。
 - 自定义颜色仍以不透明六位 HEX 存储。`sidebarGlass` / `canvasGlass` / `cardGlass` 只保存各区底色不透明度，不调用全窗口 `setOpacity`。旧 version 1 文件缺少相应字段时该项默认关闭；非法开关回退默认、有限数值限制到 0.2–1.0、非有限数值恢复该项默认值。
 - `cardGlass` 使用可空私有字段与默认值 getter，使热重载前已存在的长期偏好对象能安全读取新增字段，不要求重启承载 Pi 的 GUI。
+- `toolDisplay` 存 `collapsed` / `compact` / `expanded`，缺省 `compact`；`slotVisibility` 只保存被关闭的槽位键（`ExtensibleSlotId.name`），缺省一律开启，未知枚举回退默认。
 
 ## 设置页动效验证
 

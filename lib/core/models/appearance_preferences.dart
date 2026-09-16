@@ -3,6 +3,9 @@ enum AppearanceMode { system, light, dark }
 
 enum PaletteSource { original, system, custom }
 
+/// 聊天时间线中 agent 工具卡片的默认展示密度。
+enum ToolDisplayMode { collapsed, compact, expanded }
+
 enum AppearanceColor {
   primary,
   canvas,
@@ -70,10 +73,13 @@ class AppearancePreferences {
     this.sidebarGlass = defaultSidebarGlass,
     this.canvasGlass = defaultCanvasGlass,
     GlassPreferences this._cardGlass = defaultCardGlass,
+    this.toolDisplay = ToolDisplayMode.compact,
+    Map<String, bool> slotVisibility = const {},
     Map<AppearanceColor, int> lightColors = const {},
     Map<AppearanceColor, int> darkColors = const {},
   }) : lightColors = Map.unmodifiable(lightColors),
-       darkColors = Map.unmodifiable(darkColors);
+       darkColors = Map.unmodifiable(darkColors),
+       slotVisibility = Map.unmodifiable(slotVisibility);
 
   static const defaultSidebarGlass = GlassPreferences(opacity: 0.65);
   static const defaultCanvasGlass = GlassPreferences(opacity: 0.85);
@@ -92,6 +98,14 @@ class AppearancePreferences {
   // A nullable backing field keeps the active RPC-owning GUI safe to reload.
   final GlassPreferences? _cardGlass;
   GlassPreferences get cardGlass => _cardGlass ?? defaultCardGlass;
+
+  /// 工具卡片展示挡位；`compact` 是一直以来的默认样式。
+  final ToolDisplayMode toolDisplay;
+
+  /// Pi 扩展槽位开关，键为 [ExtensibleSlotId.name]，缺省视为开启。
+  /// 只写入被关闭的键，旧配置文件里没有也能保持兼容。
+  final Map<String, bool> slotVisibility;
+  bool isSlotVisible(String slotName) => slotVisibility[slotName] ?? true;
   // Card-only glass also uses the native capability/system-policy gate. It
   // never makes the canvas or sidebar transparent on the user's behalf.
   bool get wantsGlass =>
@@ -107,6 +121,8 @@ class AppearancePreferences {
     GlassPreferences? sidebarGlass,
     GlassPreferences? canvasGlass,
     GlassPreferences? cardGlass,
+    ToolDisplayMode? toolDisplay,
+    Map<String, bool>? slotVisibility,
     Map<AppearanceColor, int>? lightColors,
     Map<AppearanceColor, int>? darkColors,
   }) => AppearancePreferences(
@@ -118,6 +134,8 @@ class AppearancePreferences {
     sidebarGlass: sidebarGlass ?? this.sidebarGlass,
     canvasGlass: canvasGlass ?? this.canvasGlass,
     cardGlass: cardGlass ?? this.cardGlass,
+    toolDisplay: toolDisplay ?? this.toolDisplay,
+    slotVisibility: slotVisibility ?? this.slotVisibility,
     lightColors: lightColors ?? this.lightColors,
     darkColors: darkColors ?? this.darkColors,
   );
@@ -178,6 +196,16 @@ class AppearancePreferences {
         defaultCanvasGlass,
       ),
       cardGlass: GlassPreferences.fromJson(json['cardGlass'], defaultCardGlass),
+      toolDisplay: choice(
+        ToolDisplayMode.values,
+        json['toolDisplay'],
+        ToolDisplayMode.compact,
+      ),
+      slotVisibility: {
+        if (json['slotVisibility'] case final Map raw)
+          for (final entry in raw.entries)
+            if (entry.value is bool) entry.key.toString(): entry.value as bool,
+      },
       lightColors: colors(json['lightColors']),
       darkColors: colors(json['darkColors']),
     );
@@ -193,6 +221,12 @@ class AppearancePreferences {
     'sidebarGlass': sidebarGlass.toJson(),
     'canvasGlass': canvasGlass.toJson(),
     'cardGlass': cardGlass.toJson(),
+    'toolDisplay': toolDisplay.name,
+    // 只保存关闭的槽位，避免文件随槽位枚举增长膨胀。
+    'slotVisibility': {
+      for (final entry in slotVisibility.entries)
+        if (!entry.value) entry.key: false,
+    },
     'lightColors': {
       for (final e in lightColors.entries) e.key.name: formatHexRgb(e.value),
     },

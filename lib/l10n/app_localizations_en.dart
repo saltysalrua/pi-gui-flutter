@@ -742,6 +742,85 @@ class AppLocalizationsEn extends AppLocalizations {
       'Scales text, controls, icons and spacing together, on top of system display scaling. Default: 100%.';
 
   @override
+  String get appearanceToolDisplay => 'Tool display';
+
+  @override
+  String get appearanceToolDisplayHint =>
+      'How much agent tool cards show by default in the chat. Open a single card anytime to see the details.';
+
+  @override
+  String get appearanceToolDensity => 'Tool cards';
+
+  @override
+  String get appearanceToolCollapsed => 'Collapsed';
+
+  @override
+  String get appearanceToolCompact => 'Compact';
+
+  @override
+  String get appearanceToolExpanded => 'Expanded';
+
+  @override
+  String get appearanceToolCollapsedHint =>
+      'Show only the one-line tool title. Most compact.';
+
+  @override
+  String get appearanceToolCompactHint =>
+      'Title plus a short preview: 6 lines of output, 3 when failed, 8 for file changes. The default look.';
+
+  @override
+  String get appearanceToolExpandedHint =>
+      'Show the full command, output and file changes right away. Clearest but takes space.';
+
+  @override
+  String get appearanceOn => 'On';
+
+  @override
+  String get appearanceOff => 'Off';
+
+  @override
+  String get appearanceExtensionSlots => 'Extension display slots';
+
+  @override
+  String get appearanceExtensionSlotsHint =>
+      'Where Pi extensions are allowed to show content. Extension dialog questions always show and are not affected by these switches.';
+
+  @override
+  String get appearanceSlotAboveEditor => 'Above the input box';
+
+  @override
+  String get appearanceSlotAboveEditorHint =>
+      'Extension cards like task progress and to-do lists.';
+
+  @override
+  String get appearanceSlotBelowEditor => 'Below the input box';
+
+  @override
+  String get appearanceSlotBelowEditorHint =>
+      'Text extensions like quick suggestions and hints.';
+
+  @override
+  String get appearanceSlotStatusBar => 'Status bar badges';
+
+  @override
+  String get appearanceSlotStatusBarHint =>
+      'Extension status badges such as branch and token usage.';
+
+  @override
+  String get appearanceSlotSidebarPanel => 'Sidebar extension panel';
+
+  @override
+  String get appearanceSlotSidebarPanelHint =>
+      'Extension content at the bottom of the sidebar (e.g. plugin panels).';
+
+  @override
+  String get appearanceSlotNotificationToast => 'Notification toasts';
+
+  @override
+  String get appearanceSlotNotificationToastHint =>
+      'Extension notification bubbles in the top-right corner.';
+
+  @override
   String get appearanceColors => 'Surface colors';
 
   @override

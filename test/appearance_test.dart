@@ -66,6 +66,47 @@ void main() {
     expect(parseHexRgb('#fff'), isNull);
   });
 
+  test('tool display tier and extension slot switches persist and tolerate bad data', () {
+    // 缺省：简略挡位、全部槽位可见
+    final d = AppearancePreferences.fromJson({'version': 1});
+    expect(d.toolDisplay, ToolDisplayMode.compact);
+    expect(d.isSlotVisible('aboveEditor'), isTrue);
+    expect(d.isSlotVisible('notificationToast'), isTrue);
+
+    // 持久化往返：只保存被关闭的槽位，非法挡位/类型回退默认
+    final p = AppearancePreferences.fromJson({
+      'version': 1,
+      'toolDisplay': 'expanded',
+      'slotVisibility': {
+        'aboveEditor': false,
+        'statusBar': true,
+        'weird': false,
+      },
+    });
+    expect(p.toolDisplay, ToolDisplayMode.expanded);
+    expect(p.isSlotVisible('aboveEditor'), isFalse);
+    expect(p.isSlotVisible('statusBar'), isTrue);
+    expect(p.toJson()['slotVisibility'], {
+      'aboveEditor': false,
+      'weird': false,
+    });
+    expect(AppearancePreferences.fromJson(p.toJson()).slotVisibility, {
+      'aboveEditor': false,
+      'weird': false,
+    });
+    final roundTrip = AppearancePreferences.fromJson(p.toJson());
+    for (final slot in ['aboveEditor', 'statusBar', 'belowEditor']) {
+      expect(roundTrip.isSlotVisible(slot), p.isSlotVisible(slot));
+    }
+    final bad = AppearancePreferences.fromJson({
+      'version': 1,
+      'toolDisplay': 'nope',
+      'slotVisibility': 'x',
+    });
+    expect(bad.toolDisplay, ToolDisplayMode.compact);
+    expect(bad.slotVisibility, isEmpty);
+  });
+
   test(
     'actual file replacement round trips and rejects damaged data',
     () async {
