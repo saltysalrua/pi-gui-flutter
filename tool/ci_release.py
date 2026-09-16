@@ -151,7 +151,8 @@ def linux_executables(source: Path) -> set[str]:
     return {
         p.name
         for p in source.iterdir()
-        if p.is_file() and p.stat().st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        if p.is_file()
+        and p.stat().st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     }
 
 
@@ -170,7 +171,9 @@ def package_linux(root: Path, source: Path, output: Path) -> Path:
         raise ValueError("Incomplete Linux release: missing Flutter assets")
     executables = linux_executables(source)
     if executables != {"pi_gui"}:
-        raise ValueError(f"Unexpected executable in release directory: {sorted(executables)}")
+        raise ValueError(
+            f"Unexpected executable in release directory: {sorted(executables)}"
+        )
     output.mkdir(parents=True, exist_ok=True)
     archive = output / f"pi-gui-flutter-{version}-linux-x64.tar.gz"
     with tarfile.open(archive, "w:gz") as bundle:
@@ -223,9 +226,7 @@ def main() -> None:
         sys.stdout.buffer.write(release_notes(ROOT).encode("utf-8"))
     elif args.command == "package-linux":
         print(
-            package_linux(
-                ROOT, ROOT / "build/linux/x64/release/bundle", ROOT / "dist"
-            )
+            package_linux(ROOT, ROOT / "build/linux/x64/release/bundle", ROOT / "dist")
         )
     else:
         print(package(ROOT, ROOT / "build/windows/x64/runner/Release", ROOT / "dist"))
