@@ -7,28 +7,30 @@ enum WorkspaceDocumentKind { chat, file, commit }
 
 @immutable
 class WorkspaceDocument {
-  const WorkspaceDocument.chat()
+  const WorkspaceDocument.chat([this.sessionId, this.workspace])
     : kind = WorkspaceDocumentKind.chat,
-      workspace = null,
       path = null,
       commit = null;
   const WorkspaceDocument.file(this.workspace, this.path, {this.commit})
-    : kind = WorkspaceDocumentKind.file;
+    : kind = WorkspaceDocumentKind.file,
+      sessionId = null;
   const WorkspaceDocument.commit(this.workspace, this.commit)
     : kind = WorkspaceDocumentKind.commit,
-      path = null;
+      path = null,
+      sessionId = null;
   final WorkspaceDocumentKind kind;
-  final String? workspace, path, commit;
+  final String? workspace, path, commit, sessionId;
 
   @override
   bool operator ==(Object other) =>
       other is WorkspaceDocument &&
       kind == other.kind &&
+      sessionId == other.sessionId &&
       workspace == other.workspace &&
       path == other.path &&
       commit == other.commit;
   @override
-  int get hashCode => Object.hash(kind, workspace, path, commit);
+  int get hashCode => Object.hash(kind, sessionId, workspace, path, commit);
 }
 
 /// Workspace-bound document identities. Preview requests remain in the browser

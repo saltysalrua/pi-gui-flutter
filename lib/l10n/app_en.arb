@@ -207,7 +207,7 @@
   "worktreeManage": "Choose worktree",
   "worktreeCreate": "New worktree",
   "worktreeBranch": "New branch name",
-  "worktreeBase": "Starting branch",
+  "worktreeBase": "Start from (branch or full commit SHA)",
   "worktreeHead": "Current commit (HEAD)",
   "worktreeDetached": "Detached HEAD",
   "worktreeLocked": "Locked",
@@ -432,7 +432,41 @@
   "tabsSplit": "Move to new group on the right",
   "tabsMerge": "Merge all tabs",
   "tabsActions": "Tab actions",
-  "tabsCloseOthers": "Close other file tabs",
+  "tabsCloseOthers": "Close other tabs",
   "tabsReadOnly": "Read-only",
-  "tabsRefresh": "Reload this preview"
+  "tabsRefresh": "Reload this preview",
+  "workbenchSharedDirectory": "Another session is running in this directory and may edit the same files. Create a worktree to isolate changes.",
+  "workbenchSearch": "Search projects, worktrees and sessions…",
+  "workbenchAddProject": "Add project",
+  "workbenchMain": "Main",
+  "workbenchWaiting": "Waiting for you",
+  "workbenchRunning": "Running",
+  "workbenchUnread": "Unread",
+  "workbenchHistory": "History",
+  "workbenchCloseSession": "Close session",
+  "workbenchStopClose": "Stop and close",
+  "workbenchCloseRunning": "This session is running or waiting for you. Stop and close ends its Pi process; saved history is kept.",
+  "workbenchCloseDraft": "This session has unsent text or attachments. Closing discards the draft, but keeps saved history.",
+  "workbenchForgetProject": "Remove project from list",
+  "workbenchForgetHint": "Remove only the registration, not directories, branches or history. Close all sessions in this project first.",
+  "workbenchName": "Worktree name",
+  "workbenchCreateHint": "Creates a separate checkout and branch in the background. Uncommitted and ignored files are not copied; dependencies are not installed. Other sessions keep running.",
+  "workbenchCreateBackground": "Create in background",
+  "workbenchCreating": "Creating…",
+  "workbenchFailed": "Operation failed",
+  "workbenchNoMatch": "No matching projects or sessions",
+  "workbenchEmpty": "Add a project or select a directory in the sidebar to start chatting.",
+  "workbenchOperationUnknown": "Waiting for backend confirmation. Do not repeat the operation; refresh to check the result.",
+  "workbenchDisconnected": "This session process exited. Other sessions are unaffected. Close this tab and reopen it from history; messages are never replayed automatically.",
+  "workbenchSessionCount": "{count} sessions",
+  "workbenchCloseWindow": "Sessions are running or have unsent drafts. Closing this window stops all sessions and discards unsent drafts.",
+  "workbenchRemoveInUse": "Close every session in this directory before removing the worktree. The main checkout cannot be removed.",
+  "@workbenchSessionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workbenchWaitBeforeClose": "A workspace operation is still in progress. Wait for creation or removal to finish before closing, to avoid leaving an incomplete Git checkout."
 }

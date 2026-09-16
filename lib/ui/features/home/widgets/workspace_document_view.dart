@@ -26,9 +26,11 @@ class WorkspaceDocumentView extends StatefulWidget {
     super.key,
     required this.document,
     required this.tabs,
+    this.onOpenFile,
   });
   final WorkspaceDocument document;
   final WorkspaceTabsController tabs;
+  final void Function(String path, {String? commit})? onOpenFile;
   @override
   State<WorkspaceDocumentView> createState() => _WorkspaceDocumentViewState();
 }
@@ -345,7 +347,10 @@ class _WorkspaceDocumentViewState extends State<WorkspaceDocumentView> {
               subtitle: file.original,
               leading: const Icon(Icons.description_outlined),
               trailing: Text(file.status, style: context.textTheme.labelSmall),
-              onTap: () => widget.tabs.openFile(file.path, commit: data.hash),
+              onTap: () => (widget.onOpenFile ?? widget.tabs.openFile)(
+                file.path,
+                commit: data.hash,
+              ),
             ),
           ),
         if (data.limited)

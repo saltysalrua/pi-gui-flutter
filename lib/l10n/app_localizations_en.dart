@@ -494,7 +494,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worktreeBranch => 'New branch name';
 
   @override
-  String get worktreeBase => 'Starting branch';
+  String get worktreeBase => 'Start from (branch or full commit SHA)';
 
   @override
   String get worktreeHead => 'Current commit (HEAD)';
@@ -1114,11 +1114,105 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabsActions => 'Tab actions';
 
   @override
-  String get tabsCloseOthers => 'Close other file tabs';
+  String get tabsCloseOthers => 'Close other tabs';
 
   @override
   String get tabsReadOnly => 'Read-only';
 
   @override
   String get tabsRefresh => 'Reload this preview';
+
+  @override
+  String get workbenchSharedDirectory =>
+      'Another session is running in this directory and may edit the same files. Create a worktree to isolate changes.';
+
+  @override
+  String get workbenchSearch => 'Search projects, worktrees and sessions…';
+
+  @override
+  String get workbenchAddProject => 'Add project';
+
+  @override
+  String get workbenchMain => 'Main';
+
+  @override
+  String get workbenchWaiting => 'Waiting for you';
+
+  @override
+  String get workbenchRunning => 'Running';
+
+  @override
+  String get workbenchUnread => 'Unread';
+
+  @override
+  String get workbenchHistory => 'History';
+
+  @override
+  String get workbenchCloseSession => 'Close session';
+
+  @override
+  String get workbenchStopClose => 'Stop and close';
+
+  @override
+  String get workbenchCloseRunning =>
+      'This session is running or waiting for you. Stop and close ends its Pi process; saved history is kept.';
+
+  @override
+  String get workbenchCloseDraft =>
+      'This session has unsent text or attachments. Closing discards the draft, but keeps saved history.';
+
+  @override
+  String get workbenchForgetProject => 'Remove project from list';
+
+  @override
+  String get workbenchForgetHint =>
+      'Remove only the registration, not directories, branches or history. Close all sessions in this project first.';
+
+  @override
+  String get workbenchName => 'Worktree name';
+
+  @override
+  String get workbenchCreateHint =>
+      'Creates a separate checkout and branch in the background. Uncommitted and ignored files are not copied; dependencies are not installed. Other sessions keep running.';
+
+  @override
+  String get workbenchCreateBackground => 'Create in background';
+
+  @override
+  String get workbenchCreating => 'Creating…';
+
+  @override
+  String get workbenchFailed => 'Operation failed';
+
+  @override
+  String get workbenchNoMatch => 'No matching projects or sessions';
+
+  @override
+  String get workbenchEmpty =>
+      'Add a project or select a directory in the sidebar to start chatting.';
+
+  @override
+  String get workbenchOperationUnknown =>
+      'Waiting for backend confirmation. Do not repeat the operation; refresh to check the result.';
+
+  @override
+  String get workbenchDisconnected =>
+      'This session process exited. Other sessions are unaffected. Close this tab and reopen it from history; messages are never replayed automatically.';
+
+  @override
+  String workbenchSessionCount(int count) {
+    return '$count sessions';
+  }
+
+  @override
+  String get workbenchCloseWindow =>
+      'Sessions are running or have unsent drafts. Closing this window stops all sessions and discards unsent drafts.';
+
+  @override
+  String get workbenchRemoveInUse =>
+      'Close every session in this directory before removing the worktree. The main checkout cannot be removed.';
+
+  @override
+  String get workbenchWaitBeforeClose =>
+      'A workspace operation is still in progress. Wait for creation or removal to finish before closing, to avoid leaving an incomplete Git checkout.';
 }

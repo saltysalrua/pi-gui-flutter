@@ -13,11 +13,19 @@ class AppTabGroup<T extends Object> {
 /// UI-only tab/group state. [home] is permanent and stays first in its group.
 /// Document identity is supplied by T's equality; opening twice only activates.
 class AppTabsController<T extends Object> extends ChangeNotifier {
-  AppTabsController({required this.home}) {
+  AppTabsController({required this.home, this.pinHome = true}) {
     _tabs.add(home);
     _groups.add(AppTabGroup._(0, home));
   }
-  final T home;
+  T home;
+  final bool pinHome;
+
+  /// Business hosts can transfer the fallback before closing its old document.
+  void replaceHome(T tab) {
+    if (!_tabs.contains(tab)) return;
+    home = tab;
+  }
+
   final _tabs = <T>[];
   final _groups = <AppTabGroup<T>>[];
   int _nextGroup = 1, _activeGroup = 0;
@@ -81,7 +89,7 @@ class AppTabsController<T extends Object> extends ChangeNotifier {
 
   /// Index is an insertion boundary in the destination's pre-move order.
   void move(T tab, int groupId, {int? index}) {
-    if (tab == home) return;
+    if (pinHome && tab == home) return;
     final source = groupOf(tab);
     final matches = _groups.where((g) => g.id == groupId);
     if (source == null || matches.isEmpty) return;
@@ -97,7 +105,7 @@ class AppTabsController<T extends Object> extends ChangeNotifier {
     } else {
       _removeFromGroup(source, tab);
     }
-    if (target._tabs.contains(home)) {
+    if (pinHome && target._tabs.contains(home)) {
       insertion = insertion.clamp(1, target._tabs.length);
     }
     target._tabs.insert(insertion, tab);
@@ -106,7 +114,8 @@ class AppTabsController<T extends Object> extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool canSplit(T tab) => tab != home && (groupOf(tab)?.tabs.length ?? 0) > 1;
+  bool canSplit(T tab) =>
+      (!pinHome || tab != home) && (groupOf(tab)?.tabs.length ?? 0) > 1;
 
   /// Move, do not clone: a document and especially the chat editor mount once.
   void split(T tab) {

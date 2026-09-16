@@ -1,6 +1,6 @@
 ---
 title: "图片附件、图片预览与文件链接"
-version: "1.1.1"
+version: "1.2.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, images, attachments, links]
@@ -12,19 +12,19 @@ tags: [flutter, pi-rpc, images, attachments, links]
 
 - 输入框左下角点 **＋**，菜单内可选择 **添加图片** 或 **添加文件**。图片支持 PNG、JPEG、GIF 或 WebP。
 - 输入框内 Ctrl+V（macOS 为 Cmd+V）优先粘贴剪贴板图片/文件列表；纯文字仍使用 Flutter 原有粘贴，保留选区替换与撤销。
-- 剪贴板接入 `super_clipboard` 原生插件，旧进程仅热重载不能加载插件，需要重新构建并启动 GUI。当前原生端到端验证尚未完成，不应将旧窗口的附件读取失败误判为图片损坏。
+- 剪贴板接入 `super_clipboard` 原生插件，旧进程仅热重载不能加载插件，需要重新构建并启动 GUI。用户已重新构建并确认图片粘贴可用，不应将未更新窗口的附件读取失败误判为图片损坏。
 - 图片先进入草稿：点击缩略图可放大、缩放查看，点右侧叉号移除。发送前不会把图片交给模型。
 - 可以附带文字，也可以只发图片。图片随同一条 `prompt` 交给 Pi，不是把本机路径作为文字发送。
 - 每条消息最多 8 张，每张最多 10 MiB，总共最多 20 MiB；单张分辨率不超过 4000 万像素。模型服务可能另有限制。
 - 如果 Pi 明确返回模型不支持图片，输入框会提示切换模型或移除图片，不猜测模型名称。
 - 明确拒绝发送时，文字与附件都保留。确认超时时继续沿用聊天写入屏障，不自动重发。回复过程中可以准备下一条图片草稿。
-- 切换工作区时附件跟随该工作区草稿保存；成功新建或切换会话时清空附件。取消选择不会清空原来的图片。
+- 每个并行会话独立保留附件草稿；切换会话或 Worktree 不清空其他会话的附件。新建会话从空草稿开始，有草稿时关闭会话须确认。取消选择不会清空原来的图片。
 
 ## 图片显示
 
 - 用户、助手及工具结果中的 RPC 图片块会显示缩略图；历史消息重新读取后也能显示。
 - Markdown 中的本地图片和 base64 图片可以预览，例如 `![结果](output/result.png)`。
-- 本地相对路径以 **当前 Pi 工作区** 为基准，不使用 GUI 启动目录。工作区外的本地绝对路径也可查看。
+- 本地相对路径以 **该会话 / 文档所属的 Pi 工作区** 为基准，不使用当前选中标签的另一个目录或 GUI 启动目录。工作区外的本地绝对路径也可查看。
 - 网络图片先显示 **点击加载网络图片**，悬停可看到完整地址。只有点击后才发起 HTTP(S) 请求，避免模型回复自动联网追踪。不会附带 Pi 密钥或聊天内容。
 - 点击图片打开铺满应用窗口的暗色 Lightbox：滚轮以视口中心缩放、拖动平移，双击放大或恢复适应窗口；右上角关闭按钮、Esc 和点击图片外空白均可退出。由公共组件 `lib/ui/atoms/app_image_lightbox.dart` 实现，复用项目主题与动效 Token。
 - 显示侧最多读取 20 MiB、4000 万像素，限制解码预览尺寸。损坏、缺失、超限或非支持格式只显示本地化提示，不中断对话。
@@ -47,7 +47,7 @@ tags: [flutter, pi-rpc, images, attachments, links]
 | `lib/ui/atoms/app_file_tile.dart` | 草稿和历史共用文件卡片 |
 | `lib/ui/atoms/app_image_lightbox.dart` | 公共全窗口图片查看器 |
 
-图片和文件仍由 HomeView 的同一附件控制器管理，工作区代次隔离、确认发送快照清理、会话切换清空规则不变。
+图片和文件由每个 `WorkbenchSession` 自己的 `ImageAttachmentController` 管理；控制器内部的异步代次隔离和确认发送快照清理不变，不再以全局工作区切换清空其他会话。见 [工作区与并行会话](workspaces_sessions.md)。
 
 ## 打开文件链接
 
@@ -84,9 +84,10 @@ tags: [flutter, pi-rpc, images, attachments, links]
 | `lib/ui/features/home/widgets/home_chat_panel.dart` | 发送时快照附件，成功后仅移除本次快照；保留用户后续新增内容 |
 | `lib/ui/features/home/widgets/chat_message_view.dart` | 用户和助手图片块展示 |
 | `lib/ui/features/home/widgets/tool_card_registry.dart` | 工具图片输出与文件打开入口 |
-| `lib/ui/features/home/views/home_view.dart` | 长期附件控制器、工作区/会话草稿生命周期 |
+| `lib/ui/features/home/controllers/workbench_controller.dart` | 每会话长期附件控制器与关闭 / 草稿生命周期 |
+| `lib/ui/features/home/views/home_view.dart` | 按文档目录装配 ChatResourceScope，保证并排会话的相对链接不串目录 |
 
-图片只通过原有 RPC 的 `prompt.images` 发送，不新增后端进程、不直连模型 API，不读写 Pi 私有会话文件。资源服务的本地 I/O 仅用于用户选择附件、显示图片及明确点击打开文件。
+图片只通过所属通道原有 RPC 的 `prompt.images` 发送，不为附件新增进程、不直连模型 API，不读写 Pi 私有会话文件。资源服务的本地 I/O 仅用于用户选择附件、显示图片及明确点击打开文件。
 
 ```json
 {"id":"gui-1","type":"prompt","message":"看看这张图","images":[{"type":"image","data":"<base64 bytes>","mimeType":"image/png"}]}

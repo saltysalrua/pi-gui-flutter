@@ -26,8 +26,18 @@ enum ExtensibleSlotId {
 /// 遵循 AGENTS.md 规范，统一承接来自 Pi RPC 的 extension_ui_request
 /// 并以响应式方式驱动 UI 上的 [SlotContainer] 刷新。
 class SlotManager {
-  SlotManager._();
-  static final SlotManager instance = SlotManager._();
+  SlotManager();
+  static final SlotManager instance = SlotManager();
+
+  static SlotManager of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SlotScope>()?.manager ??
+      instance;
+
+  void dispose() {
+    for (final notifier in _slotNotifiers.values) {
+      notifier.dispose();
+    }
+  }
 
   /// UI-only anchor for extension questions, shared by the two composer states.
   final editorAnchor = GlobalKey();
@@ -57,4 +67,12 @@ class SlotManager {
   void clearSlot(ExtensibleSlotId slotId) {
     _slotNotifiers[slotId]?.value = const [];
   }
+}
+
+/// Each parallel conversation owns its own editor anchor and extension slots.
+class SlotScope extends InheritedWidget {
+  const SlotScope({super.key, required this.manager, required super.child});
+  final SlotManager manager;
+  @override
+  bool updateShouldNotify(SlotScope oldWidget) => manager != oldWidget.manager;
 }

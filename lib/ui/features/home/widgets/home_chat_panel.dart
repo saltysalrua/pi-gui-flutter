@@ -40,6 +40,8 @@ class HomeChatPanel extends StatefulWidget {
     required this.contentBackground,
     required this.panelBackground,
     this.animateMaterial = true,
+    this.conversationOnly = false,
+    this.sharedDirectoryWarning = false,
   });
   final ChatController chat;
   final ModelPickerController modelPicker;
@@ -50,7 +52,7 @@ class HomeChatPanel extends StatefulWidget {
   final WorkspaceBrowserController browser;
   final WorkspaceTabsController tabs;
   final Color contentBackground, panelBackground;
-  final bool animateMaterial;
+  final bool animateMaterial, conversationOnly, sharedDirectoryWarning;
   @override
   State<HomeChatPanel> createState() => _HomeChatPanelState();
 }
@@ -337,6 +339,16 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
                 active: chat.isRunning || chat.isLoading || chat.isSending,
               ),
             ),
+          if (widget.sharedDirectoryWarning)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Text(
+                l10n.workbenchSharedDirectory,
+                style: context.textTheme.bodySmall?.copyWith(
+                  color: context.colors.warning,
+                ),
+              ),
+            ),
           HomeStarterPanel(
             modelPicker: widget.modelPicker,
             inputController: widget.input,
@@ -417,6 +429,7 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
         ),
         editor: _editor(context, started),
       );
+      if (widget.conversationOnly) return conversation;
       return AppSplitPanel(
         isOpen: widget.browser.isOpen,
         onDismiss: widget.browser.toggle,

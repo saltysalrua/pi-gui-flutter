@@ -54,8 +54,12 @@ class PiProcessTransport implements PiRpcTransport {
     return PiProcessTransport._(process);
   }
 
-  static Future<PiProcessTransport> startAdapter(String scriptPath) async =>
-      PiProcessTransport._(await Process.start('node', [scriptPath]));
+  static Future<PiProcessTransport> startAdapter(
+    String scriptPath, {
+    List<String> arguments = const [],
+  }) async => PiProcessTransport._(
+    await Process.start('node', [scriptPath, ...arguments]),
+  );
 
   final Process _process;
   late final StreamSubscription<List<int>> _stderr;

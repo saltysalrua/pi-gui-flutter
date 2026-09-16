@@ -1,6 +1,6 @@
 ---
 title: "文档标签页与并排分组"
-version: "1.0.0"
+version: "2.0.0"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, tabs, workspace, diff, layout]
@@ -12,20 +12,20 @@ tags: [flutter, tabs, workspace, diff, layout]
 
 主内容区采用 [VS Code 标签页与编辑器分组](https://code.visualstudio.com/docs/editing/getting-started/userinterface#_tabs) 的方式：多个文档在同一个应用窗口里打开，不再为每个文件弹出阻断式 Diff 弹窗。这是**主内容区标签页**，不是浮动面板，也不是操作系统多窗口。
 
-- **聊天**是第一个固定标签，不能关闭或拖到另一个分组。切到文件不会停止 Agent；返回聊天时原有草稿、附件、时间线和输入状态仍在。空对话输入居中，发送第一条消息后才移到底部。
+- **聊天**支持多个独立会话标签，可以关闭、排序和移到其他分组。切到文件或另一会话不会停止 Agent；每个会话保留自己的草稿、附件、时间线和输入状态。空对话输入居中，发送第一条消息后才移到底部。并行运行和关闭确认见 [工作区与会话](workspaces_sessions.md)。
 - 点击标签栏右侧的 **文件与 Git** 文件夹图标打开原来的右栏。文件树、Git graph 和扩展侧栏插槽保持原样；点击文件、提交或提交里的文件，分别打开文件预览、提交详情或提交 Diff 标签。
 - 每次打开新文档都会保留标签，不采用“单击覆盖上一个临时预览”的模式。同一工作区、路径、提交版本的文档只保留一份，再次点击会定位它；工作目录与不同提交是不同标签。
-- 文件标签显示简短文件名，重名时补上一级目录；提交版本补短 hash。悬停查看完整相对路径和完整 hash。正文保留只读标记，**文件内容 / Diff** 图标切换与原来的已暂存 / 未暂存区分不变。
-- 点标签上的 **×** 或鼠标中键关闭；关闭当前标签后选择邻近标签。最后一个文件标签关闭后仍保留聊天，不会关闭应用。
+- 文件标签显示简短文件名，提交版本补短 hash。悬停查看完整工作区、相对路径和完整 hash，同名文件可据此区分。正文保留只读标记，**文件内容 / Diff** 图标切换与原来的已暂存 / 未暂存区分不变。
+- 点标签上的 **×** 或鼠标中键关闭；关闭当前标签后选择邻近标签。运行中或有草稿的会话先确认；文件直接关闭。最后一个标签关闭后保留新建会话入口，不关闭应用。
 - 标签栏可水平滚动，鼠标滚轮也能横向浏览；下拉箭头打开 **所有标签页**，可从其他分组或被挤出可见区域的标签中直接选择。选择后自动滚到该标签。
 
 ### 排序、并排与合并
 
 1. 在同一标签栏拖动标签调整顺序；目标前后有插入位置提示。
-2. 选中文件标签，点 **移到右侧新分组** 图标，或在 **标签页操作** 菜单中选择同名操作。文档会移动到右侧分组，可以与聊天或其他文件并排查看；不会复制正文或创建第二个 Agent。
+2. 选中会话或文件标签，点 **移到右侧新分组** 图标，或在 **标签页操作** 菜单中选择同名操作。文档会移动到右侧分组，可以与其他会话 / 文件并排查看；移动不复制正文，也不额外启动 Agent。新建会话才创建独立运行通道。
 3. 拖动两个分组之间的 10px 区域调整宽度，双击恢复等分。静止时不显示分隔线，悬停 / 拖动时才显示手柄。
 4. 把标签拖到另一个分组的标签栏，就会移入该组。原分组的最后一个标签移走或关闭后，空分组自动消失。
-5. **标签页操作 → 合并所有标签页** 将所有分组合并回聊天所在组，保留当前选中文档；**关闭其他文件标签页** 保留当前文档和聊天。
+5. **标签页操作 → 合并所有标签页** 将所有分组合并，保留当前选中文档；**关闭其他标签页** 按同样的关闭确认规则逐项处理，保留当前文档。
 
 同一组只有一个文档时，不提供无意义的继续拆分。可建立多个横向分组；每组至少留 300 逻辑像素。可用宽度不够时只显示当前活动组，其余文档仍可从“所有标签页”访问；放大后恢复原分组和宽度比例，不自动关闭文档。不实现上下分组或窗口外拖出。
 
@@ -40,15 +40,15 @@ tags: [flutter, tabs, workspace, diff, layout]
 | 当前组上一个标签 | Ctrl+Shift+Tab / Ctrl+PageUp |
 | 标签栏内切换 | 左 / 右方向键 |
 
-固定聊天标签不响应关闭命令。所有菜单和按钮沿用公共组件的键盘 Focus / Hover / Disabled 状态。标签栏高度跟随主题字号与系统文字缩放，选中反馈及正文渐显使用 Motion Tokens；减弱动态时直接切换。
+会话标签同样响应关闭命令，但运行 / 草稿确认不能被快捷键绕过。所有菜单和按钮沿用公共组件的键盘 Focus / Hover / Disabled 状态。标签栏高度跟随主题字号与系统文字缩放，选中反馈及正文渐显使用 Motion Tokens；减弱动态时直接切换。
 
 ## 状态与刷新边界
 
-- 标签和分组是**本次应用运行期间的 UI 状态**，不写入 `appearance.json`、Pi 会话或其他后端私有文件；重启后从聊天开始。
-- 同一工作区切换 / 新建聊天会话保留文件标签，并切回聊天。工作区发生变化（包括进入切换中状态）时清除旧文件标签和分组，防止查看到另一个项目的旧内容。
+- 标签和分组是**本次应用运行期间的 UI 状态**，不写入 `appearance.json`、Pi 会话或其他后端私有文件；重启后从空会话开始。
+- 跨项目切换也保留已打开文档。每份文档身份包含工作目录；每目录独立浏览 Controller，不把前一个目录的数据错误套到另一个目录。右栏跟随当前活动文档的目录。
 - 文档第一次打开时读取一次。普通切页、拖拽、拆分、合并不会重新读取，也不占用聊天操作锁。关闭文档会释放预览快照。
 - 已打开文档是只读快照，不是实时编辑器。正文右上角 **重新读取此预览** 只刷新该文档；右栏“刷新文件与 Git”仍只刷新目录 / Git 列表。失败显示原有的人话错误提示和重试按钮；不把旧快照说成最新结果。
-- 每个文档有独立的滚动存储，内容 / Diff 两页保持挂载；隐藏文档不接收焦点，停用内部 Ticker。聊天也不重新挂载，不复制全局 editorAnchor / extension_ui 槽位。
+- 每个文档有独立的滚动存储，内容 / Diff 两页保持挂载；隐藏文档不接收焦点，停用内部 Ticker。每个会话仅挂载一次，使用自己独立的 SlotManager / editorAnchor；前台问答投射到全局遮罩。
 
 ## 代码结构
 
@@ -60,8 +60,9 @@ tags: [flutter, tabs, workspace, diff, layout]
 | `lib/ui/features/home/controllers/workspace_tabs_controller.dart` | `WorkspaceDocument` 身份与工作区隔离；关联已有浏览 Controller |
 | `lib/ui/features/home/widgets/workspace_document_view.dart` | 文件 / 提交的只读正文与异步快照；复用 AppCodeBlock / AppDiffView / AppIconTabs / AppNavTile |
 | `lib/ui/features/home/widgets/workspace_browser_panel.dart` | 通过 `onOpenFile` / `onOpenCommit` 回调打开标签，不自行操作 Navigator |
-| `lib/ui/features/home/widgets/home_chat_panel.dart` | 在原 AppSplitPanel 主区装配标签宿主，描述标签与选择正文类型 |
-| `lib/ui/features/home/views/home_view.dart` | 长期持有唯一 RPC、浏览与标签 Controller，会话成功切换后显示聊天 |
+| `lib/ui/features/home/widgets/home_chat_panel.dart` | 每会话两态输入与时间线；生产使用 conversationOnly 模式，由 HomeView 统一装配标签与右栏 |
+| `lib/ui/features/home/views/home_view.dart` | 装配全局标签宿主与每会话 SlotScope，串行关闭确认 |
+| `lib/ui/features/home/controllers/workbench_controller.dart` | WorkbenchTabs / WorkbenchSession、多个会话和每目录浏览 Controller；唯一物理连接由 PiChannelHub 持有 |
 | `test/app_tabs_controller_test.dart` | 标签 / 分组不变量与工作区迟到响应回归 |
 
 ### 不重新挂载正文
@@ -77,22 +78,23 @@ tags: [flutter, tabs, workspace, diff, layout]
 
 公共 Controller 和原子组件对 RPC、文件系统、聊天、Git 都无依赖。新的业务类型只需提供稳定且可比较的文档身份、`AppDocumentTab` 元数据与正文 builder。
 
-当前业务描述示意（内存身份，不是新增 RPC 或持久化格式）：
+当前业务描述示意（内存身份，不是新增 RPC 或持久化格式；聊天加入 sessionId）：
 
 ```json
 [
-  {"kind":"chat"},
+  {"kind":"chat","sessionId":"session-a","workspace":"D:\\project"},
+  {"kind":"chat","sessionId":"session-b","workspace":"D:\\project"},
   {"kind":"file","workspace":"D:\\project","path":"lib/main.dart","commit":null},
   {"kind":"file","workspace":"D:\\project","path":"lib/main.dart","commit":"0123456789012345678901234567890123456789"},
   {"kind":"commit","workspace":"D:\\project","commit":"0123456789012345678901234567890123456789"}
 ]
 ```
 
-`AppTabsController.move(tab, groupId, index: ...)` 的 index 是**移动之前**目标列表的插入边界；同组向右移动会扣除原位置，固定首页仍留在首项。DragTarget 只接受同一个 Controller 的拖拽 payload，不接收另一宿主或外部文件拖放。
+`AppTabsController.move(tab, groupId, index: ...)` 的 index 是**移动之前**目标列表的插入边界；同组向右移动会扣除原位置。默认仍保护固定首页，WorkbenchTabs 使用 `pinHome: false`，并在关闭旧首页前转移 fallback 身份，避免出现空分组。DragTarget 只接受同一个 Controller 的拖拽 payload，不接收另一宿主或外部文件拖放。
 
 ### RPC
 
-本功能**没有新增 RPC 命令、后端扩展或子进程**。仍通过同一个 `WorkspaceBrowserController` 使用：
+文档查看本身不增加 Agent 进程；多会话的通道管理见 [工作区与会话](workspaces_sessions.md)。每目录通过自己的 `WorkspaceBrowserController` 和共用管理通道使用：
 
 - `gui_get_file_preview`：`workspace`、`path`、可选完整 `commit`，返回 `PiFilePreview`。
 - `gui_get_git_commit`：`workspace`、完整 `commit`，返回 `PiCommitDetails`。

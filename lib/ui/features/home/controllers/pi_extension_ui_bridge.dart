@@ -24,7 +24,13 @@ String _plainText(String text) => text.replaceAll(
 
 /// 从连接建立前开始订阅，避免扩展在启动/模型切换时请求 UI 而悬挂。
 class PiExtensionUiBridge {
-  PiExtensionUiBridge(this._client, this._editor) {
+  PiExtensionUiBridge(
+    this._client,
+    this._editor, {
+    SlotManager? slots,
+    this.onAttentionChanged,
+    this._foreground = true,
+  }) : _slots = slots ?? SlotManager.instance {
     _subscription = _client.events.listen((event) {
       if (event is PiExtensionUiRequest) _route(event);
       if (event is PiRpcDisconnected || event is PiRpcWorkspaceReset) {
@@ -39,7 +45,30 @@ class PiExtensionUiBridge {
   final PiRpcClient _client;
   final TextEditingController _editor;
   late final StreamSubscription<PiRpcEvent> _subscription;
-  final _slots = SlotManager.instance;
+  final SlotManager _slots;
+  final VoidCallback? onAttentionChanged;
+  bool _foreground;
+  String? _title;
+  bool get needsAttention => _dialogs.isNotEmpty;
+  bool get hasNotifications => _notifications.isNotEmpty;
+  final _notifications = <({String? message, bool invalid})>[];
+  final _dialogInputs = <String, TextEditingController>{};
+
+  void setForeground(bool value) {
+    if (_foreground == value) return;
+    _foreground = value;
+    if (value) {
+      _showDialog();
+      _showNotification();
+      if (_title case final title?) {
+        unawaited(windowManager.setTitle(title).catchError((Object _) {}));
+      }
+    } else {
+      SlotManager.instance.clearSlot(ExtensibleSlotId.dialogOverlay);
+      SlotManager.instance.clearSlot(ExtensibleSlotId.notificationToast);
+    }
+  }
+
   final _widgets = <String, ({ExtensibleSlotId slot, Widget child})>{};
   final _statuses = <String, Widget>{};
   final _dialogs = <PiExtensionUiRequest>[];
@@ -100,8 +129,11 @@ class PiExtensionUiBridge {
       case 'set_editor_text':
         _editor.text = request.text ?? '';
       case 'setTitle':
-        if (request.title case final title?) {
-          unawaited(windowManager.setTitle(title).catchError((Object _) {}));
+        _title = request.title;
+        if (_foreground && request.title != null) {
+          unawaited(
+            windowManager.setTitle(request.title!).catchError((Object _) {}),
+          );
         }
       case 'notify':
         _notify(request.message);
@@ -110,6 +142,9 @@ class PiExtensionUiBridge {
       case 'input':
       case 'editor':
         _dialogs.add(request);
+        _dialogInputs[request.id] = TextEditingController(
+          text: request.prefill,
+        );
         if (request.timeout case final timeout?) {
           _timers[request.id] = Timer(
             Duration(milliseconds: timeout),
@@ -124,23 +159,39 @@ class PiExtensionUiBridge {
   }
 
   void _notify(String? message, {bool invalidRequest = false}) {
-    _slots.setSlotWidgets(ExtensibleSlotId.notificationToast, [
-      AppNotificationToast(
-        key: UniqueKey(),
-        message: message,
-        invalidRequest: invalidRequest,
-        onDismiss: () => _slots.clearSlot(ExtensibleSlotId.notificationToast),
-      ),
+    _notifications.add((message: message, invalid: invalidRequest));
+    onAttentionChanged?.call();
+    _showNotification();
+  }
+
+  void _showNotification() {
+    if (!_foreground) return;
+    final notice = _notifications.firstOrNull;
+    SlotManager.instance.setSlotWidgets(ExtensibleSlotId.notificationToast, [
+      if (notice != null)
+        AppNotificationToast(
+          key: ValueKey((this, notice)),
+          message: notice.message,
+          invalidRequest: notice.invalid,
+          onDismiss: () {
+            if (_notifications.isNotEmpty) _notifications.removeAt(0);
+            onAttentionChanged?.call();
+            _showNotification();
+          },
+        ),
     ]);
   }
 
   void _showDialog() {
+    onAttentionChanged?.call();
+    if (!_foreground) return;
     final request = _dialogs.firstOrNull;
-    _slots.setSlotWidgets(ExtensibleSlotId.dialogOverlay, [
+    SlotManager.instance.setSlotWidgets(ExtensibleSlotId.dialogOverlay, [
       if (request != null)
         _ExtensionDialog(
-          key: ValueKey(request.id),
+          key: ValueKey((this, request.id)),
           request: request,
+          input: _dialogInputs[request.id],
           anchorKey: _slots.editorAnchor,
           onDone: (value, confirmed, cancelled) => _finish(
             request,
@@ -169,6 +220,8 @@ class PiExtensionUiBridge {
       ),
     );
     _showDialog();
+    final input = _dialogInputs.remove(request.id);
+    WidgetsBinding.instance.addPostFrameCallback((_) => input?.dispose());
   }
 
   void _clear() {
@@ -177,8 +230,21 @@ class PiExtensionUiBridge {
     }
     _timers.clear();
     _dialogs.clear();
+    _notifications.clear();
+    final inputs = _dialogInputs.values.toList();
+    _dialogInputs.clear();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final input in inputs) {
+        input.dispose();
+      }
+    });
     _widgets.clear();
     _statuses.clear();
+    if (_foreground) {
+      SlotManager.instance.clearSlot(ExtensibleSlotId.dialogOverlay);
+      SlotManager.instance.clearSlot(ExtensibleSlotId.notificationToast);
+    }
+    onAttentionChanged?.call();
     for (final slot in [
       ExtensibleSlotId.aboveEditor,
       ExtensibleSlotId.belowEditor,
@@ -202,7 +268,9 @@ class _ExtensionDialog extends StatefulWidget {
     required this.request,
     required this.anchorKey,
     required this.onDone,
+    this.input,
   });
+  final TextEditingController? input;
   final PiExtensionUiRequest request;
   final GlobalKey anchorKey;
   final void Function(String? value, bool? confirmed, bool cancelled) onDone;
@@ -211,14 +279,15 @@ class _ExtensionDialog extends StatefulWidget {
 }
 
 class _ExtensionDialogState extends State<_ExtensionDialog> {
-  late final _input = TextEditingController(text: widget.request.prefill);
+  late final _input =
+      widget.input ?? TextEditingController(text: widget.request.prefill);
   final _focusScope = FocusScopeNode(
     traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
   );
   @override
   void dispose() {
     _focusScope.dispose();
-    _input.dispose();
+    if (widget.input == null) _input.dispose();
     super.dispose();
   }
 

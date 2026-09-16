@@ -1,6 +1,6 @@
 ---
 title: "右侧文件树、Git graph 与毛玻璃"
-version: "1.1.0"
+version: "2.0.0"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, workspace, git, graph, diff, acrylic, rpc]
@@ -13,7 +13,7 @@ tags: [flutter, workspace, git, graph, diff, acrylic, rpc]
 点击主内容标签栏右侧的 **文件与 Git** 文件夹图标，展开右栏。空会话也有这个入口，输入卡片仍保持居中；发送第一条消息后才移到底部。右栏替代原来的“本会话文件改动汇总”，只有 **文件**、**Git graph** 两个图标页签，不增加提交、暂存、切分支等写操作。
 
 - 默认宽 **300 逻辑像素**，左边缘可拖拽，双击恢复默认。普通窗口最小 240、最大 640，并至少给聊天保留约 360px。聊天区域不足 640px 时改为覆盖式右栏，点击左侧遮罩关闭；不重置原来记住的宽度。
-- 两个页签及关闭 / 重开保留已读取的数据和展开目录。切换工作区会清空旧目录、提交列表和选中项；切换同一工作区的聊天会话不清空工作区浏览状态。
+- 两个页签及关闭 / 重开保留已读取的数据和展开目录。并行会话改造后，每个目录有独立浏览 Controller；跨目录切换会切换到该目录的浏览状态，而不是清空其他目录。右栏跟随当前活动会话或文件标签的目录。
 - 右上角刷新只读取文件和 Git，不同步聊天、不发送 Prompt，也不切换模型。文件工具执行完和 Agent 停稳后合并刷新，窗口重新获得焦点时也刷新已打开的右栏。关闭右栏不做后台轮询；外部程序的改动可点刷新确认。
 - 参考用户提供的紧凑文件树截图与 [VS Code Git Graph](https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph) 的提交连线、引用标记和按需查看详情，不照搬其仓库写操作。
 
@@ -55,24 +55,25 @@ tags: [flutter, workspace, git, graph, diff, acrylic, rpc]
 - 右栏和 10px 拖拽条本身透明，没有纯色 `ColoredBox` 或卡片叠在主背景上。覆盖式窄栏还会裁掉右栏后方的聊天内容，防止输入框或消息透到栏内。
 - `WindowMaterialScope.tint` 只在原生材质 `active` 且非高对比度时允许透明；否则各区立即回退纯色。沿用已有 Windows Acrylic，不修改原生 C++、系统透明设置或用户外观偏好。
 - 普通停靠栏展开 / 收起使用 slow 400ms / medium 350ms；窄窗阻断浮层使用 fast 250ms / quick 150ms。拖拽即时更新，切页 quick 150ms；减弱动态时立即完成。尺寸动画驱动同一份布局与背景边界，不产生重叠 tint。
-- `HomeChatPanel` 的空态 / 会话态始终使用同一个 `AppComposerLayout`。外层 `AppTabWorkspace` 把聊天与文档正文放在同一扁平 Stack 下，切页、排序与跨组移动不会重新挂载编辑器；右栏入口位于当前活动组的标签栏。
+- 每个 `HomeChatPanel` 的空态 / 会话态始终使用同一个 `AppComposerLayout`。`HomeView` 的 `AppTabWorkspace` 把所有会话与文档正文放在同一扁平 Stack 下，切页、排序与跨组移动不会重新挂载编辑器；右栏入口位于当前活动组的标签栏。
 
 材质原理、系统回退与独立卡片毛玻璃见 [外观设置](appearance_settings.md)。
 
 ## 后端与数据边界
 
-复用 HomeView 唯一的 `PiRpcClient`。新增命令属于 GUI 本地 JSONL 适配层，不是捏造的 Pi 官方命令；不创建第二个 Agent，也不让 Flutter 调用 `Process` 或扫描工作区。
+复用 `WorkbenchController` 的管理通道和 `PiChannelHub` 唯一物理连接。命令属于 GUI 本地 JSONL 适配层，不是 Pi 官方命令；查看目录不创建 Agent，也不让 Widget 调用 `Process` 或扫描工作区。
 
 ```text
-HomeView ─ 唯一 PiRpcClient
-  ├─ ChatController / ModelPickerController / WorkspaceController / PiExtensionUiBridge
-  └─ WorkspaceBrowserController
-       │ strict JSONL
+HomeView → WorkbenchController
+  └─ 每目录 WorkspaceBrowserController
+       │ 管理 PiRpcClient → PiChannelHub（control 通道）
        ▼
-workspace_rpc.mjs ─ WorkspaceBrowser（workspace_browser.mjs）
-       ├─ 只读目录 / Git 查询
-       └─ 原有唯一 pi --mode rpc 子进程保持不变
+workspace_manager.mjs → WorkspaceBrowser（workspace_browser.mjs）
+       ├─ 已注册目录的只读文件 / Git 查询
+       └─ 与各独立 Pi 会话进程解耦
 ```
+
+完整多会话架构见 [工作区与会话](workspaces_sessions.md)。
 
 | 命令 | 主要请求字段 | 返回实体 |
 | --- | --- | --- |
@@ -81,7 +82,7 @@ workspace_rpc.mjs ─ WorkspaceBrowser（workspace_browser.mjs）
 | `gui_get_git_commit` | `workspace`, `commit` | `PiCommitDetails`、`PiCommitFile` |
 | `gui_get_file_preview` | `workspace`, `path`, `commit?` | `PiFilePreview` |
 
-所有请求携带已确认的绝对 `workspace`。后端先与当前目录核对，返回值也携带工作区；前端用工作区 generation、刷新 revision 和请求身份隔离迟到结果。旧目录响应 / 预览不能覆盖新目录；刷新重入会合并并执行一次强制尾随读取。错误保留上一份已确认列表并提示失败，不声称它已经刷新成功。目录切换互斥期间拒绝读取，Agent 正常运行期间允许只读查询，不占聊天操作锁。
+所有请求携带已确认的绝对 `workspace`。多会话后端先核对该目录是否已注册，返回值也携带工作区；每目录 Controller 保留 generation、刷新 revision 和请求身份校验。旧目录响应不能覆盖其他目录，刷新重入仍合并并执行一次强制尾随读取。错误保留已确认列表并提示失败。只读查询不占会话运行锁；各会话工具结束 / 停稳时只使所属目录缓存失效。
 
 ```json
 {"id":"gui-1","type":"gui_list_files","workspace":"D:\\project","path":"lib","force":true,"limit":500}
@@ -101,7 +102,7 @@ workspace_rpc.mjs ─ WorkspaceBrowser（workspace_browser.mjs）
 - 文本预览最多 **256 KiB UTF-8**；非 UTF-8 / 二进制 / 特殊文件显示原因。单份 Diff 上限 256 KiB，超过后提示，不截断成伪完整补丁。其他 Git 输出最大 16 MiB，每次 Git 命令超时 15 秒。
 - 此处是文件系统和 Git 的只读快照，不是跨进程事务；其他程序同时编辑时可能需要再次刷新。不实现自动磁盘 watcher、仓库搜索、多提交比较或编辑审批。
 
-`PiWorkspaceTransport` 现在同时解包三个资源：`workspace_rpc.mjs`、`workspace_browser.mjs`、`gui_tool_diff.mjs`。**新后端在下次正常启动更新后的应用时装载**，热重载不能替换已运行的 Node 模块。旧后端收到未知命令时右栏给出更新提示，不中断聊天。
+`PiWorkspaceTransport` 同时解包四个资源：`workspace_rpc.mjs`、`workspace_manager.mjs`、`workspace_browser.mjs`、`gui_tool_diff.mjs`。**新后端在下次正常启动更新后的应用时装载**，热重载不能替换已运行的 Node 模块。旧后端收到未知命令时右栏给出更新提示，不中断聊天。
 
 ## 关键路径
 

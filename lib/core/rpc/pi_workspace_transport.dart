@@ -16,6 +16,7 @@ class PiWorkspaceTransport implements PiRpcTransport {
     try {
       for (final name in [
         'workspace_rpc.mjs',
+        'workspace_manager.mjs',
         'workspace_browser.mjs',
         'gui_tool_diff.mjs',
       ]) {
@@ -25,7 +26,10 @@ class PiWorkspaceTransport implements PiRpcTransport {
       }
       final file = File('${directory.path}/workspace_rpc.mjs');
       return PiWorkspaceTransport._(
-        await PiProcessTransport.startAdapter(file.path),
+        await PiProcessTransport.startAdapter(
+          file.path,
+          arguments: const ['--gui-multiplex'],
+        ),
         directory,
       );
     } catch (_) {

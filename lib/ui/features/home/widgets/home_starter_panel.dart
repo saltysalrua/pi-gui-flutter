@@ -128,7 +128,7 @@ class _HomeStarterPanelState extends State<HomeStarterPanel> {
           padding: EdgeInsets.only(bottom: AppSpacing.sm),
         ),
         AppCard.elevated(
-          key: SlotManager.instance.editorAnchor,
+          key: SlotManager.of(context).editorAnchor,
           backgroundColor: context.colors.composerBackground,
           borderColor: _focusNode.hasFocus ? context.colors.borderFocus : null,
           child: Column(

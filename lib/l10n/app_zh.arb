@@ -207,7 +207,7 @@
   "worktreeManage": "选择 Worktree",
   "worktreeCreate": "新建 Worktree",
   "worktreeBranch": "新分支名称",
-  "worktreeBase": "起始分支",
+  "worktreeBase": "起点（分支或完整 Commit SHA）",
   "worktreeHead": "当前提交（HEAD）",
   "worktreeDetached": "游离 HEAD",
   "worktreeLocked": "已锁定",
@@ -432,7 +432,41 @@
   "tabsSplit": "移到右侧新分组",
   "tabsMerge": "合并所有标签页",
   "tabsActions": "标签页操作",
-  "tabsCloseOthers": "关闭其他文件标签页",
+  "tabsCloseOthers": "关闭其他标签页",
   "tabsReadOnly": "只读",
-  "tabsRefresh": "重新读取此预览"
+  "tabsRefresh": "重新读取此预览",
+  "workbenchSharedDirectory": "同一目录还有其他会话正在运行，可能修改同一份文件。需要隔离时请新建 Worktree。",
+  "workbenchSearch": "搜索项目、Worktree 和会话…",
+  "workbenchAddProject": "添加项目",
+  "workbenchMain": "主目录",
+  "workbenchWaiting": "等待回答",
+  "workbenchRunning": "运行中",
+  "workbenchUnread": "有新消息",
+  "workbenchHistory": "历史会话",
+  "workbenchCloseSession": "关闭会话",
+  "workbenchStopClose": "停止并关闭",
+  "workbenchCloseRunning": "此会话仍在运行或等待回答。停止并关闭会结束其 Pi 进程，已保存的历史仍会保留。",
+  "workbenchCloseDraft": "此会话还有未发送的文字或附件。关闭后草稿不会保留，已保存的历史不受影响。",
+  "workbenchForgetProject": "从列表移除项目",
+  "workbenchForgetHint": "仅从列表移除，不删除目录、分支或历史。请先关闭此项目下的所有会话。",
+  "workbenchName": "Worktree 名称",
+  "workbenchCreateHint": "在后台创建独立目录和新分支，不复制未提交或忽略文件，也不自动安装依赖。其他会话可以继续运行。",
+  "workbenchCreateBackground": "后台创建",
+  "workbenchCreating": "正在创建…",
+  "workbenchFailed": "操作失败",
+  "workbenchNoMatch": "没有匹配的项目或会话",
+  "workbenchEmpty": "添加项目，或在左侧选择目录开始对话。",
+  "workbenchOperationUnknown": "正在等待后端确认，请勿重复操作。稍后刷新列表查看结果。",
+  "workbenchDisconnected": "会话进程已退出，其他会话不受影响。可关闭此标签后从历史重新打开；不会自动重发消息。",
+  "workbenchSessionCount": "{count} 个会话",
+  "workbenchCloseWindow": "还有会话正在运行或有未发送的草稿。关闭窗口会停止所有会话，并丢弃未发送的草稿。",
+  "workbenchRemoveInUse": "请先关闭此目录下的所有会话，再移除 Worktree。主目录不能移除。",
+  "@workbenchSessionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workbenchWaitBeforeClose": "工作区操作尚未结束，请等待创建或移除完成后再关闭窗口，以免留下未完成的 Git 目录。"
 }

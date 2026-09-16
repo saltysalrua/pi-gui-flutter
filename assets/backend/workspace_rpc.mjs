@@ -159,23 +159,33 @@ export async function gitInfo(cwd) {
   });
   if (root === null) return null;
   const repository = root.trimEnd();
-  const [branch, commit, dirty, branches, worktrees] = await Promise.all([
-    git(cwd, ["symbolic-ref", "--quiet", "--short", "HEAD"], {
-      allowFailure: true,
-    }),
-    git(cwd, ["rev-parse", "--verify", "HEAD^{commit}"], {
-      allowFailure: true,
-    }),
-    git(cwd, ["status", "--porcelain", "-z", "--untracked-files=normal"]),
-    git(cwd, ["for-each-ref", "--format=%(refname:short)", "refs/heads/"]),
-    git(cwd, ["worktree", "list", "--porcelain", "-z"]),
-  ]);
+  const [branch, commit, dirty, branches, worktrees, remotes, remoteHead] =
+    await Promise.all([
+      git(cwd, ["symbolic-ref", "--quiet", "--short", "HEAD"], {
+        allowFailure: true,
+      }),
+      git(cwd, ["rev-parse", "--verify", "HEAD^{commit}"], {
+        allowFailure: true,
+      }),
+      git(cwd, ["status", "--porcelain", "-z", "--untracked-files=normal"]),
+      git(cwd, ["for-each-ref", "--format=%(refname:short)", "refs/heads/"]),
+      git(cwd, ["worktree", "list", "--porcelain", "-z"]),
+      git(cwd, ["for-each-ref", "--format=%(refname:short)", "refs/remotes/"]),
+      git(cwd, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"], {
+        allowFailure: true,
+      }),
+    ]);
   return {
     root: repository,
     branch: branch?.trimEnd() ?? null,
     hasHead: commit !== null,
     dirty: dirty.length > 0,
     branches: branches.trimEnd().split("\n").filter(Boolean),
+    remotes: remotes
+      .trimEnd()
+      .split("\n")
+      .filter((ref) => ref && !ref.endsWith("/HEAD")),
+    baseRef: remoteHead?.trim().replace(/^refs\/remotes\//, "") ?? "HEAD",
     worktrees: parseWorktrees(worktrees),
     worktreeParent: path.join(
       path.dirname(repository),
@@ -204,6 +214,7 @@ export class WorkspaceService {
   async initialize() {
     try {
       const saved = JSON.parse(await readFile(this.storePath, "utf8"));
+      this.catalog = saved.catalog;
       this.recent = Array.isArray(saved.recent)
         ? saved.recent.filter((item) => text(item.path)).slice(0, 24)
         : [];
@@ -230,6 +241,7 @@ export class WorkspaceService {
           version: 1,
           current: this.current,
           recent: this.recent,
+          ...(this.catalog ? { catalog: this.catalog } : {}),
         }),
         "utf8",
       );
@@ -388,9 +400,22 @@ export class WorkspaceService {
     )
       fail("INVALID_BRANCH");
     if (info.branches.includes(branch)) fail("BRANCH_EXISTS");
-    if (baseRef !== "HEAD" && !info.branches.includes(baseRef))
+    const fullCommit =
+      typeof baseRef === "string" &&
+      /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(baseRef);
+    if (
+      baseRef !== "HEAD" &&
+      !fullCommit &&
+      !info.branches.includes(baseRef) &&
+      !info.remotes.includes(baseRef)
+    )
       fail("INVALID_BASE");
-    const base = baseRef === "HEAD" ? "HEAD" : `refs/heads/${baseRef}`;
+    const base =
+      baseRef === "HEAD" || fullCommit
+        ? baseRef
+        : info.branches.includes(baseRef)
+          ? `refs/heads/${baseRef}`
+          : `refs/remotes/${baseRef}`;
     // Resolve a verified commit before writing. No option or revision expression injection.
     const commit = await git(
       this.current,
@@ -824,33 +849,56 @@ async function main() {
   );
   await service.initialize();
   const emit = (line) => process.stdout.write(`${line}\n`);
-  const adapter = new WorkspaceAdapter(
+  if (!process.argv.includes("--gui-multiplex")) {
+    const adapter = new WorkspaceAdapter(
+      service,
+      (cwd, output, sessionPath) =>
+        new PiChild(
+          root,
+          cwd,
+          output,
+          () => {
+            if (!adapter.mutating) process.exit(1);
+          },
+          sessionPath,
+        ),
+      emit,
+      () => process.exit(1),
+    );
+    const ready = adapter.start();
+    lines(process.stdin, (line) => {
+      try {
+        void adapter.handle(JSON.parse(line)).catch(() => process.exit(1));
+      } catch {
+        /* Invalid input is isolated. */
+      }
+    });
+    process.stdin.on("end", async () => {
+      await adapter.pi?.stop();
+      process.exit(0);
+    });
+    await ready;
+    return;
+  }
+  const { WorkspaceManager } = await import("./workspace_manager.mjs");
+  const manager = new WorkspaceManager(
     service,
-    (cwd, output, sessionPath) =>
-      new PiChild(
-        root,
-        cwd,
-        output,
-        () => {
-          // Startup failure during a deliberate switch is handled by rollback.
-          if (!adapter.mutating) process.exit(1);
-        },
-        sessionPath,
-      ),
+    (cwd, output, sessionPath, onExit) =>
+      new PiChild(root, cwd, output, onExit, sessionPath),
     emit,
-    () => process.exit(1),
   );
-  const ready = adapter.start();
-  // Read extension_ui_response even while initial startup awaits an extension dialog.
+  await manager.initialize();
+  const ready = manager.start();
+  // Replies to startup extension questions must bypass readiness waits.
   lines(process.stdin, (line) => {
     try {
-      void adapter.handle(JSON.parse(line)).catch(() => process.exit(1));
+      void manager.handle(JSON.parse(line));
     } catch {
       /* Invalid input is isolated. */
     }
   });
   process.stdin.on("end", async () => {
-    await adapter.pi?.stop();
+    await manager.close();
     process.exit(0);
   });
   await ready;

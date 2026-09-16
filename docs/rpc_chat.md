@@ -1,6 +1,6 @@
 ---
 title: "RPC 对话、Markdown 与文件改动"
-version: "1.5.0"
+version: "1.6.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, chat, markdown, diff]
@@ -16,7 +16,7 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 
 - **空会话**：保留原来的居中启动卡片，项目名称在卡片上方。不是底部固定输入，也不额外增加欢迎大标题。
 - **开始发送后**：同一个输入组件平滑移到底部，上方显示对话时间线。发送被拒且没有产生消息时回到居中。
-- **新建空会话**：Pi 确认 `new_session` 成功后，清空当前投影、恢复居中。扩展取消切换时保留原对话。
+- **新建空会话**：并行工作区通过 `gui_open_channel` 创建独立 Pi 会话，显示居中输入；旧会话和草稿保留。单会话兼容客户端仍支持原有 `new_session` / `switch_session`。
 
 输入框在布局移动时不重建，其焦点、输入法编辑态和草稿仍由同一组件持有。空态面板最大宽度 760，开始后的面板最大宽度 868（含外边距）；模型浮层继续保持原先 280 宽的紧凑设计。
 
@@ -57,9 +57,9 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 
 ### 会话与恢复
 
-侧栏通过工作区后端的 `gui_list_sessions` 读取当前工作目录的 Pi 历史会话，切换使用 RPC 的 `switch_session`。Flutter 不自行扫描 Pi 私有会话目录。
+生产侧栏通过管理通道的 `gui_workspace_history` 读取各目录的官方历史摘要，`gui_open_channel(sessionPath)` 在独立 Pi 进程中恢复历史；同一历史只允许一个运行实例。切换标签纯属 UI，不发送 `switch_session`。Flutter 不自行扫描 Pi 私有会话目录。
 
-同一个 Pi 连接中断后，沿用模型控制器的有界重连。聊天控制器恢复有消息的已保存会话，再读取内容，**不重放消息**。尚未落盘的空会话不尝试恢复不存在的文件。读取或恢复失败后仍允许用户明确点击“新对话”开始新的会话；未经确认的写操作尚未结束时除外。
+每个通道有独立 ChatController / ModelPickerController 和写确认屏障。单会话断连不影响其他通道，不自动重放消息；已退出会话可关闭标签后从历史重开。单会话兼容传输的有界重连 / 恢复逻辑仍用于原有探针。完整生命周期见 [工作区与并行会话](workspaces_sessions.md)。
 
 ## 架构与代码入口
 
@@ -67,14 +67,14 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 
 | 层 | 路径 | 职责 |
 | --- | --- | --- |
-| 生命周期 | `lib/ui/features/home/views/home_view.dart` | 唯一 `PiRpcClient`，共享模型控制器、聊天控制器及扩展桥 |
+| 生命周期 | `lib/ui/features/home/controllers/workbench_controller.dart` | 唯一 PiChannelHub 物理连接，每个会话独立逻辑客户端、模型、聊天与扩展桥 |
 | RPC 服务 | `lib/core/rpc/pi_rpc_client.dart` | JSONL 帧、关联响应、类型映射、写确认屏障、真实断线 |
 | 聊天协议 | `lib/core/rpc/pi_chat_types.dart` | `PiChatGateway`、`PiChatMessage`、`PiContent`、`PiContentDelta`、`PiChatEvent`、工具结果及队列 |
 | 通用状态 | `lib/core/rpc/pi_rpc_types.dart` | 扩充 `PiSessionState`，连接、会话切换及迟到确认事件 |
 | 时间线投影 | `lib/core/models/chat_timeline.dart` | 按内容索引拼接、最终消息替换、toolCallId 关联、历史重建；`assistantNumbers` 按正序生成与消息列表对齐的编号 |
 | Diff 解析 | `lib/core/models/diff_document.dart` | patch/带行号 Diff、中性写入后视图；隐藏重复文件头但保留真实内容，无文件 I/O、无补丁执行 |
 | write Diff 后端 | `assets/backend/gui_tool_diff.mjs` | 公共 `tool_call/tool_result` 中间件，有限快照、冲突降级、补充结果 details，不接管工具执行 |
-| 扩展装载 | `lib/core/rpc/pi_workspace_transport.dart`、`assets/backend/workspace_rpc.mjs` | 发布适配层、工作区浏览模块和 Diff 扩展三个 assets；`PiChild` 以 `--extension` 装载 Diff 观察扩展 |
+| 扩展装载 | `lib/core/rpc/pi_workspace_transport.dart`、`assets/backend/workspace_rpc.mjs` | 发布适配层、并行管理器、工作区浏览模块和 Diff 扩展四个 assets；`PiChild` 以 `--extension` 装载 Diff 观察扩展 |
 | 交互状态 | `lib/ui/features/home/controllers/chat_controller.dart` | 发送互斥、停止、恢复、会话书签与成功文件记录投影 |
 | 主工作区 | `lib/ui/features/home/widgets/home_chat_panel.dart` | 两态布局、时间线、草稿、回到最新、响应式文件 / Git 右栏 |
 | 输入组件 | `lib/ui/features/home/widgets/home_starter_panel.dart` | 共用输入卡片、键盘/IME、紧凑模型入口 |
@@ -103,6 +103,8 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 ## RPC 命令与数据
 
 ### 命令
+
+下面是原生 Pi 命令格式。在并行 GUI 中由 PiChannelHub 封装 `gui_channel`；新建 / 选择会话用管理命令开通道，不在既有通道上替换另一个会话。
 
 ```json
 {"id":"gui-1","type":"get_state"}
@@ -206,9 +208,9 @@ assistantNumbers: null,       null, 1,         2,         null, 3
 仍采用 Flutter/Dart → Node 适配层 → Pi RPC，不引入 Rust、不直接解析 Pi 私有历史，也不改变空会话居中 / 有消息底部输入的两态布局。
 
 - **按数据块分帧**：`lib/core/rpc/pi_rpc_transport.dart` 的 `decodePiJsonl` 只扫描当前 UTF-8 解码块，把未结束的一行放入 `StringBuffer`；遇到 LF 才合并。`assets/backend/workspace_rpc.mjs` 的 `lines` 同样用片段数组处理，避免大 `get_messages` 每收到一块就复制、重扫整个前缀。LF/CRLF、跨块 UTF-8、U+2028/U+2029、空行行为不变；Dart 保留原来的 EOF 尾行读取行为，Node 仍只派发完整 LF 帧。
-- **Node 只解码一次**：`routePiOutput` 把解析结果一并交给 `WorkspaceAdapter` 做响应关联和运行状态维护，公开输出仍转发原始 JSON 行，不二次解析或重新序列化。内部探测响应不外泄，未知事件、旁路文字和坏行继续交给 Dart 隔离，`agent_end` 仍不解除运行锁。
+- **基础输出路由**：`routePiOutput` 把解析结果一并交给 `WorkspaceAdapter` 做响应关联和运行状态维护。兼容单会话输出保留原始 JSON 行；并行管理器额外封装通道身份。内部探测响应不外泄，未知事件、旁路文字和坏行在所属通道隔离，`agent_end` 仍不解除运行锁。
 - **工具引用索引**：`lib/core/models/chat_timeline.dart` 用 `toolCallId → 可见引用数` 判断结果是否已有消息引用，避免每个工具结果都扫描全部前文。最终消息替换、内容块替换、历史重载会维护/清空引用数；不能使用只增不减的 Set，否则被最终消息删除的草稿工具会错误隐藏后续孤立结果。流式更新只维护变化的内容块，不反复登记整条消息的工具。孤立结果、编号、累计输出与 Diff 证据保持原行为。
-- **摘要缓存与加载调度**：见 [工作区历史缓存](workspaces_sessions.md#历史缓存与加载顺序)。消息本身不做跨会话缓存，不绕过 Pi 的当前分支/压缩投影。
+- **摘要缓存与加载调度**：见 [工作区历史缓存](workspaces_sessions.md#后端结构)。消息本身不做跨会话缓存，不绕过 Pi 的当前分支/压缩投影。
 
 用纯合成数据运行分段探针，不启动 Pi、不读用户历史、不消耗模型额度：
 

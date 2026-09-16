@@ -461,7 +461,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get worktreeBranch => '新分支名称';
 
   @override
-  String get worktreeBase => '起始分支';
+  String get worktreeBase => '起点（分支或完整 Commit SHA）';
 
   @override
   String get worktreeHead => '当前提交（HEAD）';
@@ -1034,11 +1034,99 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabsActions => '标签页操作';
 
   @override
-  String get tabsCloseOthers => '关闭其他文件标签页';
+  String get tabsCloseOthers => '关闭其他标签页';
 
   @override
   String get tabsReadOnly => '只读';
 
   @override
   String get tabsRefresh => '重新读取此预览';
+
+  @override
+  String get workbenchSharedDirectory =>
+      '同一目录还有其他会话正在运行，可能修改同一份文件。需要隔离时请新建 Worktree。';
+
+  @override
+  String get workbenchSearch => '搜索项目、Worktree 和会话…';
+
+  @override
+  String get workbenchAddProject => '添加项目';
+
+  @override
+  String get workbenchMain => '主目录';
+
+  @override
+  String get workbenchWaiting => '等待回答';
+
+  @override
+  String get workbenchRunning => '运行中';
+
+  @override
+  String get workbenchUnread => '有新消息';
+
+  @override
+  String get workbenchHistory => '历史会话';
+
+  @override
+  String get workbenchCloseSession => '关闭会话';
+
+  @override
+  String get workbenchStopClose => '停止并关闭';
+
+  @override
+  String get workbenchCloseRunning =>
+      '此会话仍在运行或等待回答。停止并关闭会结束其 Pi 进程，已保存的历史仍会保留。';
+
+  @override
+  String get workbenchCloseDraft => '此会话还有未发送的文字或附件。关闭后草稿不会保留，已保存的历史不受影响。';
+
+  @override
+  String get workbenchForgetProject => '从列表移除项目';
+
+  @override
+  String get workbenchForgetHint => '仅从列表移除，不删除目录、分支或历史。请先关闭此项目下的所有会话。';
+
+  @override
+  String get workbenchName => 'Worktree 名称';
+
+  @override
+  String get workbenchCreateHint =>
+      '在后台创建独立目录和新分支，不复制未提交或忽略文件，也不自动安装依赖。其他会话可以继续运行。';
+
+  @override
+  String get workbenchCreateBackground => '后台创建';
+
+  @override
+  String get workbenchCreating => '正在创建…';
+
+  @override
+  String get workbenchFailed => '操作失败';
+
+  @override
+  String get workbenchNoMatch => '没有匹配的项目或会话';
+
+  @override
+  String get workbenchEmpty => '添加项目，或在左侧选择目录开始对话。';
+
+  @override
+  String get workbenchOperationUnknown => '正在等待后端确认，请勿重复操作。稍后刷新列表查看结果。';
+
+  @override
+  String get workbenchDisconnected =>
+      '会话进程已退出，其他会话不受影响。可关闭此标签后从历史重新打开；不会自动重发消息。';
+
+  @override
+  String workbenchSessionCount(int count) {
+    return '$count 个会话';
+  }
+
+  @override
+  String get workbenchCloseWindow => '还有会话正在运行或有未发送的草稿。关闭窗口会停止所有会话，并丢弃未发送的草稿。';
+
+  @override
+  String get workbenchRemoveInUse => '请先关闭此目录下的所有会话，再移除 Worktree。主目录不能移除。';
+
+  @override
+  String get workbenchWaitBeforeClose =>
+      '工作区操作尚未结束，请等待创建或移除完成后再关闭窗口，以免留下未完成的 Git 目录。';
 }

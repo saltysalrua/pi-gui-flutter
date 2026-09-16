@@ -1,32 +1,33 @@
 import 'dart:async';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:pi_gui/core/rpc/pi_rpc_client.dart';
-import 'package:pi_gui/core/rpc/pi_rpc_types.dart';
-import 'package:pi_gui/core/rpc/pi_workspace_transport.dart';
-import 'package:pi_gui/ui/atoms/app_desktop_scaffold.dart';
+import 'package:pi_gui/core/rpc/pi_catalog_types.dart';
+import 'package:pi_gui/core/slots/slot_manager.dart';
 import 'package:pi_gui/core/services/window_material_service.dart';
-import 'package:pi_gui/ui/core/window_material_scope.dart';
+import 'package:pi_gui/ui/atoms/app_action_button.dart';
+import 'package:pi_gui/ui/atoms/app_desktop_scaffold.dart';
 import 'package:pi_gui/ui/atoms/app_dialog.dart';
-import 'package:pi_gui/ui/core/context_l10n.dart';
+import 'package:pi_gui/ui/atoms/app_document_tabs.dart';
+import 'package:pi_gui/ui/atoms/app_icon_button.dart';
+import 'package:pi_gui/ui/atoms/app_split_panel.dart';
+import 'package:pi_gui/ui/atoms/app_tab_workspace.dart';
 import 'package:pi_gui/ui/core/chat_resource_scope.dart';
+import 'package:pi_gui/ui/core/context_l10n.dart';
 import 'package:pi_gui/ui/core/sidebar_layout_controller.dart';
-
-import '../controllers/image_attachment_controller.dart';
-
+import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
+import 'package:pi_gui/ui/core/window_material_scope.dart';
 
-import '../controllers/chat_controller.dart';
-import '../controllers/model_picker_controller.dart';
-import '../controllers/pi_extension_ui_bridge.dart';
-import '../controllers/workspace_controller.dart';
-import '../controllers/workspace_browser_controller.dart';
+import '../controllers/workbench_controller.dart';
 import '../controllers/workspace_tabs_controller.dart';
 import '../widgets/home_chat_panel.dart';
-import '../widgets/home_sidebar.dart';
 import '../widgets/tool_card_registry.dart';
-import '../widgets/workspace_dialog.dart';
+import '../widgets/workbench_sidebar.dart';
+import '../widgets/workspace_browser_panel.dart';
+import '../widgets/workspace_document_view.dart';
+import '../widgets/worktree_create_dialog.dart';
 import '../../settings/views/appearance_settings_view.dart';
 import '../../settings/controllers/appearance_controller.dart';
 
@@ -37,97 +38,141 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> with WindowListener {
-  final _pi = PiRpcClient(transportFactory: PiWorkspaceTransport.start);
-  final _input = TextEditingController();
-  final _attachments = ImageAttachmentController();
-  late final ModelPickerController _modelPicker;
-  late final PiExtensionUiBridge _extensionUi;
-  late final ChatController _chat;
-  late final WorkspaceController _workspace;
-  late final _browser = WorkspaceBrowserController(_pi)
-    ..setWorkspace(_workspace.snapshot?.current.path);
-  late final _tabs = WorkspaceTabsController(_browser);
-  Object? _browserSnapshot;
-  late final StreamSubscription<PiRpcEvent> _events;
-  final _drafts = <String, TextEditingValue>{};
-  String? _draftWorkspace;
+  final _workbench = WorkbenchController();
   final _toolCards = ToolCardRegistry();
   bool _closing = false;
-
+  Future<void> _closeQueue = Future.value();
   @override
   void initState() {
     super.initState();
-    _modelPicker = ModelPickerController(_pi);
-    _extensionUi = PiExtensionUiBridge(_pi, _input);
-    _chat = ChatController(_pi);
-    _workspace = WorkspaceController(_pi, _chat, _modelPicker);
-    _browser.setWorkspace(null);
-    _workspace.addListener(_workspaceUpdated);
-    _events = _pi.events.listen((event) {
-      if (event is PiRpcWorkspaceChanged) {
-        if (_draftWorkspace case final old?) _drafts[old] = _input.value;
-        _draftWorkspace = event.path;
-        _attachments.setWorkspace(event.path);
-        _input.value = _drafts[event.path] ?? TextEditingValue.empty;
-      }
-    });
+    _workbench.tabs.onClose = (doc) {
+      _closeQueue = _closeQueue.then((_) => _closeDocument(doc));
+    };
     windowManager.addListener(this);
     unawaited(windowManager.setPreventClose(true).catchError((Object _) {}));
-    unawaited(_workspace.refresh());
+    unawaited(_workbench.initialize());
   }
 
-  void _workspaceUpdated() {
-    final snapshot = _workspace.snapshot;
-    if (snapshot != null && !identical(snapshot, _browserSnapshot)) {
-      _browserSnapshot = snapshot;
-      _browser.setWorkspace(snapshot.current.path);
-    }
-    _draftWorkspace ??= _workspace.snapshot?.current.path;
-    if (_draftWorkspace case final path?) _attachments.setWorkspace(path);
-  }
+  Future<bool> _confirm(String title, String message, {String? action}) async =>
+      await showAppDialog<bool>(
+        context,
+        (context) => AppDialog(
+          title: title,
+          maxWidth: 420,
+          actions: [
+            AppActionButton.subtle(
+              label: context.l10n.cancel,
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+            AppActionButton(
+              label: action ?? context.l10n.confirm,
+              onPressed: () => Navigator.of(context).pop(true),
+            ),
+          ],
+          child: Text(message, style: context.textTheme.bodyMedium),
+        ),
+      ) ==
+      true;
 
-  Future<void> _chooseWorkspace(
-    GlobalKey anchorKey, {
-    bool worktrees = false,
-  }) async {
-    if (!_workspace.canSwitch) return;
-    _workspace.dismissFailure();
-    // Refresh the real Git list before presenting branches/worktrees.
-    await _workspace.refresh(loadConversation: false);
+  Future<void> _closeDocument(WorkspaceDocument doc) async {
     if (!mounted) return;
-    await showAppDialog<void>(
+    final session = _workbench.sessions[doc.sessionId];
+    if (session == null) {
+      if (doc.sessionId != null || doc.kind != WorkspaceDocumentKind.chat) {
+        _workbench.tabs.remove(doc);
+      }
+      return;
+    }
+    final l10n = context.l10n;
+    final busy = session.busy;
+    if ((busy || session.hasDraft) &&
+        !await _confirm(
+          l10n.workbenchCloseSession,
+          busy ? l10n.workbenchCloseRunning : l10n.workbenchCloseDraft,
+          action: busy ? l10n.workbenchStopClose : l10n.close,
+        )) {
+      return;
+    }
+    await _workbench.closeSession(session.id, stop: busy);
+  }
+
+  Future<void> _addProject() async {
+    try {
+      final path = await getDirectoryPath(
+        confirmButtonText: context.l10n.workbenchAddProject,
+      );
+      if (mounted && path != null) await _workbench.addProject(path);
+    } catch (_) {
+      if (mounted) {
+        await _confirm(
+          context.l10n.workbenchAddProject,
+          context.l10n.workspacePathFailed,
+        );
+      }
+    }
+  }
+
+  Future<void> _createWorktree(PiCatalogProject project) async {
+    final draft = await showAppDialog<WorktreeDraft>(
       context,
-      (_) => WorkspaceDialog(
-        controller: _workspace,
-        anchorKey: anchorKey,
-        initialPage: worktrees
-            ? WorkspaceDialogPage.worktrees
-            : WorkspaceDialogPage.choose,
+      (_) => WorktreeCreateDialog(project: project),
+    );
+    if (!mounted || draft == null) return;
+    unawaited(
+      _workbench.createWorktree(
+        project,
+        draft.name,
+        draft.branch,
+        draft.baseRef,
       ),
-      anchored: true,
-      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.12),
     );
   }
 
-  Future<void> _changeSession([String? path]) async {
-    if (!_workspace.canSwitch) return;
-    if (await _chat.changeSession(path: path) && mounted) {
-      _input.clear();
-      _attachments.clear();
-      _tabs.showChat();
-      unawaited(_workspace.refreshSessions());
-      unawaited(_modelPicker.refresh());
+  Future<void> _removeWorktree(
+    PiCatalogProject project,
+    PiCatalogWorktree worktree,
+  ) async {
+    if (await _confirm(
+      context.l10n.worktreeRemove,
+      '${context.l10n.worktreeRemoveConfirm}\n\n${worktree.path}',
+    )) {
+      await _workbench.removeWorktree(project, worktree);
+    }
+  }
+
+  Future<void> _forgetProject(PiCatalogProject project) async {
+    if (await _confirm(
+      context.l10n.workbenchForgetProject,
+      '${context.l10n.workbenchForgetHint}\n\n${project.path}',
+    )) {
+      await _workbench.forgetProject(project.path);
     }
   }
 
   @override
-  void onWindowFocus() => _browser.refreshIfOpen();
-
+  void onWindowFocus() => _workbench.activeBrowser?.refreshIfOpen();
   @override
   void onWindowClose() async {
     if (_closing) return;
     _closing = true;
-    await _pi.close();
+    if (_workbench.hasWorkspaceOperation) {
+      await _confirm(
+        context.l10n.windowClose,
+        context.l10n.workbenchWaitBeforeClose,
+      );
+      _closing = false;
+      return;
+    }
+    if (_workbench.sessions.values.any((s) => s.busy || s.hasDraft) &&
+        !await _confirm(
+          context.l10n.windowClose,
+          context.l10n.workbenchCloseWindow,
+          action: context.l10n.workbenchStopClose,
+        )) {
+      _closing = false;
+      return;
+    }
+    await _workbench.shutdown();
     await AppearanceController.instance.settled;
     await windowManager.destroy();
   }
@@ -135,67 +180,144 @@ class _HomeViewState extends State<HomeView> with WindowListener {
   @override
   void dispose() {
     windowManager.removeListener(this);
-    unawaited(_events.cancel());
-    _workspace.removeListener(_workspaceUpdated);
-    _workspace.dispose();
-    _tabs.dispose();
-    _browser.dispose();
-    _chat.dispose();
-    _extensionUi.dispose();
-    _modelPicker.dispose();
-    _input.dispose();
-    _attachments.dispose();
-    unawaited(_pi.close());
+    _workbench.dispose();
     super.dispose();
+  }
+
+  AppDocumentTab<WorkspaceDocument> _tab(WorkspaceDocument doc) {
+    final l10n = context.l10n;
+    if (doc.kind == WorkspaceDocumentKind.chat) {
+      final session = _workbench.sessions[doc.sessionId];
+      final title = session?.chat.title;
+      return AppDocumentTab(
+        id: doc,
+        label: title == null || title.isEmpty ? l10n.newConversation : title,
+        tooltip:
+            '${title == null || title.isEmpty ? l10n.newConversation : title}\n${doc.workspace ?? ''}',
+        icon: session?.extensions.needsAttention == true
+            ? Icons.notifications_active_outlined
+            : Icons.chat_bubble_outline,
+        busy:
+            session?.chat.isRunning == true &&
+            session?.extensions.needsAttention != true,
+        closable: session != null,
+      );
+    }
+    final short = doc.commit?.substring(0, 7);
+    return AppDocumentTab(
+      id: doc,
+      label: doc.path == null
+          ? '${l10n.browserCommitDetails} · $short'
+          : '${doc.path!.split('/').last}${short == null ? '' : ' · $short'}',
+      tooltip: [
+        doc.workspace!,
+        if (doc.path != null) doc.path!,
+        if (doc.commit != null) doc.commit!,
+      ].join('\n'),
+      icon: doc.path == null ? Icons.commit : Icons.description_outlined,
+    );
+  }
+
+  Widget _document(BuildContext context, WorkspaceDocument doc) {
+    final session = _workbench.sessions[doc.sessionId];
+    if (doc.kind != WorkspaceDocumentKind.chat) {
+      return ChatResourceScope(
+        directory: doc.workspace,
+        child: WorkspaceDocumentView(
+          document: doc,
+          tabs: _workbench.documentTabsFor(doc.workspace!),
+          onOpenFile: (path, {commit}) =>
+              _workbench.openFile(doc.workspace!, path, commit: commit),
+        ),
+      );
+    }
+    if (session == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                context.l10n.workbenchEmpty,
+                style: context.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              AppActionButton.subtle(
+                label: context.l10n.newConversation,
+                leading: const Icon(Icons.add),
+                onPressed:
+                    _workbench.selectedWorkspace == null || _workbench.opening
+                    ? null
+                    : () =>
+                          _workbench.openSession(_workbench.selectedWorkspace!),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return SlotScope(
+      manager: session.slots,
+      child: ChatResourceScope(
+        directory: session.workspace,
+        child: HomeChatPanel(
+          chat: session.chat,
+          modelPicker: session.models,
+          input: session.input,
+          attachments: session.attachments,
+          project: session.workspace.split(RegExp(r'[/\\]')).last,
+          registry: _toolCards,
+          browser: _workbench.browserFor(session.workspace),
+          tabs: _workbench.documentTabsFor(session.workspace),
+          conversationOnly: true,
+          sharedDirectoryWarning: _workbench
+              .sessionsFor(session.workspace)
+              .any((s) => s.id != session.id && s.chat.isRunning),
+          contentBackground: Colors.transparent,
+          panelBackground: Colors.transparent,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final preferences = AppearanceScope.of(context).preferences;
-    final sidebarLayout = SidebarLayoutController.instance;
+    final layout = SidebarLayoutController.instance;
     return LayoutBuilder(
       builder: (context, constraints) => ListenableBuilder(
-        listenable: Listenable.merge([
-          _workspace,
-          _chat,
-          _modelPicker,
-          sidebarLayout,
-        ]),
-        builder: (context, _) => AppDesktopScaffold(
-          sidebarBackground: WindowMaterialScope.tint(
-            context,
-            colors.sidebarBackground,
-            preferences.sidebarGlass,
-          ),
-          // HomeChatPanel paints the main/right regions side by side. Do not
-          // put a main-area tint underneath the translucent right sidebar.
-          contentBackground: Colors.transparent,
-          animate:
+        listenable: Listenable.merge([_workbench, layout]),
+        builder: (context, _) {
+          final browser = _workbench.activeBrowser;
+          final material =
               WindowMaterialScope.statusOf(context) ==
-              WindowMaterialStatus.active,
-          sidebarWidth: sidebarLayout.widthFor(constraints.maxWidth),
-          onSidebarResize: (dx) =>
-              sidebarLayout.resizeBy(dx, viewportWidth: constraints.maxWidth),
-          onSidebarReset: sidebarLayout.reset,
-          sidebar: HomeSidebar(
-            backgroundColor: Colors.transparent,
-            width: sidebarLayout.widthFor(constraints.maxWidth),
-            workspace: _workspace,
-            selectedSessionId: _chat.sessionFile,
-            onSessionSelected: _changeSession,
-            onNewConversation: _changeSession,
-            onChooseWorkspace: _chooseWorkspace,
-            onChooseWorktree: (anchor) =>
-                _chooseWorkspace(anchor, worktrees: true),
-            onSettingsPressed: () => showAppearanceSettings(context),
-          ),
-          child: ChatResourceScope(
-            directory: _workspace.snapshot?.current.path,
-            child: HomeChatPanel(
-              browser: _browser,
-              // One persistent host; tab changes never recreate the RPC client.
-              tabs: _tabs,
+              WindowMaterialStatus.active;
+          return AppDesktopScaffold(
+            sidebarBackground: WindowMaterialScope.tint(
+              context,
+              colors.sidebarBackground,
+              preferences.sidebarGlass,
+            ),
+            contentBackground: Colors.transparent,
+            animate: material,
+            sidebarWidth: layout.widthFor(constraints.maxWidth),
+            onSidebarResize: (dx) =>
+                layout.resizeBy(dx, viewportWidth: constraints.maxWidth),
+            onSidebarReset: layout.reset,
+            sidebar: WorkbenchSidebar(
+              controller: _workbench,
+              onAddProject: _addProject,
+              onCreateWorktree: _createWorktree,
+              onRemoveWorktree: _removeWorktree,
+              onForgetProject: _forgetProject,
+              onCloseSession: (s) => _workbench.tabs.close(s.document),
+              onSettings: () => showAppearanceSettings(context),
+            ),
+            child: AppSplitPanel(
+              isOpen: browser?.isOpen ?? false,
+              onDismiss: () => browser?.toggle(),
               contentBackground: WindowMaterialScope.tint(
                 context,
                 colors.canvasBackground,
@@ -206,20 +328,54 @@ class _HomeViewState extends State<HomeView> with WindowListener {
                 colors.sidebarBackground,
                 preferences.sidebarGlass,
               ),
-              animateMaterial:
-                  WindowMaterialScope.statusOf(context) ==
-                  WindowMaterialStatus.active,
-              chat: _chat,
-              modelPicker: _modelPicker,
-              input: _input,
-              attachments: _attachments,
-              project:
-                  _workspace.snapshot?.current.name ??
-                  context.l10n.workspaceLoading,
-              registry: _toolCards,
+              animateMaterial: material,
+              panel: browser == null
+                  ? const SizedBox.shrink()
+                  : SlotScope(
+                      manager:
+                          _workbench.activeSession?.slots ??
+                          SlotManager.instance,
+                      child: WorkspaceBrowserPanel(
+                        controller: browser,
+                        onOpenFile: (path, {commit}) => _workbench.openFile(
+                          browser.workspace!,
+                          path,
+                          commit: commit,
+                        ),
+                        onOpenCommit: (commit) =>
+                            _workbench.openCommit(browser.workspace!, commit),
+                      ),
+                    ),
+              child: AppTabWorkspace<WorkspaceDocument>(
+                controller: _workbench.tabs,
+                describeTab: _tab,
+                builder: _document,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppIconButton.subtle(
+                      icon: Icons.add,
+                      tooltip: context.l10n.newConversation,
+                      onPressed:
+                          _workbench.selectedWorkspace == null ||
+                              _workbench.opening
+                          ? null
+                          : () => _workbench.openSession(
+                              _workbench.selectedWorkspace!,
+                            ),
+                    ),
+                    AppIconButton.subtle(
+                      icon: Icons.snippet_folder_outlined,
+                      tooltip: context.l10n.browserTitle,
+                      color: browser?.isOpen == true ? colors.primary : null,
+                      onPressed: browser?.toggle,
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

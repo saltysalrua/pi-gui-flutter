@@ -26,7 +26,7 @@ class SlotContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<List<Widget>>(
-      valueListenable: SlotManager.instance.notifierFor(slotId),
+      valueListenable: SlotManager.of(context).notifierFor(slotId),
       builder: (context, widgets, _) {
         if (widgets.isEmpty) {
           return const SizedBox.shrink();

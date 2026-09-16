@@ -1,6 +1,6 @@
 ---
 title: "扩展槽位与 Extension UI 动态挂载机制"
-version: "1.1.0"
+version: "2.0.0"
 status: "implemented"
 type: "architecture"
 tags: [flutter, pi-rpc, extension-ui, slots, pi-lens, todos]
@@ -33,6 +33,19 @@ tags: [flutter, pi-rpc, extension-ui, slots, pi-lens, todos]
 5. **全局通知 (`notificationToast`)**：
    - **典型插件**：插件发起的非阻塞通知 (`notify`)。
 
+## 并行会话作用域
+
+`WorkbenchSession` 为每个会话持有独立 `SlotManager`、输入控制器和 `PiExtensionUiBridge`。`SlotScope` 放在会话正文之上，`SlotContainer` 和输入框通过 `SlotManager.of(context)` 读取本会话的插槽 / editorAnchor；不能复制全局单例的 GlobalKey。单例只作为兼容默认值及全局浮层宿主。
+
+- 后台 `setWidget` / `setStatus` 更新所属会话，`set_editor_text` 只更新其草稿。
+- 后台问答排队并在侧栏显示“等待回答”，不抢占当前会话；切到所属会话后才投射到全局 `dialogOverlay`。
+- 问答输入控制器按请求保存，切换前后台不丢未提交输入；不同会话相同请求 ID 使用不同 Widget key。
+- 通知保留在所属会话的队列，切到前台后显示；后台通知不被静默丢弃。
+- 前台切换先撤下旧会话浮层，再挂新会话；关闭 / 断开后台会话不能清空其他会话的全局浮层。
+- 回复仍是原生 `extension_ui_response`，只在外层 `gui_channel` 中标注所属通道。超时取消的语义不变；没有重写扩展工具。
+
+生命周期和协议见 [工作区与并行会话](workspaces_sessions.md)。
+
 ## 问答小卡片
 
 Agent / 扩展通过 `select`、`confirm`、`input`、`editor` 向用户提问时，显示靠近聊天输入框的小卡片，不再统一居中：
@@ -44,7 +57,7 @@ Agent / 扩展通过 `select`、`confirm`、`input`、`editor` 向用户提问�
 
 ### 代码与协议
 
-- `lib/core/slots/slot_manager.dart`：`editorAnchor` 只保存 UI 锚点。
+- `lib/core/slots/slot_manager.dart`：每会话 `editorAnchor` 只保存该输入框的 UI 锚点，`SlotScope` 提供组件作用域。
 - `lib/ui/features/home/widgets/home_starter_panel.dart`：在实际输入 `AppCard.elevated` 上挂载锚点，空会话居中 / 有消息后到底部仍只有一个输入组件。
 - `lib/ui/features/home/controllers/pi_extension_ui_bridge.dart`：`_ExtensionDialog` 复用 `AppDialog`、`AppActionButton`、`AppTextField`，通过 `anchorKey` 接收输入区位置；仍经 `dialogOverlay` 挂在普通路由上方。
 - `lib/ui/atoms/app_dialog.dart`：统一锚点定位、避边、可用空间与滚动边界；布局后核对坐标以适应窗口缩放和同帧出现的入口，使用原有 `AppDurations` / `AppCurves` / `AppShadows`。

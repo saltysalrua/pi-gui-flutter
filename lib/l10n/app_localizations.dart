@@ -965,7 +965,7 @@ abstract class AppLocalizations {
   /// No description provided for @worktreeBase.
   ///
   /// In zh, this message translates to:
-  /// **'起始分支'**
+  /// **'起点（分支或完整 Commit SHA）'**
   String get worktreeBase;
 
   /// No description provided for @worktreeHead.
@@ -2063,7 +2063,7 @@ abstract class AppLocalizations {
   /// No description provided for @tabsCloseOthers.
   ///
   /// In zh, this message translates to:
-  /// **'关闭其他文件标签页'**
+  /// **'关闭其他标签页'**
   String get tabsCloseOthers;
 
   /// No description provided for @tabsReadOnly.
@@ -2077,6 +2077,168 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'重新读取此预览'**
   String get tabsRefresh;
+
+  /// No description provided for @workbenchSharedDirectory.
+  ///
+  /// In zh, this message translates to:
+  /// **'同一目录还有其他会话正在运行，可能修改同一份文件。需要隔离时请新建 Worktree。'**
+  String get workbenchSharedDirectory;
+
+  /// No description provided for @workbenchSearch.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索项目、Worktree 和会话…'**
+  String get workbenchSearch;
+
+  /// No description provided for @workbenchAddProject.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加项目'**
+  String get workbenchAddProject;
+
+  /// No description provided for @workbenchMain.
+  ///
+  /// In zh, this message translates to:
+  /// **'主目录'**
+  String get workbenchMain;
+
+  /// No description provided for @workbenchWaiting.
+  ///
+  /// In zh, this message translates to:
+  /// **'等待回答'**
+  String get workbenchWaiting;
+
+  /// No description provided for @workbenchRunning.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行中'**
+  String get workbenchRunning;
+
+  /// No description provided for @workbenchUnread.
+  ///
+  /// In zh, this message translates to:
+  /// **'有新消息'**
+  String get workbenchUnread;
+
+  /// No description provided for @workbenchHistory.
+  ///
+  /// In zh, this message translates to:
+  /// **'历史会话'**
+  String get workbenchHistory;
+
+  /// No description provided for @workbenchCloseSession.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭会话'**
+  String get workbenchCloseSession;
+
+  /// No description provided for @workbenchStopClose.
+  ///
+  /// In zh, this message translates to:
+  /// **'停止并关闭'**
+  String get workbenchStopClose;
+
+  /// No description provided for @workbenchCloseRunning.
+  ///
+  /// In zh, this message translates to:
+  /// **'此会话仍在运行或等待回答。停止并关闭会结束其 Pi 进程，已保存的历史仍会保留。'**
+  String get workbenchCloseRunning;
+
+  /// No description provided for @workbenchCloseDraft.
+  ///
+  /// In zh, this message translates to:
+  /// **'此会话还有未发送的文字或附件。关闭后草稿不会保留，已保存的历史不受影响。'**
+  String get workbenchCloseDraft;
+
+  /// No description provided for @workbenchForgetProject.
+  ///
+  /// In zh, this message translates to:
+  /// **'从列表移除项目'**
+  String get workbenchForgetProject;
+
+  /// No description provided for @workbenchForgetHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅从列表移除，不删除目录、分支或历史。请先关闭此项目下的所有会话。'**
+  String get workbenchForgetHint;
+
+  /// No description provided for @workbenchName.
+  ///
+  /// In zh, this message translates to:
+  /// **'Worktree 名称'**
+  String get workbenchName;
+
+  /// No description provided for @workbenchCreateHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'在后台创建独立目录和新分支，不复制未提交或忽略文件，也不自动安装依赖。其他会话可以继续运行。'**
+  String get workbenchCreateHint;
+
+  /// No description provided for @workbenchCreateBackground.
+  ///
+  /// In zh, this message translates to:
+  /// **'后台创建'**
+  String get workbenchCreateBackground;
+
+  /// No description provided for @workbenchCreating.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在创建…'**
+  String get workbenchCreating;
+
+  /// No description provided for @workbenchFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'操作失败'**
+  String get workbenchFailed;
+
+  /// No description provided for @workbenchNoMatch.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有匹配的项目或会话'**
+  String get workbenchNoMatch;
+
+  /// No description provided for @workbenchEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加项目，或在左侧选择目录开始对话。'**
+  String get workbenchEmpty;
+
+  /// No description provided for @workbenchOperationUnknown.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在等待后端确认，请勿重复操作。稍后刷新列表查看结果。'**
+  String get workbenchOperationUnknown;
+
+  /// No description provided for @workbenchDisconnected.
+  ///
+  /// In zh, this message translates to:
+  /// **'会话进程已退出，其他会话不受影响。可关闭此标签后从历史重新打开；不会自动重发消息。'**
+  String get workbenchDisconnected;
+
+  /// No description provided for @workbenchSessionCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 个会话'**
+  String workbenchSessionCount(int count);
+
+  /// No description provided for @workbenchCloseWindow.
+  ///
+  /// In zh, this message translates to:
+  /// **'还有会话正在运行或有未发送的草稿。关闭窗口会停止所有会话，并丢弃未发送的草稿。'**
+  String get workbenchCloseWindow;
+
+  /// No description provided for @workbenchRemoveInUse.
+  ///
+  /// In zh, this message translates to:
+  /// **'请先关闭此目录下的所有会话，再移除 Worktree。主目录不能移除。'**
+  String get workbenchRemoveInUse;
+
+  /// No description provided for @workbenchWaitBeforeClose.
+  ///
+  /// In zh, this message translates to:
+  /// **'工作区操作尚未结束，请等待创建或移除完成后再关闭窗口，以免留下未完成的 Git 目录。'**
+  String get workbenchWaitBeforeClose;
 }
 
 class _AppLocalizationsDelegate

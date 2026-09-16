@@ -62,3 +62,6 @@ __pycache__/
 *.py[cod]
 .ruff_cache/
 .pytest_cache/
+
+# Runtime-generated backend launcher (embed the local Pi package path)
+assets/backend/pi_launcher.mjs

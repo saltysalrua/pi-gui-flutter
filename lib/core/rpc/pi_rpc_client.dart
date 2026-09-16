@@ -19,6 +19,12 @@ class _PendingRequest {
     'gui_create_workspace',
     'gui_create_worktree',
     'gui_remove_worktree',
+    'gui_add_project',
+    'gui_forget_project',
+    'gui_open_channel',
+    'gui_close_channel',
+    'gui_add_worktree',
+    'gui_delete_worktree',
   }.contains(command);
   bool get isConversationMutation =>
       isWorkspaceMutation ||
@@ -334,6 +340,12 @@ class PiRpcClient
     } finally {
       timer.cancel();
     }
+  }
+
+  /// GUI adapter commands used only by the typed management service.
+  Future<Object?> requestGui(String command, Map<String, Object?> fields) {
+    if (!command.startsWith('gui_')) throw ArgumentError.value(command);
+    return _request(command, fields);
   }
 
   @override
