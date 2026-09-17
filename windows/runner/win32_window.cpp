@@ -18,6 +18,19 @@ namespace {
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
+/// Timer id for the post-maximize DWM recomposition nudge (see
+/// UpdateMaximizedCaptionStyle). Arbitrary, only needs to be unique.
+constexpr UINT_PTR kMaximizedCaptionRefreshTimer = 0x504955;
+/// The maximize animation composes the ghost caption layer from the
+/// pre-strip style snapshot, and that layer survives the style change made
+/// mid-transition. A style change after the animation completes makes DWM
+/// re-evaluate the caption layer, which then drops the ghost. Flipping
+/// WS_MINIMIZEBOX is invisible in both directions while WS_CAPTION is
+/// stripped, so the nudge retries without any visible flicker.
+constexpr UINT kMaximizedCaptionRefreshFirstDelayMs = 500;
+constexpr UINT kMaximizedCaptionRefreshStepDelayMs = 400;
+constexpr int kMaximizedCaptionRefreshSteps = 6;
+
 /// Registry key for app theme preference.
 ///
 /// A value of 0 indicates apps should use dark mode. A non-zero or missing
@@ -204,7 +217,46 @@ Win32Window::MessageHandler(HWND hwnd,
         MoveWindow(child_content_, rect.left, rect.top, rect.right - rect.left,
                    rect.bottom - rect.top, TRUE);
       }
+      UpdateMaximizedCaptionStyle();
       return 0;
+    }
+
+    case WM_TIMER: {
+      if (wparam == kMaximizedCaptionRefreshTimer) {
+        if (!IsZoomed(window_handle_)) {
+          StopCaptionRefresh();
+          return 0;
+        }
+        // Flip WS_MINIMIZEBOX: a style change makes DWM re-evaluate the
+        // caption layer. With WS_CAPTION stripped, every re-evaluation
+        // concludes "no caption buttons", dropping the ghost layer composed
+        // during the maximize animation. The flip itself draws nothing.
+        LONG_PTR style = GetWindowLongPtr(window_handle_, GWL_STYLE);
+        if (minimize_box_toggled_) {
+          style |= static_cast<LONG_PTR>(WS_MINIMIZEBOX);
+          minimize_box_toggled_ = false;
+        } else {
+          style &= ~static_cast<LONG_PTR>(WS_MINIMIZEBOX);
+          minimize_box_toggled_ = true;
+        }
+        SetWindowLongPtr(window_handle_, GWL_STYLE, style);
+        caption_refresh_step_++;
+        RECT window_rect;
+        if (GetWindowRect(window_handle_, &window_rect)) {
+          SetWindowPos(window_handle_, nullptr, window_rect.left,
+                       window_rect.top, 0, 0,
+                       SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOSIZE |
+                           SWP_FRAMECHANGED | SWP_NOACTIVATE);
+        }
+        if (caption_refresh_step_ >= kMaximizedCaptionRefreshSteps) {
+          StopCaptionRefresh();
+        } else {
+          SetTimer(window_handle_, kMaximizedCaptionRefreshTimer,
+                   kMaximizedCaptionRefreshStepDelayMs, nullptr);
+        }
+        return 0;
+      }
+      break;
     }
 
     case WM_ACTIVATE:
@@ -212,7 +264,6 @@ Win32Window::MessageHandler(HWND hwnd,
         SetFocus(child_content_);
       }
       return 0;
-
     case WM_DWMCOLORIZATIONCOLORCHANGED:
       UpdateTheme(hwnd);
       return 0;
@@ -230,6 +281,50 @@ void Win32Window::Destroy() {
   }
   if (g_active_window_count == 0) {
     WindowClassRegistrar::GetInstance()->UnregisterWindowClass();
+  }
+}
+
+void Win32Window::UpdateMaximizedCaptionStyle() {
+  if (!window_handle_) {
+    return;
+  }
+  // IsZoomed stays true while a maximized window is minimized or restored
+  // from minimized, so it is a more reliable signal than the WM_SIZE wParam.
+  const bool zoomed = IsZoomed(window_handle_) != FALSE;
+  if (zoomed == caption_stripped_for_maximize_) {
+    return;
+  }
+  LONG_PTR style = GetWindowLongPtr(window_handle_, GWL_STYLE);
+  style = zoomed ? (style & ~static_cast<LONG_PTR>(WS_CAPTION))
+                 : (style | static_cast<LONG_PTR>(WS_CAPTION));
+  SetWindowLongPtr(window_handle_, GWL_STYLE, style);
+  caption_stripped_for_maximize_ = zoomed;
+  // Apply the style change so DWM recomposes the frame without the ghost
+  // caption buttons behind the glass title bar.
+  RECT window_rect;
+  if (GetWindowRect(window_handle_, &window_rect)) {
+    SetWindowPos(window_handle_, nullptr, window_rect.left, window_rect.top, 0,
+                 0, SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOSIZE |
+                          SWP_FRAMECHANGED | SWP_NOACTIVATE);
+  }
+  if (zoomed) {
+    caption_refresh_step_ = 0;
+    SetTimer(window_handle_, kMaximizedCaptionRefreshTimer,
+             kMaximizedCaptionRefreshFirstDelayMs, nullptr);
+  } else {
+    StopCaptionRefresh();
+  }
+}
+
+void Win32Window::StopCaptionRefresh() {
+  KillTimer(window_handle_, kMaximizedCaptionRefreshTimer);
+  caption_refresh_step_ = 0;
+  if (minimize_box_toggled_ && window_handle_) {
+    // Never leave WS_MINIMIZEBOX flipped behind if the nudge was interrupted.
+    LONG_PTR style = GetWindowLongPtr(window_handle_, GWL_STYLE);
+    SetWindowLongPtr(window_handle_, GWL_STYLE,
+                     style | static_cast<LONG_PTR>(WS_MINIMIZEBOX));
+    minimize_box_toggled_ = false;
   }
 }
 

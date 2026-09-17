@@ -359,6 +359,120 @@ test("restart relaunches the current workspace on its persisted last conversatio
     assert.equal(service.persistenceWarning, false);
 });
 
+test("an active new chat becomes the restart bookmark even though its sessionFile never changes", async (t) => {
+    const { root, repo, manager, children, service } = await fixture(t);
+    const conversation = path.join(repo, "conversation.jsonl");
+    await writeFile(conversation, "{}\n");
+    children[0].receive({
+        id: "state",
+        type: "response",
+        command: "get_state",
+        success: true,
+        data: { sessionFile: conversation, messageCount: 2 },
+    });
+    await manager.saving;
+    // A brand-new chat gets its own channel. Its sessionFile is assigned at
+    // startup (messageCount 0) and then never changes, so comparing against
+    // the previous observation would never update the bookmark again.
+    const described = await manager.openChannel({
+        channelId: "chat",
+        workspace: repo,
+    });
+    assert.equal(described.id, "chat");
+    const chat = children[1];
+    const chatEntry = manager.channels.get("chat");
+    await chatEntry.ready;
+    const chatSession = (await chat.request()).sessionFile;
+    assert.ok(chatSession && chatSession !== conversation);
+    await writeFile(chatSession, "{}\n");
+    children[0].receive({
+        id: "state-primary",
+        type: "response",
+        command: "get_state",
+        success: true,
+        data: { sessionFile: conversation, messageCount: 2 },
+    });
+    chat.receive({
+        id: "state-chat-empty",
+        type: "response",
+        command: "get_state",
+        success: true,
+        data: { sessionFile: chatSession, messageCount: 0 },
+    });
+    await manager.saving;
+    // The empty new chat has not displaced the primary conversation yet.
+    assert.equal(
+        service.recent.find(
+            (i) =>
+                path.normalize(i.path).toLowerCase() ===
+                path.normalize(repo).toLowerCase(),
+        )?.sessionPath,
+        conversation,
+    );
+    // The user chats in the new tab; every settle re-reads state with the
+    // same sessionFile. Only now must the bookmark follow the active chat.
+    chat.receive({
+        id: "state-chat",
+        type: "response",
+        command: "get_state",
+        success: true,
+        data: { sessionFile: chatSession, messageCount: 7 },
+    });
+    chat.receive({
+        id: "state-chat-again",
+        type: "response",
+        command: "get_state",
+        success: true,
+        data: { sessionFile: chatSession, messageCount: 8 },
+    });
+    await manager.saving;
+    assert.equal(
+        service.recent.find(
+            (i) =>
+                path.normalize(i.path).toLowerCase() ===
+                path.normalize(repo).toLowerCase(),
+        )?.sessionPath,
+        chatSession,
+    );
+    const store = JSON.parse(
+        await readFile(path.join(root, "gui.json"), "utf8"),
+    );
+    assert.equal(
+        store.recent.find(
+            (i) =>
+                path.normalize(i.path).toLowerCase() ===
+                path.normalize(repo).toLowerCase(),
+        )?.sessionPath,
+        chatSession,
+    );
+    // Restart now returns to the last active conversation, not the stale one.
+    const launched = [];
+    const next = new WorkspaceManager(
+        service,
+        (cwd, _emit, sessionPath) => {
+            launched.push(sessionPath);
+            return {
+                cwd,
+                sent: [],
+                send(request) {
+                    this.sent.push(request);
+                },
+                request: async () => ({
+                    isStreaming: false,
+                    messageCount: 8,
+                    sessionFile: sessionPath,
+                }),
+                async stop() {},
+            };
+        },
+        () => {},
+    );
+    await next.initialize();
+    await next.start();
+    assert.equal(launched[0], chatSession);
+    await next.close();
+});
+
 test("repository lock covers sibling worktree opens, folder projects persist and forgotten projects stay forgotten", async (t) => {
     const { repo, root, manager, service } = await fixture(t);
     const created = await service.createWorktree("feat/lock", "main");

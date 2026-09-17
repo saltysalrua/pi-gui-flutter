@@ -209,6 +209,14 @@ export class WorkspaceManager {
     }
     await this.save();
   }
+  // The restart bookmark lives in the store, not on the channel: the
+  // primary channel relaunches with it, so identity is checked against it.
+  hasBookmark(cwd, sessionFile) {
+    const entry = this.service.recent.find(
+      (item) => key(item.path) === key(cwd),
+    );
+    return !!entry?.sessionPath && key(entry.sessionPath) === key(sessionFile);
+  }
   start() {
     if (!this.workspaceProjects.has(key(this.service.current)))
       return Promise.resolve();
@@ -247,14 +255,16 @@ export class WorkspaceManager {
           message.command === "get_state" &&
           message.success
         ) {
-          const previous = entry.sessionFile;
           entry.sessionFile = message.data?.sessionFile ?? entry.sessionFile;
           // Remember conversations with content so the next GUI restart can
-          // reopen them. Empty sessions never overwrite a previous bookmark.
+          // reopen the last active one. A channel keeps one sessionFile for
+          // its whole life, so dedupe against the persisted bookmark — not
+          // the previous observation on this channel, which would freeze a
+          // stale entry forever. Empty sessions never overwrite a bookmark.
           if (
             entry.sessionFile &&
-            entry.sessionFile !== previous &&
-            (message.data?.messageCount ?? 0) > 0
+            (message.data?.messageCount ?? 0) > 0 &&
+            !this.hasBookmark(entry.cwd, entry.sessionFile)
           ) {
             void this.rememberSession(entry.cwd, entry.sessionFile);
           }

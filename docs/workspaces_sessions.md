@@ -89,7 +89,7 @@ workspace_rpc.mjs --gui-multiplex
 
 重启后 `WorkspaceManager.start()` 不再从空会话启动：它在 `workspaces.json` 的 `recent` 里查最后打开目录（`service.current`）记录的 `sessionPath`，文件仍存在时直接把该会话作为 `--session` 参数传给 primary 通道的 Pi，GUI 收到 catalog 后自动重开标签并 hydrate 出完整时间线；文件已删除或还没有记录时仍从新会话开始。
 
-记录的写入点在 `workspace_manager.mjs` 的子进程行过滤器：凡是通过通道转发的 `get_state` 成功响应，只要返回的 `sessionFile` 与之前不同且 `messageCount > 0`，就把该会话路径写入所属目录的 `recent` 条目（不重排顺序，新建条目时插到队首并保留 24 条上限），随后走同一条串行 `save()` 链持久化。GUI 在 hydrate、agent_settled 后都会读状态，所以每轮对话结束就会落盘；空的全新会话不会覆盖旧记录。旧版本保存的 `workspaces.json` 没有 `sessionPath`，因此**升级后的第一次重启仍是新会话**，聊过一轮之后的重启才会自动回到上次对话。同时打开多个会话时，最后回读状态的通道胜出；重启后只恢复 primary 一个会话，其余历史仍从侧边栏打开。回归见 `test/workspace_manager.test.mjs`。
+记录的写入点在 `workspace_manager.mjs` 的子进程行过滤器：凡是通过通道转发的 `get_state` 成功响应，只要返回的 `sessionFile` 与该目录已保存的书签不同（`hasBookmark`，不是与同通道上次观察值比较——新建聊天的 sessionFile 终生不变，那样比较会把书签永久冻结在旧会话上）且 `messageCount > 0`，就把该会话路径写入所属目录的 `recent` 条目（不重排顺序，新建条目时插到队首并保留 24 条上限），随后走同一条串行 `save()` 链持久化。GUI 在 hydrate、agent_settled 后都会读状态，所以每轮对话结束就会落盘；空的全新会话不会覆盖旧记录。旧版本保存的 `workspaces.json` 没有 `sessionPath`，因此**升级后的第一次重启仍是新会话**，聊过一轮之后的重启才会自动回到上次对话。同时打开多个会话时，最后回读状态的通道胜出；重启后只恢复 primary 一个会话，其余历史仍从侧边栏打开。回归见 `test/workspace_manager.test.mjs`。
 
 ## 协议
 

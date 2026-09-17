@@ -3,8 +3,6 @@
 
 #include <windows.h>
 
-#include <functional>
-#include <memory>
 #include <string>
 
 // A class abstraction for a high DPI-aware Win32 Window. Intended to be
@@ -55,6 +53,16 @@ class Win32Window {
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
+  // While maximized, temporarily remove WS_CAPTION: Windows 11 composes native
+  // caption buttons behind the translucent acrylic glass title bar of a
+  // maximized window even when WM_NCCALCSIZE moves the caption into the client
+  // area, showing a second, dimmed set of window buttons through the glass.
+  // Stripping only WS_CAPTION keeps WS_SYSMENU, WS_MINIMIZEBOX, WS_MAXIMIZEBOX
+  // and WS_THICKFRAME, so Alt+Space, Win+arrow snapping and resizing keep
+  // working. The style is restored as soon as the window leaves the maximized
+  // state, so the windowed frame (shadow, rounded corners) is unaffected.
+  void UpdateMaximizedCaptionStyle();
+
  protected:
   // Processes and route salient window messages for mouse handling,
   // size change and DPI. Delegates handling of these to member overloads that
@@ -74,6 +82,10 @@ class Win32Window {
  private:
   friend class WindowClassRegistrar;
 
+  // Cancels the post-maximize recomposition nudge and restores the temporary
+  // WS_MINIMIZEBOX flip if it was in progress.
+  void StopCaptionRefresh();
+
   // OS callback called by message pump. Handles the WM_NCCREATE message which
   // is passed when the non-client area is being created and enables automatic
   // non-client DPI scaling so that the non-client area automatically
@@ -91,6 +103,15 @@ class Win32Window {
   static void UpdateTheme(HWND const window);
 
   bool quit_on_close_ = false;
+
+  // True while WS_CAPTION is temporarily removed from the maximized window.
+  bool caption_stripped_for_maximize_ = false;
+
+  // Progress of the post-maximize recomposition nudge (count of timer ticks).
+  int caption_refresh_step_ = 0;
+
+  // True while the nudge temporarily removed WS_MINIMIZEBOX for the flip.
+  bool minimize_box_toggled_ = false;
 
   // window handle for top level window.
   HWND window_handle_ = nullptr;
