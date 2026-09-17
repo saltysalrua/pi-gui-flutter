@@ -312,6 +312,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatSendFailed => 'Pi 未接受这条消息，草稿已保留。请检查模型配置后重试。';
 
   @override
+  String get chatImageProcessingFailed =>
+      '图片未能处理，消息尚未发送，草稿已保留。请重试，或减少图片数量、换用较小的图片。';
+
+  @override
   String get chatReplyFailed => '这次回复未完成。请检查模型服务与额度，再发送消息继续。';
 
   @override
@@ -613,6 +617,71 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsNoResults => '没有找到匹配的设置';
+
+  @override
+  String get piPageTitle => 'pi';
+
+  @override
+  String get piPageSubtitle => '查看 Pi 后端的版本，在线检查更新并浏览更新日志。';
+
+  @override
+  String get piUpdates => '更新检查';
+
+  @override
+  String get piCurrentVersion => '当前版本';
+
+  @override
+  String get piLatestVersion => '最新版本';
+
+  @override
+  String get piCheckUpdate => '检查更新';
+
+  @override
+  String get piCheckHint => '从 npm 查询 Pi 已发布的最新版本。';
+
+  @override
+  String get piChecking => '正在检查更新…';
+
+  @override
+  String get piUpToDate => '已是最新版本。';
+
+  @override
+  String piUpdateAvailable(String version) {
+    return '发现新版本 $version。';
+  }
+
+  @override
+  String get piUpdateHint => '更新前请先完全退出本应用和正在运行的 Pi，然后在终端里运行上面的命令。';
+
+  @override
+  String get piCheckFailed => '检查更新失败，请检查网络后重试。';
+
+  @override
+  String get piLoading => '正在读取 Pi 的安装信息…';
+
+  @override
+  String get piLoadFailed => '无法读取 Pi 的安装信息。请确认 Pi 是用 npm 全局安装的，然后重试。';
+
+  @override
+  String get piRegistryPage => 'npm 页面';
+
+  @override
+  String get piRegistryPageHint => '在浏览器中打开这个包的 npm 介绍页。';
+
+  @override
+  String get piOpenRegistry => '打开 npm 页面';
+
+  @override
+  String get piChangelog => '更新日志';
+
+  @override
+  String get piChangelogEmpty => '没有匹配的版本。';
+
+  @override
+  String get piShowMore => '显示更多版本';
+
+  @override
+  String get piCurrentTag => '当前';
 
   @override
   String get appearanceTitle => '外观';

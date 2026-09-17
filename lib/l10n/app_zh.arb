@@ -139,6 +139,7 @@
   "chatLatest": "回到最新消息",
   "chatLoadFailed": "无法读取对话。请检查 Pi 连接，然后刷新。",
   "chatSendFailed": "Pi 未接受这条消息，草稿已保留。请检查模型配置后重试。",
+  "chatImageProcessingFailed": "图片未能处理，消息尚未发送，草稿已保留。请重试，或减少图片数量、换用较小的图片。",
   "chatReplyFailed": "这次回复未完成。请检查模型服务与额度，再发送消息继续。",
   "chatUncertain": "尚未收到 Pi 的确认，暂时禁止再次发送，避免重复执行。请等待确认或刷新查看状态。",
   "chatStopFailed": "Pi 尚未确认停止，请稍后重试停止。",
@@ -270,6 +271,34 @@
   "settingsBack": "返回应用",
   "settingsSearch": "搜索设置…",
   "settingsNoResults": "没有找到匹配的设置",
+  "piPageTitle": "pi",
+  "piPageSubtitle": "查看 Pi 后端的版本，在线检查更新并浏览更新日志。",
+  "piUpdates": "更新检查",
+  "piCurrentVersion": "当前版本",
+  "piLatestVersion": "最新版本",
+  "piCheckUpdate": "检查更新",
+  "piCheckHint": "从 npm 查询 Pi 已发布的最新版本。",
+  "piChecking": "正在检查更新…",
+  "piUpToDate": "已是最新版本。",
+  "piUpdateAvailable": "发现新版本 {version}。",
+  "piUpdateHint": "更新前请先完全退出本应用和正在运行的 Pi，然后在终端里运行上面的命令。",
+  "piCheckFailed": "检查更新失败，请检查网络后重试。",
+  "piLoading": "正在读取 Pi 的安装信息…",
+  "piLoadFailed": "无法读取 Pi 的安装信息。请确认 Pi 是用 npm 全局安装的，然后重试。",
+  "piRegistryPage": "npm 页面",
+  "piRegistryPageHint": "在浏览器中打开这个包的 npm 介绍页。",
+  "piOpenRegistry": "打开 npm 页面",
+  "piChangelog": "更新日志",
+  "piChangelogEmpty": "没有匹配的版本。",
+  "piShowMore": "显示更多版本",
+  "piCurrentTag": "当前",
+  "@piUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "appearanceTitle": "外观",
   "appearanceSubtitle": "调整配色、毛玻璃、文字大小和界面比例。修改后立即生效，自动保存。",
   "appearanceTheme": "主题与配色",

@@ -325,6 +325,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Pi did not accept this message. Your draft is kept. Check the model configuration and retry.';
 
   @override
+  String get chatImageProcessingFailed =>
+      'Could not prepare the images. Nothing was sent and your draft is kept. Retry, or use fewer or smaller images.';
+
+  @override
   String get chatReplyFailed =>
       'The reply did not finish. Check the model service and quota, then send a message to continue.';
 
@@ -663,6 +667,76 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsNoResults => 'No matching settings';
+
+  @override
+  String get piPageTitle => 'pi';
+
+  @override
+  String get piPageSubtitle =>
+      'See the installed Pi backend version, check for updates online, and browse its changelog.';
+
+  @override
+  String get piUpdates => 'Update check';
+
+  @override
+  String get piCurrentVersion => 'Installed version';
+
+  @override
+  String get piLatestVersion => 'Latest version';
+
+  @override
+  String get piCheckUpdate => 'Check for updates';
+
+  @override
+  String get piCheckHint => 'Queries npm for the latest published Pi version.';
+
+  @override
+  String get piChecking => 'Checking for updates…';
+
+  @override
+  String get piUpToDate => 'Pi is up to date.';
+
+  @override
+  String piUpdateAvailable(String version) {
+    return 'Version $version is available.';
+  }
+
+  @override
+  String get piUpdateHint =>
+      'Fully exit this app and any running Pi first, then run the command above in a terminal.';
+
+  @override
+  String get piCheckFailed =>
+      'Could not check for updates. Check your network and try again.';
+
+  @override
+  String get piLoading => 'Reading the Pi installation…';
+
+  @override
+  String get piLoadFailed =>
+      'Could not read the Pi installation. Make sure Pi is installed globally with npm, then retry.';
+
+  @override
+  String get piRegistryPage => 'npm page';
+
+  @override
+  String get piRegistryPageHint =>
+      'Opens the package page on npm in your browser.';
+
+  @override
+  String get piOpenRegistry => 'Open the npm page';
+
+  @override
+  String get piChangelog => 'Changelog';
+
+  @override
+  String get piChangelogEmpty => 'No matching versions.';
+
+  @override
+  String get piShowMore => 'Show more versions';
+
+  @override
+  String get piCurrentTag => 'Installed';
 
   @override
   String get appearanceTitle => 'Appearance';

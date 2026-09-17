@@ -28,7 +28,7 @@ import '../widgets/workbench_sidebar.dart';
 import '../widgets/workspace_browser_panel.dart';
 import '../widgets/workspace_document_view.dart';
 import '../widgets/worktree_create_dialog.dart';
-import '../../settings/views/appearance_settings_view.dart';
+import '../../settings/views/settings_view.dart';
 import '../../settings/controllers/appearance_controller.dart';
 
 class HomeView extends StatefulWidget {
@@ -313,7 +313,7 @@ class _HomeViewState extends State<HomeView> with WindowListener {
               onRemoveWorktree: _removeWorktree,
               onForgetProject: _forgetProject,
               onCloseSession: (s) => _workbench.tabs.close(s.document),
-              onSettings: () => showAppearanceSettings(context),
+              onSettings: () => showSettings(context),
             ),
             child: AppSplitPanel(
               isOpen: browser?.isOpen ?? false,

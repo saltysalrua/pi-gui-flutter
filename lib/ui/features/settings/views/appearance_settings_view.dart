@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../core/models/appearance_preferences.dart';
+import '../../../../core/services/window_material_service.dart';
 import '../../../../core/slots/slot_manager.dart';
 import '../../../atoms/app_action_button.dart';
 import '../../../atoms/app_card.dart';
@@ -10,195 +10,18 @@ import '../../../atoms/app_color_picker.dart';
 import '../../../atoms/app_dialog.dart';
 import '../../../atoms/app_disclosure.dart';
 import '../../../atoms/app_icon_button.dart';
-import '../../../atoms/app_nav_tile.dart';
-import '../../../atoms/app_desktop_scaffold.dart';
-import '../../../../core/services/window_material_service.dart';
-import '../../../core/window_material_scope.dart';
 import '../../../atoms/app_select.dart';
 import '../../../atoms/app_setting.dart';
 import '../../../atoms/app_stepped_slider.dart';
-import '../../../atoms/app_text_field.dart';
-import '../../../core/app_desktop_page_route.dart';
 import '../../../core/context_l10n.dart';
-import '../../../core/sidebar_layout_controller.dart';
 import '../../../core/theme/appearance_palette.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/theme/theme_context_extensions.dart';
+import '../../../core/window_material_scope.dart';
 import '../appearance_labels.dart';
 import '../controllers/appearance_controller.dart';
 
-Future<void> showAppearanceSettings(BuildContext context) =>
-    Navigator.of(context).push<void>(
-      AppDesktopPageRoute<void>(
-        reduceMotion: MediaQuery.disableAnimationsOf(context),
-        builder: (_) => const AppearanceSettingsView(),
-      ),
-    );
-
-/// A normal maintained route: opening settings never disposes the RPC-owning HomeView.
-class AppearanceSettingsView extends StatefulWidget {
-  const AppearanceSettingsView({super.key});
-  @override
-  State<AppearanceSettingsView> createState() => _AppearanceSettingsViewState();
-}
-
-class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
-  final _search = TextEditingController();
-  final _scroll = ScrollController();
-  String _query = '';
-  @override
-  void dispose() {
-    _search.dispose();
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = context.l10n;
-    final colors = context.colors;
-    final controller = AppearanceScope.of(context);
-    final sidebarLayout = SidebarLayoutController.instance;
-    final search = AppTextField(
-      controller: _search,
-      hintText: l.settingsSearch,
-      isCompact: true,
-      leading: const Icon(Icons.search),
-      onChanged: (v) => setState(() => _query = v.trim()),
-      trailing: _query.isEmpty
-          ? null
-          : AppIconButton.subtle(
-              icon: Icons.close,
-              tooltip: l.clearSearch,
-              onPressed: () {
-                _search.clear();
-                setState(() => _query = '');
-              },
-            ),
-    );
-    return ListenableBuilder(
-      listenable: sidebarLayout,
-      builder: (context, _) => CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): () =>
-              Navigator.of(context).maybePop(),
-        },
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxWidth < 760;
-            final sidebar = SizedBox(
-              width: sidebarLayout.widthFor(constraints.maxWidth),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    AppActionButton.subtle(
-                      label: l.settingsBack,
-                      leading: const Icon(Icons.arrow_back_rounded),
-                      isExpanded: true,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      onPressed: () => Navigator.of(context).maybePop(),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    search,
-                    const SizedBox(height: AppSpacing.xxl),
-                    Text(l.settings, style: context.textTheme.labelSmall),
-                    const SizedBox(height: AppSpacing.sm),
-                    AppNavTile(
-                      title: l.appearanceTitle,
-                      leading: const Icon(Icons.palette_outlined),
-                      isSelected: true,
-                      onTap: () {
-                        _search.clear();
-                        setState(() => _query = '');
-                        _scroll.animateTo(
-                          0,
-                          duration: MediaQuery.disableAnimationsOf(context)
-                              ? Duration.zero
-                              : AppDurations.fast,
-                          curve: AppCurves.smoothOut,
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            );
-            final page = Column(
-              children: [
-                if (compact)
-                  Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: Row(
-                      children: [
-                        AppIconButton.subtle(
-                          icon: Icons.arrow_back_rounded,
-                          tooltip: l.settingsBack,
-                          onPressed: () => Navigator.of(context).maybePop(),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(child: search),
-                      ],
-                    ),
-                  ),
-                Expanded(
-                  child: Scrollbar(
-                    controller: _scroll,
-                    child: SingleChildScrollView(
-                      controller: _scroll,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: compact ? AppSpacing.lg : AppSpacing.xxxl,
-                        vertical: compact
-                            ? AppSpacing.xxl
-                            : AppSpacing.xxxl * 2,
-                      ),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 880),
-                          child: AppearanceSettingsContent(
-                            controller: controller,
-                            query: _query,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-            return AppDesktopScaffold(
-              contentAnimation: ModalRoute.of(context)?.animation,
-              sidebarBackground: WindowMaterialScope.tint(
-                context,
-                colors.sidebarBackground,
-                controller.preferences.sidebarGlass,
-              ),
-              contentBackground: WindowMaterialScope.tint(
-                context,
-                colors.canvasBackground,
-                controller.preferences.canvasGlass,
-              ),
-              animate:
-                  WindowMaterialScope.statusOf(context) ==
-                  WindowMaterialStatus.active,
-              sidebar: compact ? null : sidebar,
-              sidebarWidth: sidebarLayout.widthFor(constraints.maxWidth),
-              onSidebarResize: (dx) => sidebarLayout.resizeBy(
-                dx,
-                viewportWidth: constraints.maxWidth,
-              ),
-              onSidebarReset: sidebarLayout.reset,
-              child: page,
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
+/// The appearance settings page content, hosted by SettingsView.
 class AppearanceSettingsContent extends StatefulWidget {
   const AppearanceSettingsContent({
     super.key,

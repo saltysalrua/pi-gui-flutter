@@ -42,7 +42,7 @@ tags: [flutter, settings, material3, windows, theme]
 打开设置时，侧栏控件与右侧内容从右侧 **8 逻辑像素** 滑回原位；返回时反向轻移。顶部标题栏、拖拽分隔条及两区背景不参与位移，整页不再淡入淡出。颜色与毛玻璃不透明度仍由用户设置决定，不会为了切页临时变浅、变深或变成纯色。
 
 - 参考 [Windows 页面切换](https://learn.microsoft.com/en-us/windows/apps/develop/motion/page-transitions) 的内容位移方式，但不采用整页透明度动画。打开使用 `AppDurations.fast`（250ms），返回使用 `AppDurations.quick`（150ms），曲线为 `AppCurves.smoothOut`，距离复用 `AppSpacing.sm`。开启“减弱动态”时直接切换。
-- `showAppearanceSettings` 使用公共 `AppDesktopPageRoute<void>`。通过 Flutter 的 `delegatedTransition` 在**整个过渡期间**让前一页 Offstage，抑制默认的退出淡化 / 缩放；首页仍保持挂载，RPC、聊天、输入草稿和会话不因切页重建。
+- `showSettings` 使用公共 `AppDesktopPageRoute<void>`。通过 Flutter 的 `delegatedTransition` 在**整个过渡期间**让前一页 Offstage，抑制默认的退出淡化 / 缩放；首页仍保持挂载，RPC、聊天、输入草稿和会话不因切页重建。
 - 仅删除 `FadeTransition` 不够：普通 opaque 路由在入场完成前仍会绘制前一页，两个半透明外壳会叠色。新路由在返回的最后一帧也停止绘制自身，确保首页恢复绘制时不会再叠一层设置背景。不要改回整页 Fade / Slide，也不要用不透明遮罩来掩盖问题。
 - `AppDesktopScaffold.contentAnimation` 只变换子内容，侧栏和正文分别裁切到各自区域。该参数默认空，不给首页插入新的动画包装，不改变现有首页布局或子树路径。设置页弹出的菜单、取色器和确认框仍保留下面的设置页面，沿用自身公共动效。
 - 设置分组 `AppSettingsGroup` 在减弱动态时直接显示内容，与 `AppDisclosure` 一致；不再运行零时长 `AnimatedSize`，避免 Flutter beta 在布局过程中同步重新标脏的断言。
@@ -145,7 +145,9 @@ Windows 设置中开启“从背景自动选取强调色”后，应用可间接
 | `windows/runner/flutter_window.cpp` | 原生生命周期/消息路由；补全隐藏标题栏的 NC 激活默认处理，避免 DWM 卡在未激活灰底 |
 | `lib/core/services/appearance_store.dart` | GUI 自有 JSON 文件读写，临时文件 flush 后 rename 替换 |
 | `lib/ui/features/settings/controllers/appearance_controller.dart` | 即时状态、顺序保存/合并等待中的写入、失败重试、系统强调色观察 |
-| `lib/ui/features/settings/views/appearance_settings_view.dart` | 设置路由、分类/搜索、分组设置、取色/恢复确认及预览 |
+| `lib/ui/features/settings/views/settings_view.dart` | 设置路由、侧栏页签（外观 / pi）、搜索、窄窗口页选择器与内容淡切 |
+| `lib/ui/features/settings/views/appearance_settings_view.dart` | 外观页内容：分组设置、取色/恢复确认及预览 |
+| `lib/ui/features/settings/views/pi_settings_view.dart` | pi 页内容：更新检查卡片与分页更新日志 |
 | `lib/ui/features/settings/appearance_labels.dart` | 颜色枚举到 i18n 文案的映射 |
 | `lib/ui/core/sidebar_layout_controller.dart` | 首页 / 设置共用的侧栏宽度、视口限制、拖拽和复位；纯内存状态 |
 | `lib/ui/core/theme/appearance_palette.dart` | 默认 / M3 色板到语义 Token 的映射，再叠加覆盖；对比度与前景色选择 |

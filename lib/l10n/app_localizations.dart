@@ -680,6 +680,12 @@ abstract class AppLocalizations {
   /// **'Pi 未接受这条消息，草稿已保留。请检查模型配置后重试。'**
   String get chatSendFailed;
 
+  /// No description provided for @chatImageProcessingFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'图片未能处理，消息尚未发送，草稿已保留。请重试，或减少图片数量、换用较小的图片。'**
+  String get chatImageProcessingFailed;
+
   /// No description provided for @chatReplyFailed.
   ///
   /// In zh, this message translates to:
@@ -1255,6 +1261,132 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'没有找到匹配的设置'**
   String get settingsNoResults;
+
+  /// No description provided for @piPageTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'pi'**
+  String get piPageTitle;
+
+  /// No description provided for @piPageSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看 Pi 后端的版本，在线检查更新并浏览更新日志。'**
+  String get piPageSubtitle;
+
+  /// No description provided for @piUpdates.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新检查'**
+  String get piUpdates;
+
+  /// No description provided for @piCurrentVersion.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前版本'**
+  String get piCurrentVersion;
+
+  /// No description provided for @piLatestVersion.
+  ///
+  /// In zh, this message translates to:
+  /// **'最新版本'**
+  String get piLatestVersion;
+
+  /// No description provided for @piCheckUpdate.
+  ///
+  /// In zh, this message translates to:
+  /// **'检查更新'**
+  String get piCheckUpdate;
+
+  /// No description provided for @piCheckHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'从 npm 查询 Pi 已发布的最新版本。'**
+  String get piCheckHint;
+
+  /// No description provided for @piChecking.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在检查更新…'**
+  String get piChecking;
+
+  /// No description provided for @piUpToDate.
+  ///
+  /// In zh, this message translates to:
+  /// **'已是最新版本。'**
+  String get piUpToDate;
+
+  /// No description provided for @piUpdateAvailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'发现新版本 {version}。'**
+  String piUpdateAvailable(String version);
+
+  /// No description provided for @piUpdateHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新前请先完全退出本应用和正在运行的 Pi，然后在终端里运行上面的命令。'**
+  String get piUpdateHint;
+
+  /// No description provided for @piCheckFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'检查更新失败，请检查网络后重试。'**
+  String get piCheckFailed;
+
+  /// No description provided for @piLoading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在读取 Pi 的安装信息…'**
+  String get piLoading;
+
+  /// No description provided for @piLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法读取 Pi 的安装信息。请确认 Pi 是用 npm 全局安装的，然后重试。'**
+  String get piLoadFailed;
+
+  /// No description provided for @piRegistryPage.
+  ///
+  /// In zh, this message translates to:
+  /// **'npm 页面'**
+  String get piRegistryPage;
+
+  /// No description provided for @piRegistryPageHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'在浏览器中打开这个包的 npm 介绍页。'**
+  String get piRegistryPageHint;
+
+  /// No description provided for @piOpenRegistry.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开 npm 页面'**
+  String get piOpenRegistry;
+
+  /// No description provided for @piChangelog.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新日志'**
+  String get piChangelog;
+
+  /// No description provided for @piChangelogEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有匹配的版本。'**
+  String get piChangelogEmpty;
+
+  /// No description provided for @piShowMore.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示更多版本'**
+  String get piShowMore;
+
+  /// No description provided for @piCurrentTag.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前'**
+  String get piCurrentTag;
 
   /// No description provided for @appearanceTitle.
   ///

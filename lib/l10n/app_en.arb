@@ -139,6 +139,7 @@
   "chatLatest": "Jump to latest",
   "chatLoadFailed": "Could not load the conversation. Check the Pi connection and refresh.",
   "chatSendFailed": "Pi did not accept this message. Your draft is kept. Check the model configuration and retry.",
+  "chatImageProcessingFailed": "Could not prepare the images. Nothing was sent and your draft is kept. Retry, or use fewer or smaller images.",
   "chatReplyFailed": "The reply did not finish. Check the model service and quota, then send a message to continue.",
   "chatUncertain": "Pi has not confirmed the request. Sending is paused to avoid duplicate execution. Wait for confirmation or refresh the status.",
   "chatStopFailed": "Pi has not confirmed it stopped. Try stopping again shortly.",
@@ -270,6 +271,34 @@
   "settingsBack": "Back to app",
   "settingsSearch": "Search settings…",
   "settingsNoResults": "No matching settings",
+  "piPageTitle": "pi",
+  "piPageSubtitle": "See the installed Pi backend version, check for updates online, and browse its changelog.",
+  "piUpdates": "Update check",
+  "piCurrentVersion": "Installed version",
+  "piLatestVersion": "Latest version",
+  "piCheckUpdate": "Check for updates",
+  "piCheckHint": "Queries npm for the latest published Pi version.",
+  "piChecking": "Checking for updates…",
+  "piUpToDate": "Pi is up to date.",
+  "piUpdateAvailable": "Version {version} is available.",
+  "piUpdateHint": "Fully exit this app and any running Pi first, then run the command above in a terminal.",
+  "piCheckFailed": "Could not check for updates. Check your network and try again.",
+  "piLoading": "Reading the Pi installation…",
+  "piLoadFailed": "Could not read the Pi installation. Make sure Pi is installed globally with npm, then retry.",
+  "piRegistryPage": "npm page",
+  "piRegistryPageHint": "Opens the package page on npm in your browser.",
+  "piOpenRegistry": "Open the npm page",
+  "piChangelog": "Changelog",
+  "piChangelogEmpty": "No matching versions.",
+  "piShowMore": "Show more versions",
+  "piCurrentTag": "Installed",
+  "@piUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "appearanceTitle": "Appearance",
   "appearanceSubtitle": "Adjust colors, glass, text size and interface scale. Changes apply immediately and save automatically.",
   "appearanceTheme": "Theme and colors",
