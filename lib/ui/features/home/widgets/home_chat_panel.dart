@@ -233,6 +233,8 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
     final failureText = switch (chat.failure) {
       ChatFailure.load => l10n.chatLoadFailed,
       ChatFailure.send => l10n.chatSendFailed,
+      // Upload preparation fails before Pi; changing models is not the remedy.
+      ChatFailure.imageProcessing => l10n.chatImageProcessingFailed,
       ChatFailure.reply => l10n.chatReplyFailed,
       ChatFailure.disconnected => l10n.piDisconnected,
       ChatFailure.uncertain => l10n.chatUncertain,

@@ -27,7 +27,8 @@ const inside = (parent, child) => {
 };
 
 export class WorkspaceManager {
-  constructor(service, createChild, emit) {
+  constructor(service, createChild, emit, { resizeImage } = {}) {
+    this.resizeImage = resizeImage;
     this.service = service;
     this.createChild = createChild;
     this.emit = emit;
@@ -273,6 +274,7 @@ export class WorkspaceManager {
           this.changed();
       },
       () => this.exited(entry),
+      { resizeImage: this.resizeImage },
     );
     entry.adapter = adapter;
     entry.ready = adapter

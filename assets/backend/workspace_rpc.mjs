@@ -15,6 +15,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { WorkspaceBrowser } from "./workspace_browser.mjs";
+import { prepareImageUpload } from "./gui_image_upload.mjs";
 
 const exec = promisify(execFile);
 // A short-lived SDK summary, not a second session database or a polling timer.
@@ -641,8 +642,17 @@ export class PiChild {
 }
 
 export class WorkspaceAdapter {
-  constructor(service, createChild, emit, onFatal = () => {}) {
+  constructor(
+    service,
+    createChild,
+    emit,
+    onFatal = () => {},
+    { resizeImage } = {},
+  ) {
     this.onFatal = onFatal;
+    this.resizeImage = resizeImage;
+    this.preparingImages = false;
+    this.uploadEpoch = 0;
     this.service = service;
     this.browser = new WorkspaceBrowser(() => service.current);
     this.createChild = createChild;
@@ -704,7 +714,8 @@ export class WorkspaceAdapter {
     );
   }
   async ensureIdle() {
-    if (this.agentBusy || this.forwarded.size) fail("WORKSPACE_BUSY");
+    if (this.agentBusy || this.forwarded.size || this.preparingImages)
+      fail("WORKSPACE_BUSY");
     const state = await this.pi.request("get_state");
     if (
       state.isStreaming ||
@@ -750,16 +761,49 @@ export class WorkspaceAdapter {
   async handle(request) {
     if (!request || typeof request.type !== "string") return;
     if (!request.type.startsWith("gui_")) {
-      if (this.mutating && request.type !== "extension_ui_response") {
+      const prompting = ["prompt", "steer", "follow_up"].includes(request.type);
+      if (
+        (this.mutating && request.type !== "extension_ui_response") ||
+        (this.preparingImages &&
+          (prompting ||
+            ["new_session", "switch_session"].includes(request.type)))
+      ) {
         this.reply(request, null, new WorkspaceError("WORKSPACE_BUSY"));
         return;
       }
+      // Stop/read/UI responses must remain live while a worker prepares images.
+      if (request.type === "abort") this.uploadEpoch++;
       if (
         typeof request.id === "string" &&
         request.type !== "extension_ui_response"
       )
         this.forwarded.set(request.id, request.type);
-      this.pi.send(request);
+      const prepare =
+        prompting &&
+        request.images !== undefined &&
+        !(Array.isArray(request.images) && request.images.length === 0);
+      const child = this.pi,
+        epoch = this.uploadEpoch;
+      try {
+        let outgoing = request;
+        if (prepare) {
+          this.preparingImages = true;
+          const images = await prepareImageUpload(
+            request.images,
+            this.resizeImage,
+          );
+          if (epoch !== this.uploadEpoch) fail("IMAGE_PREPROCESS_FAILED");
+          outgoing = { ...request, images };
+        }
+        if (child !== this.pi || child.exited || child.expectedExit)
+          fail("PI_EXITED");
+        child.send(outgoing);
+      } catch (error) {
+        this.forwarded.delete(request.id);
+        this.reply(request, null, error);
+      } finally {
+        if (prepare) this.preparingImages = false;
+      }
       return;
     }
     const mutation = [
@@ -830,7 +874,7 @@ export class WorkspaceAdapter {
 
 async function main() {
   const root = await resolvePiPackage();
-  const { SessionManager } = await import(
+  const { SessionManager, resizeImage } = await import(
     pathToFileURL(path.join(root, "dist/index.js")).href
   );
   const storePath =
@@ -864,6 +908,7 @@ async function main() {
         ),
       emit,
       () => process.exit(1),
+      { resizeImage },
     );
     const ready = adapter.start();
     lines(process.stdin, (line) => {
@@ -886,6 +931,7 @@ async function main() {
     (cwd, output, sessionPath, onExit) =>
       new PiChild(root, cwd, output, onExit, sessionPath),
     emit,
+    { resizeImage },
   );
   await manager.initialize();
   const ready = manager.start();

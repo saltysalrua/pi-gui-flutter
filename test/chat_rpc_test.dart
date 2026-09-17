@@ -297,6 +297,16 @@ void main() {
       pi.pendingPrompt!.completeError(const PiRpcException('Rejected'));
       expect(await sending, false);
       expect(chat.failure, ChatFailure.send);
+      pi.pendingPrompt = Completer<void>();
+      final processing = chat.send('', images: images);
+      pi.pendingPrompt!.completeError(
+        const PiRpcException('IMAGE_PREPROCESS_FAILED'),
+      );
+      expect(await processing, false);
+      expect(chat.failure, ChatFailure.imageProcessing);
+      expect(chat.canSend, true);
+      expect(chat.timeline.messages, isEmpty);
+      expect(pi.sentImages, images);
       pi.pendingPrompt = null;
       expect(await chat.send('', images: images), true);
       await tick();

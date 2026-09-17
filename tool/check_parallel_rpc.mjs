@@ -23,6 +23,7 @@ for (const name of [
   "workspace_manager.mjs",
   "workspace_browser.mjs",
   "gui_tool_diff.mjs",
+  "gui_image_upload.mjs",
 ]) {
   await cp(
     fileURLToPath(new URL(`../assets/backend/${name}`, import.meta.url)),

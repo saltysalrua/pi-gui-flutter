@@ -81,7 +81,7 @@ workspace_rpc.mjs --gui-multiplex
 
 注册项目、显示名称、起点保存在 **GUI 自有** `workspaces.json` 的 `catalog` 字段，旧 `recent` 仅用于首次迁移。位置仍为 Windows `%APPDATA%/pi-gui/workspaces.json`，其他系统 `$XDG_CONFIG_HOME/pi-gui/workspaces.json` 或 `~/.config/pi-gui/workspaces.json`；`PI_GUI_WORKSPACE_STORE` 可覆盖。只有管理器串行保存，各通道不争写配置；保存失败有提示。
 
-需要 PATH 中的 Node.js、npm 安装的 Pi；Git 功能需要 Git。`PiWorkspaceTransport` 携带四个脚本：`workspace_rpc.mjs`、`workspace_manager.mjs`、`workspace_browser.mjs`、`gui_tool_diff.mjs`，解包到同一临时目录。关闭应用只清理它自己的进程树和脚本。
+需要 PATH 中的 Node.js、npm 安装的 Pi；Git 功能需要 Git。`PiWorkspaceTransport` 携带五个脚本：`workspace_rpc.mjs`、`workspace_manager.mjs`、`workspace_browser.mjs`、`gui_tool_diff.mjs`、`gui_image_upload.mjs`，解包到同一临时目录。上传图片由适配层复用 Pi 公开缩放函数预处理，见 [图片与附件](images_and_links.md)。关闭应用只清理它自己的进程树和脚本。
 
 不带 `--gui-multiplex` 的适配器继续提供原单会话协议，供兼容性回归 / 探针使用；旧 `WorkspaceController`、`WorkspaceDialog`、`HomeSidebar` 不再是生产首页入口。
 

@@ -19,6 +19,7 @@ class PiWorkspaceTransport implements PiRpcTransport {
         'workspace_manager.mjs',
         'workspace_browser.mjs',
         'gui_tool_diff.mjs',
+        'gui_image_upload.mjs',
       ]) {
         final script = await rootBundle.loadString('assets/backend/$name');
         await File('${directory.path}/$name')

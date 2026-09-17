@@ -11,6 +11,7 @@ enum ChatActivity { idle, working, retrying, compacting, stopping }
 enum ChatFailure {
   load,
   send,
+  imageProcessing,
   reply,
   disconnected,
   uncertain,
@@ -175,6 +176,9 @@ class ChatController extends ChangeNotifier {
           ? ChatFailure.disconnected
           : uncertain
           ? ChatFailure.uncertain
+          : error is PiRpcException &&
+                error.message == 'IMAGE_PREPROCESS_FAILED'
+          ? ChatFailure.imageProcessing
           : ChatFailure.send;
       return false;
     } finally {
