@@ -195,6 +195,27 @@ void main() {
       expect(state.resources['themes'], isEmpty);
     });
 
+    test('resource displayName shows the skill folder, not SKILL.md', () {
+      final skill = PiResourceItem.fromJson('skills', {
+        'path': 'C:/agent/skills/find-skills/SKILL.md',
+        'enabled': true,
+        'source': 'local',
+        'scope': 'user',
+        'origin': 'top-level',
+        'baseDir': null,
+      });
+      expect(skill.displayName, 'find-skills');
+      final extension = PiResourceItem.fromJson('extensions', {
+        'path': 'C:/agent/extensions/qi-control.ts',
+        'enabled': true,
+        'source': 'local',
+        'scope': 'user',
+        'origin': 'top-level',
+        'baseDir': null,
+      });
+      expect(extension.displayName, 'qi-control.ts');
+    });
+
     test('finished install events carry the same typed state', () {
       final finished = PiPackagesFinished.fromJson({
         'operationId': 'op-1',

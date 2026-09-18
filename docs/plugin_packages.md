@@ -33,10 +33,12 @@ tags: [flutter, settings, packages, pi-backend, npm]
 
 ### 插件管理
 
-- 打开 **设置 → 插件 → 管理**。已配置的插件包逐个成卡：来源（如 `npm:pi-lens`）、安装目录、版本徽章与操作按钮（**更新** / **移除**，移除前有确认弹窗）。
-- 卡片内按资源类型（扩展 / 技能 / 提示词 / 主题）列出该包提供的每项资源，右侧下拉切换 **启用 / 停用**——写入的配置与 `pi config` 逐字节一致（顶层资源写 `settings.json` 的 `+/-` 模式条目；包资源写进包条目的筛选数组）。
+- 打开 **设置 → 插件 → 管理**。列表上方有**独立的搜索框**，即时过滤已安装的插件与资源（匹配来源、包名、安装路径和资源名，不额外发网络请求）；设置页左侧的共享搜索框在本页同样生效。
+- 列表按范围分成两组：**全局**（用户目录 `~/.pi/agent`）与**项目**（工作区）。项目组启停开关置灰，需在对应项目目录用 `pi config -l` 管理（组标题旁有提示）。
+- 已配置的插件包逐个成卡：来源（如 `npm:pi-lens`）、安装目录、范围徽章与操作按钮（**更新** / **移除**，移除前有确认弹窗）。
+- 卡片内按资源类型（扩展 / 技能 / 提示词 / 主题）列出该包提供的每项资源，右侧下拉切换 **启用 / 停用**——写入的配置与 `pi config` 逐字节一致（顶层资源写 `settings.json` 的 `+/-` 模式条目；包资源写进包条目的筛选数组）。技能资源显示**技能目录名**（如 `find-skills`）而不是千篇一律的 `SKILL.md`；完整路径在 Tooltip 里。
 - **检查更新** 会联网比对每个 npm/git 插件的最新版本；发现可更新项后可用 **全部更新**（等价 `pi update --extensions`）或单包 **更新**。
-- 本页只管理**全局**（`~/.pi/agent`）范围；项目级插件请在项目目录里用 `pi config -l` 管理（页面上有提示文案）。
+- 本页只管理**全局**（`~/.pi/agent`）范围的启停；项目范围的包分组展示但只读，请在项目目录里用 `pi config -l` 管理（项目组标题旁有提示）。
 
 ## 架构（Agent 视角）
 
@@ -47,9 +49,9 @@ tags: [flutter, settings, packages, pi-backend, npm]
 | `assets/backend/gui_packages.mjs` | `GuiPackagesBridge`：复用 Pi SDK 的 `DefaultPackageManager` / `SettingsManager`（`dist/index.js`），提供 state / check_updates / install / remove / update / toggle 六个命令 |
 | `assets/backend/workspace_manager.mjs` | `control()` 路由 `gui_packages_*` → `this.packages()`，惰性 import 桥接模块；`packageRoot` 经 `workspace_rpc.mjs` 的 `--gui-multiplex` main 传入 |
 | `lib/core/rpc/pi_workspace_transport.dart` + `pubspec.yaml` | 解包六个后端 assets（新增 `gui_packages.mjs`） |
-| `lib/core/rpc/pi_packages_types.dart` | `PiPackageEntry` / `PiResourceItem` / `PiPackagesState` / `PiPackagesProgress` / `PiPackagesFinished` 模型与 `PiPackagesService`（`requestGui` 封装） |
+| `lib/core/rpc/pi_packages_types.dart` | `PiPackageEntry` / `PiResourceItem`（含 `displayName`：技能行显示父目录名而非 SKILL.md）/ `PiPackagesState` / `PiPackagesProgress` / `PiPackagesFinished` 模型与 `PiPackagesService`（`requestGui` 封装） |
 | `lib/ui/features/settings/controllers/packages_controller.dart` | `PackagesController`：状态机（load / run / toggle / searchGallery / setGallerySort）、npm registry 搜索（`npm config get registry` 优先，失败回退官方源）、`parseRegistrySearch` 纯函数、`sortGallery` 排序纯函数 |
-| `lib/ui/features/settings/views/packages_settings_view.dart` | 插件页视图：市场/管理双 Tab、市场内搜索框＋排序下拉、共享搜索客户端过滤、条目渲染、确认弹窗、操作输出卡片 |
+| `lib/ui/features/settings/views/packages_settings_view.dart` | 插件页视图：市场/管理双 Tab、市场内搜索框＋排序下拉、管理页独立搜索框＋全局/项目分组＋共享搜索客户端过滤、条目渲染、确认弹窗、操作输出卡片 |
 | `lib/ui/features/settings/controllers/pi_update_controller.dart` | 新增 `runSelfUpdate()`：流式运行 `pi update --self`，成功后重新 `load()` 刷新版本与更新日志 |
 | `lib/ui/features/settings/views/settings_view.dart` | 设置外壳新增 `plugins` 页；`showSettings(context, control:)` 从 `HomeView` 接收首页 `WorkbenchController.control` |
 | `tool/check_packages_rpc.mjs` | 无模型、无网络的 Node 探针：用一次性 `PI_CODING_AGENT_DIR` 验证状态枚举、启停写入 pattern、异步任务事件与参数校验 |

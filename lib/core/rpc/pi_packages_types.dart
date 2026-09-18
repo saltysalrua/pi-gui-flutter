@@ -39,6 +39,22 @@ class PiResourceItem {
   final bool enabled;
   final String? baseDir;
   bool get isUserScope => scope == 'user';
+
+  /// Row label: skills are directories named after the skill with a generic
+  /// SKILL.md inside, so "find-skills" is the informative label, not the
+  /// shared filename every skill row would otherwise show.
+  String get displayName {
+    final segments = path
+        .split(RegExp(r'[\\/]'))
+        .where((segment) => segment.isNotEmpty)
+        .toList(growable: false);
+    if (segments.isEmpty) return path;
+    final last = segments.last;
+    if (segments.length >= 2 && last.toLowerCase() == 'skill.md') {
+      return segments[segments.length - 2];
+    }
+    return last;
+  }
 }
 
 /// Full management state: configured packages + resolved resources.

@@ -719,6 +719,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pluginsSearchGalleryHint => '搜索插件市场…';
 
   @override
+  String get pluginsSearchManageHint => '搜索已安装的插件和资源…';
+
+  @override
   String get pluginsGalleryEmpty => '没有找到匹配的插件。';
 
   @override

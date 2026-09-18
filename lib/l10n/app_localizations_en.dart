@@ -775,6 +775,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pluginsSearchGalleryHint => 'Search the package gallery…';
 
   @override
+  String get pluginsSearchManageHint =>
+      'Search installed packages and resources…';
+
+  @override
   String get pluginsGalleryEmpty => 'No matching packages found.';
 
   @override

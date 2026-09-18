@@ -424,48 +424,85 @@ class _GalleryItem extends StatelessWidget {
 }
 
 /// Installed packages with per-resource enable/disable, like `pi config`
-/// in global mode.
-class _ManageTab extends StatelessWidget {
+/// in global mode. Has its own instant client-side search box and groups
+/// entries by scope (user / project workspace).
+class _ManageTab extends StatefulWidget {
   const _ManageTab({required this.controller, required this.query});
   final PackagesController controller;
   final String query;
 
   @override
+  State<_ManageTab> createState() => _ManageTabState();
+}
+
+class _ManageTabState extends State<_ManageTab> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final data = controller.state;
-    return switch (controller.status) {
-      PackagesStatus.loading => const AppCard(
-        child: Padding(
-          padding: EdgeInsets.all(AppSpacing.md),
-          child: SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
+    final data = widget.controller.state;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppTextField(
+          controller: _search,
+          hintText: l.pluginsSearchManageHint,
+          isCompact: true,
+          leading: const Icon(Icons.search),
+          onChanged: (_) => setState(() {}),
+          trailing: _search.text.isEmpty
+              ? null
+              : AppIconButton.subtle(
+                  icon: Icons.close,
+                  tooltip: l.clearSearch,
+                  onPressed: () {
+                    _search.clear();
+                    setState(() {});
+                  },
+                ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        switch (widget.controller.status) {
+          PackagesStatus.loading => const AppCard(
+            child: Padding(
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
           ),
-        ),
-      ),
-      PackagesStatus.failed => AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              controller.failure == null
-                  ? l.pluginsLoadFailed
-                  : l.pluginsLoadFailedDetail(controller.failure!),
+          PackagesStatus.failed => AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.controller.failure == null
+                      ? l.pluginsLoadFailed
+                      : l.pluginsLoadFailedDetail(widget.controller.failure!),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppActionButton.subtle(
+                  label: l.appearanceRetry,
+                  leading: const Icon(Icons.refresh),
+                  onPressed: widget.controller.load,
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.md),
-            AppActionButton.subtle(
-              label: l.appearanceRetry,
-              leading: const Icon(Icons.refresh),
-              onPressed: controller.load,
-            ),
-          ],
-        ),
-      ),
-      PackagesStatus.ready =>
-        data == null ? const SizedBox.shrink() : _buildReady(context, data),
-    };
+          ),
+          PackagesStatus.ready =>
+            data == null ? const SizedBox.shrink() : _buildReady(context, data),
+        },
+      ],
+    );
   }
 
   Widget _buildReady(BuildContext context, PiPackagesState state) {
@@ -476,16 +513,16 @@ class _ManageTab extends StatelessWidget {
       children: [
         AppSettingsGroup(
           title: l.pluginsTabManage,
-          description: controller.actionError != null
-              ? l.pluginsActionFailed(controller.actionError!)
+          description: widget.controller.actionError != null
+              ? l.pluginsActionFailed(widget.controller.actionError!)
               : null,
           children: [
             AppSettingRow(
               title: l.pluginsCheckUpdates,
-              description: controller.updates.isEmpty
+              description: widget.controller.updates.isEmpty
                   ? null
-                  : l.pluginsUpdatesAvailable(controller.updates.length),
-              control: _CheckUpdatesButton(controller: controller),
+                  : l.pluginsUpdatesAvailable(widget.controller.updates.length),
+              control: _CheckUpdatesButton(controller: widget.controller),
             ),
             AppSettingRow(
               title: l.pluginsUpdateAll,
@@ -493,10 +530,11 @@ class _ManageTab extends StatelessWidget {
               control: AppActionButton.subtle(
                 label: l.pluginsUpdateAll,
                 leading: const Icon(Icons.update_rounded),
-                isLoading: controller.busy,
-                onPressed: controller.updates.isEmpty || controller.busy
+                isLoading: widget.controller.busy,
+                onPressed:
+                    widget.controller.updates.isEmpty || widget.controller.busy
                     ? null
-                    : controller.updateAll,
+                    : widget.controller.updateAll,
               ),
             ),
           ],
@@ -509,20 +547,125 @@ class _ManageTab extends StatelessWidget {
               color: colors.textSecondary,
             ),
           )
-        else ...[
-          for (final entry in state.packages.where(
-            (entry) => _matches(entry, query),
-          ))
-            _PackageCard(controller: controller, state: state, entry: entry),
-          if (_topLevel(state).isNotEmpty)
-            _TopLevelCard(controller: controller, state: state),
-        ],
-        if (controller.operation != null) ...[
+        else
+          ..._buildGroups(context, state),
+        if (widget.controller.operation != null) ...[
           const SizedBox(height: AppSpacing.xl),
-          _OperationCard(controller: controller),
+          _OperationCard(controller: widget.controller),
         ],
       ],
     );
+  }
+
+  // Scope groups (user / project workspace), each narrowed client-side by
+  // both the shared settings search and this tab's own search box.
+  List<Widget> _buildGroups(BuildContext context, PiPackagesState state) {
+    final l = context.l10n;
+    final controller = widget.controller;
+    final user = <PiPackageEntry>[];
+    final project = <PiPackageEntry>[];
+    for (final entry in state.packages) {
+      if (_matches(state, entry, widget.query) &&
+          _matches(state, entry, _search.text.trim())) {
+        (entry.scope == 'project' ? project : user).add(entry);
+      }
+    }
+    final topLevel = _topLevel(state)
+        .where(
+          (item) =>
+              _matchesResource(item, widget.query) &&
+              _matchesResource(item, _search.text.trim()),
+        )
+        .toList(growable: false);
+    final widgets = <Widget>[];
+    if (user.isNotEmpty || topLevel.isNotEmpty) {
+      widgets.addAll([
+        _groupHeader(context, l.pluginsScopeUser, null),
+        for (final entry in user)
+          _PackageCard(controller: controller, state: state, entry: entry),
+        if (topLevel.isNotEmpty)
+          _TopLevelCard(controller: controller, items: topLevel),
+      ]);
+    }
+    if (project.isNotEmpty) {
+      widgets.addAll([
+        _groupHeader(context, l.pluginsScopeProject, l.pluginsProjectScopeHint),
+        for (final entry in project)
+          _PackageCard(controller: controller, state: state, entry: entry),
+      ]);
+    }
+    if (user.isEmpty && project.isEmpty && topLevel.isEmpty) {
+      return [
+        Text(
+          l.pluginsGalleryEmpty,
+          style: context.textTheme.bodyMedium?.copyWith(
+            color: context.colors.textSecondary,
+          ),
+        ),
+      ];
+    }
+    return widgets;
+  }
+
+  Widget _groupHeader(BuildContext context, String label, String? hint) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: context.textTheme.labelLarge?.copyWith(
+              color: colors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (hint != null) ...[
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                hint,
+                overflow: TextOverflow.ellipsis,
+                style: context.textTheme.bodySmall?.copyWith(
+                  color: colors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static List<PiResourceItem> _resourcesOf(
+    PiPackagesState state,
+    PiPackageEntry entry,
+  ) => state.resources.values
+      .expand((items) => items)
+      .where(
+        (item) =>
+            item.origin == 'package' &&
+            item.source == entry.source &&
+            item.scope == entry.scope,
+      )
+      .toList(growable: false);
+
+  bool _matches(PiPackagesState state, PiPackageEntry entry, String query) {
+    if (query.isEmpty) return true;
+    final q = query.toLowerCase();
+    if (entry.source.toLowerCase().contains(q) ||
+        entry.displayName.toLowerCase().contains(q) ||
+        (entry.installedPath?.toLowerCase().contains(q) ?? false)) {
+      return true;
+    }
+    return _resourcesOf(state, entry).any((item) => _matchesResource(item, q));
+  }
+
+  static bool _matchesResource(PiResourceItem item, String query) {
+    if (query.isEmpty) return true;
+    final q = query.toLowerCase();
+    return item.displayName.toLowerCase().contains(q) ||
+        item.path.toLowerCase().contains(q);
   }
 
   static List<PiResourceItem> _topLevel(PiPackagesState state) => state
@@ -531,13 +674,6 @@ class _ManageTab extends StatelessWidget {
       .expand((items) => items)
       .where((item) => item.origin == 'top-level' && item.isUserScope)
       .toList(growable: false);
-
-  bool _matches(PiPackageEntry entry, String query) {
-    if (query.isEmpty) return true;
-    final q = query.toLowerCase();
-    return entry.source.toLowerCase().contains(q) ||
-        (entry.installedPath?.toLowerCase().contains(q) ?? false);
-  }
 }
 
 class _CheckUpdatesButton extends StatelessWidget {
@@ -704,33 +840,32 @@ class _PackageCard extends StatelessWidget {
 /// Top-level resources under ~/.pi/agent (extensions/, skills/, ...),
 /// exactly the rows `pi config` shows outside any package.
 class _TopLevelCard extends StatelessWidget {
-  const _TopLevelCard({required this.controller, required this.state});
+  const _TopLevelCard({required this.controller, required this.items});
   final PackagesController controller;
-  final PiPackagesState state;
+  final List<PiResourceItem> items;
 
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final items = state.resources.values
-        .expand((items) => items)
-        .where((item) => item.origin == 'top-level' && item.isUserScope)
-        .toList(growable: false);
     if (items.isEmpty) return const SizedBox.shrink();
-    return AppCard(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              l.pluginsTopLevelGroup,
-              style: context.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: AppCard(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l.pluginsTopLevelGroup,
+                style: context.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            for (final item in items)
-              _ResourceRow(controller: controller, item: item),
-          ],
+              for (final item in items)
+                _ResourceRow(controller: controller, item: item),
+            ],
+          ),
         ),
       ),
     );
@@ -752,7 +887,7 @@ class _ResourceRow extends StatelessWidget {
       'prompts' => l.pluginsResourcesPrompts,
       _ => l.pluginsResourcesThemes,
     };
-    final name = item.path.split(RegExp(r'[\\/]')).last;
+    final name = item.displayName;
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.md),
       child: Row(

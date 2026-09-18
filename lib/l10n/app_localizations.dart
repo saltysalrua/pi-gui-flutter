@@ -1454,6 +1454,12 @@ abstract class AppLocalizations {
   /// **'搜索插件市场…'**
   String get pluginsSearchGalleryHint;
 
+  /// No description provided for @pluginsSearchManageHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索已安装的插件和资源…'**
+  String get pluginsSearchManageHint;
+
   /// No description provided for @pluginsGalleryEmpty.
   ///
   /// In zh, this message translates to:

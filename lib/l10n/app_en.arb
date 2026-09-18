@@ -303,6 +303,7 @@
   "pluginsTabManage": "Manage",
   "pluginsGalleryHint": "Listed from public npm packages tagged pi-package, the same source as pi.dev/packages.",
   "pluginsSearchGalleryHint": "Search the package gallery…",
+  "pluginsSearchManageHint": "Search installed packages and resources…",
   "pluginsGalleryEmpty": "No matching packages found.",
   "pluginsGalleryFailed": "Could not reach the package gallery. Check your network and try again.",
   "pluginsGalleryFailedDetail": "Could not reach the package gallery: {error}",

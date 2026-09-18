@@ -303,6 +303,7 @@
   "pluginsTabManage": "管理",
   "pluginsGalleryHint": "列表来自 npm 上带 pi-package 关键词的公开包，与 pi.dev/packages 同源。",
   "pluginsSearchGalleryHint": "搜索插件市场…",
+  "pluginsSearchManageHint": "搜索已安装的插件和资源…",
   "pluginsGalleryEmpty": "没有找到匹配的插件。",
   "pluginsGalleryFailed": "插件市场查询失败，请检查网络后重试。",
   "pluginsGalleryFailedDetail": "插件市场查询失败：{error}",
