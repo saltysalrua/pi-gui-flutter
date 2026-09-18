@@ -315,6 +315,11 @@ class _HomeViewState extends State<HomeView> with WindowListener {
               onCloseSession: (s) => _workbench.tabs.close(s.document),
               onSettings: () =>
                   showSettings(context, control: _workbench.control),
+              onQuota: () => showSettings(
+                context,
+                control: _workbench.control,
+                initialPage: SettingsPage.quota,
+              ),
             ),
             child: AppSplitPanel(
               isOpen: browser?.isOpen ?? false,

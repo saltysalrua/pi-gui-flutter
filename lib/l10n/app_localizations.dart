@@ -2839,6 +2839,186 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'工作区操作尚未结束，请等待创建或移除完成后再关闭窗口，以免留下未完成的 Git 目录。'**
   String get workbenchWaitBeforeClose;
+
+  /// No description provided for @quotaPageTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'账号额度'**
+  String get quotaPageTitle;
+
+  /// No description provided for @quotaPageSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'读取 Pi 保存的 Codex OAuth 登录，查询 ChatGPT 套餐的实时用量窗口。'**
+  String get quotaPageSubtitle;
+
+  /// No description provided for @quotaRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新'**
+  String get quotaRefresh;
+
+  /// No description provided for @quotaRefreshing.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在刷新…'**
+  String get quotaRefreshing;
+
+  /// No description provided for @quotaLoading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在读取登录信息并查询额度…'**
+  String get quotaLoading;
+
+  /// No description provided for @quotaLimitReached.
+  ///
+  /// In zh, this message translates to:
+  /// **'已达到当前套餐的用量上限，请等待窗口重置。'**
+  String get quotaLimitReached;
+
+  /// No description provided for @quotaAccountGroup.
+  ///
+  /// In zh, this message translates to:
+  /// **'账号'**
+  String get quotaAccountGroup;
+
+  /// No description provided for @quotaProvider.
+  ///
+  /// In zh, this message translates to:
+  /// **'服务'**
+  String get quotaProvider;
+
+  /// No description provided for @quotaProviderDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录信息来自 Pi 的 auth.json，本页只做只读查询。'**
+  String get quotaProviderDescription;
+
+  /// No description provided for @quotaEmail.
+  ///
+  /// In zh, this message translates to:
+  /// **'邮箱'**
+  String get quotaEmail;
+
+  /// No description provided for @quotaPlan.
+  ///
+  /// In zh, this message translates to:
+  /// **'套餐'**
+  String get quotaPlan;
+
+  /// No description provided for @quotaTokenExpiry.
+  ///
+  /// In zh, this message translates to:
+  /// **'令牌有效期'**
+  String get quotaTokenExpiry;
+
+  /// No description provided for @quotaTokenExpiredHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'令牌已过期。请运行 pi auth check --provider openai-codex 刷新，或在 Pi 中重新登录。'**
+  String get quotaTokenExpiredHint;
+
+  /// No description provided for @quotaUsageGroup.
+  ///
+  /// In zh, this message translates to:
+  /// **'用量窗口'**
+  String get quotaUsageGroup;
+
+  /// No description provided for @quotaUsageGroupDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'用量按滑动窗口统计，查询额度本身不消耗用量。'**
+  String get quotaUsageGroupDescription;
+
+  /// No description provided for @quotaPrimaryWindow.
+  ///
+  /// In zh, this message translates to:
+  /// **'近 5 小时'**
+  String get quotaPrimaryWindow;
+
+  /// No description provided for @quotaSecondaryWindow.
+  ///
+  /// In zh, this message translates to:
+  /// **'近 7 天'**
+  String get quotaSecondaryWindow;
+
+  /// No description provided for @quotaWindowResets.
+  ///
+  /// In zh, this message translates to:
+  /// **'重置于 {time}'**
+  String quotaWindowResets(String time);
+
+  /// No description provided for @quotaRemaining.
+  ///
+  /// In zh, this message translates to:
+  /// **'剩余 {percent}%'**
+  String quotaRemaining(int percent);
+
+  /// No description provided for @quotaCreditsGroup.
+  ///
+  /// In zh, this message translates to:
+  /// **'积分余额'**
+  String get quotaCreditsGroup;
+
+  /// No description provided for @quotaCreditsBalance.
+  ///
+  /// In zh, this message translates to:
+  /// **'余额'**
+  String get quotaCreditsBalance;
+
+  /// No description provided for @quotaCreditsDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'按需付费积分，仅在账号开通时显示实际数字。'**
+  String get quotaCreditsDescription;
+
+  /// No description provided for @quotaNoCredits.
+  ///
+  /// In zh, this message translates to:
+  /// **'无积分'**
+  String get quotaNoCredits;
+
+  /// No description provided for @quotaMissingTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'未找到 Codex 登录信息'**
+  String get quotaMissingTitle;
+
+  /// No description provided for @quotaMissingHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'Pi 的 auth.json 中没有 openai-codex 的 OAuth 登录。请先在 Pi 中完成 Codex 登录后，回到本页刷新。'**
+  String get quotaMissingHint;
+
+  /// No description provided for @quotaFailedTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'查询额度失败'**
+  String get quotaFailedTitle;
+
+  /// No description provided for @quotaUnauthorizedHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'令牌已过期或失效。请运行 pi auth check --provider openai-codex 刷新令牌，或在 Pi 中重新登录后重试。'**
+  String get quotaUnauthorizedHint;
+
+  /// No description provided for @quotaNetworkHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法连接 ChatGPT 服务，请检查网络后重试。'**
+  String get quotaNetworkHint;
+
+  /// No description provided for @quotaParseHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'服务返回了无法识别的内容，可能是接口格式发生了变化。'**
+  String get quotaParseHint;
+
+  /// No description provided for @quotaOpenDetails.
+  ///
+  /// In zh, this message translates to:
+  /// **'点击查看详情'**
+  String get quotaOpenDetails;
 }
 
 class _AppLocalizationsDelegate

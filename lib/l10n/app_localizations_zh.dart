@@ -1449,4 +1449,102 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get workbenchWaitBeforeClose =>
       '工作区操作尚未结束，请等待创建或移除完成后再关闭窗口，以免留下未完成的 Git 目录。';
+
+  @override
+  String get quotaPageTitle => '账号额度';
+
+  @override
+  String get quotaPageSubtitle =>
+      '读取 Pi 保存的 Codex OAuth 登录，查询 ChatGPT 套餐的实时用量窗口。';
+
+  @override
+  String get quotaRefresh => '刷新';
+
+  @override
+  String get quotaRefreshing => '正在刷新…';
+
+  @override
+  String get quotaLoading => '正在读取登录信息并查询额度…';
+
+  @override
+  String get quotaLimitReached => '已达到当前套餐的用量上限，请等待窗口重置。';
+
+  @override
+  String get quotaAccountGroup => '账号';
+
+  @override
+  String get quotaProvider => '服务';
+
+  @override
+  String get quotaProviderDescription => '登录信息来自 Pi 的 auth.json，本页只做只读查询。';
+
+  @override
+  String get quotaEmail => '邮箱';
+
+  @override
+  String get quotaPlan => '套餐';
+
+  @override
+  String get quotaTokenExpiry => '令牌有效期';
+
+  @override
+  String get quotaTokenExpiredHint =>
+      '令牌已过期。请运行 pi auth check --provider openai-codex 刷新，或在 Pi 中重新登录。';
+
+  @override
+  String get quotaUsageGroup => '用量窗口';
+
+  @override
+  String get quotaUsageGroupDescription => '用量按滑动窗口统计，查询额度本身不消耗用量。';
+
+  @override
+  String get quotaPrimaryWindow => '近 5 小时';
+
+  @override
+  String get quotaSecondaryWindow => '近 7 天';
+
+  @override
+  String quotaWindowResets(String time) {
+    return '重置于 $time';
+  }
+
+  @override
+  String quotaRemaining(int percent) {
+    return '剩余 $percent%';
+  }
+
+  @override
+  String get quotaCreditsGroup => '积分余额';
+
+  @override
+  String get quotaCreditsBalance => '余额';
+
+  @override
+  String get quotaCreditsDescription => '按需付费积分，仅在账号开通时显示实际数字。';
+
+  @override
+  String get quotaNoCredits => '无积分';
+
+  @override
+  String get quotaMissingTitle => '未找到 Codex 登录信息';
+
+  @override
+  String get quotaMissingHint =>
+      'Pi 的 auth.json 中没有 openai-codex 的 OAuth 登录。请先在 Pi 中完成 Codex 登录后，回到本页刷新。';
+
+  @override
+  String get quotaFailedTitle => '查询额度失败';
+
+  @override
+  String get quotaUnauthorizedHint =>
+      '令牌已过期或失效。请运行 pi auth check --provider openai-codex 刷新令牌，或在 Pi 中重新登录后重试。';
+
+  @override
+  String get quotaNetworkHint => '无法连接 ChatGPT 服务，请检查网络后重试。';
+
+  @override
+  String get quotaParseHint => '服务返回了无法识别的内容，可能是接口格式发生了变化。';
+
+  @override
+  String get quotaOpenDetails => '点击查看详情';
 }

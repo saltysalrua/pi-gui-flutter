@@ -1553,4 +1553,108 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workbenchWaitBeforeClose =>
       'A workspace operation is still in progress. Wait for creation or removal to finish before closing, to avoid leaving an incomplete Git checkout.';
+
+  @override
+  String get quotaPageTitle => 'Account quota';
+
+  @override
+  String get quotaPageSubtitle =>
+      'Reads the Codex OAuth login stored by Pi and shows live ChatGPT plan usage windows.';
+
+  @override
+  String get quotaRefresh => 'Refresh';
+
+  @override
+  String get quotaRefreshing => 'Refreshing…';
+
+  @override
+  String get quotaLoading => 'Reading your saved login and querying quota…';
+
+  @override
+  String get quotaLimitReached =>
+      'The current plan usage limit has been reached. Wait for the window to reset.';
+
+  @override
+  String get quotaAccountGroup => 'Account';
+
+  @override
+  String get quotaProvider => 'Service';
+
+  @override
+  String get quotaProviderDescription =>
+      'Login data comes from Pi\'s auth.json; this page only reads.';
+
+  @override
+  String get quotaEmail => 'Email';
+
+  @override
+  String get quotaPlan => 'Plan';
+
+  @override
+  String get quotaTokenExpiry => 'Token expiry';
+
+  @override
+  String get quotaTokenExpiredHint =>
+      'The token has expired. Run pi auth check --provider openai-codex to refresh it, or sign in again inside Pi.';
+
+  @override
+  String get quotaUsageGroup => 'Usage windows';
+
+  @override
+  String get quotaUsageGroupDescription =>
+      'Usage counts against sliding windows; checking the quota itself does not consume any usage.';
+
+  @override
+  String get quotaPrimaryWindow => 'Last 5 hours';
+
+  @override
+  String get quotaSecondaryWindow => 'Last 7 days';
+
+  @override
+  String quotaWindowResets(String time) {
+    return 'Resets at $time';
+  }
+
+  @override
+  String quotaRemaining(int percent) {
+    return '$percent% left';
+  }
+
+  @override
+  String get quotaCreditsGroup => 'Credits';
+
+  @override
+  String get quotaCreditsBalance => 'Balance';
+
+  @override
+  String get quotaCreditsDescription =>
+      'Pay-as-you-go credits; a real number is only shown when the account has them.';
+
+  @override
+  String get quotaNoCredits => 'None';
+
+  @override
+  String get quotaMissingTitle => 'No Codex login found';
+
+  @override
+  String get quotaMissingHint =>
+      'Pi\'s auth.json has no openai-codex OAuth login. Sign in to Codex inside Pi first, then come back and refresh this page.';
+
+  @override
+  String get quotaFailedTitle => 'Failed to load quota';
+
+  @override
+  String get quotaUnauthorizedHint =>
+      'The token has expired or been revoked. Run pi auth check --provider openai-codex to refresh it, or sign in again inside Pi, then retry.';
+
+  @override
+  String get quotaNetworkHint =>
+      'Could not reach the ChatGPT service. Check your network and retry.';
+
+  @override
+  String get quotaParseHint =>
+      'The service returned an unrecognized response; the endpoint format may have changed.';
+
+  @override
+  String get quotaOpenDetails => 'Click to view details';
 }

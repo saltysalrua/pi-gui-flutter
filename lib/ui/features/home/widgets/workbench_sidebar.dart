@@ -13,6 +13,7 @@ import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
 
 import '../controllers/workbench_controller.dart';
 import '../workspace_labels.dart';
+import 'quota_sidebar_button.dart';
 
 enum _ProjectAction { forget }
 
@@ -26,9 +27,10 @@ class WorkbenchSidebar extends StatefulWidget {
     required this.onForgetProject,
     required this.onCloseSession,
     required this.onSettings,
+    required this.onQuota,
   });
   final WorkbenchController controller;
-  final VoidCallback onAddProject, onSettings;
+  final VoidCallback onAddProject, onSettings, onQuota;
   final ValueChanged<PiCatalogProject> onCreateWorktree, onForgetProject;
   final void Function(PiCatalogProject project, PiCatalogWorktree worktree)
   onRemoveWorktree;
@@ -398,10 +400,18 @@ class _WorkbenchSidebarState extends State<WorkbenchSidebar> {
         ),
         Padding(
           padding: const EdgeInsets.all(AppSpacing.sm),
-          child: AppNavTile(
-            title: l10n.settings,
-            leading: const Icon(Icons.settings_outlined),
-            onTap: widget.onSettings,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              QuotaSidebarButton(onOpenQuota: widget.onQuota),
+              const SizedBox(height: AppSpacing.xs),
+              AppNavTile(
+                title: l10n.settings,
+                leading: const Icon(Icons.settings_outlined),
+                onTap: widget.onSettings,
+              ),
+            ],
           ),
         ),
       ],

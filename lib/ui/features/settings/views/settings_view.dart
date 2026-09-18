@@ -19,26 +19,40 @@ import '../../../../core/services/window_material_service.dart';
 import '../controllers/appearance_controller.dart';
 import '../controllers/packages_controller.dart';
 import '../controllers/pi_update_controller.dart';
+import '../controllers/quota_controller.dart';
 import 'appearance_settings_view.dart';
 import 'packages_settings_view.dart';
 import 'pi_settings_view.dart';
+import 'quota_settings_view.dart';
 
-enum _SettingsPage { appearance, pi, plugins }
+/// Public settings page selector so callers (e.g. the sidebar quota button)
+/// can deep-link straight to a specific page.
+enum SettingsPage { appearance, pi, plugins, quota }
 
-Future<void> showSettings(BuildContext context, {PiRpcClient? control}) =>
-    Navigator.of(context).push<void>(
-      AppDesktopPageRoute<void>(
-        reduceMotion: MediaQuery.disableAnimationsOf(context),
-        builder: (_) => SettingsView(control: control),
-      ),
-    );
+typedef _SettingsPage = SettingsPage;
+
+Future<void> showSettings(
+  BuildContext context, {
+  PiRpcClient? control,
+  SettingsPage initialPage = SettingsPage.appearance,
+}) => Navigator.of(context).push<void>(
+  AppDesktopPageRoute<void>(
+    reduceMotion: MediaQuery.disableAnimationsOf(context),
+    builder: (_) => SettingsView(control: control, initialPage: initialPage),
+  ),
+);
 
 /// A normal maintained route: opening settings never disposes the RPC-owning
 /// HomeView. The sidebar hosts one tile per settings page; compact widths
 /// switch pages through an inline select instead.
 class SettingsView extends StatefulWidget {
-  const SettingsView({super.key, this.control});
+  const SettingsView({
+    super.key,
+    this.control,
+    this.initialPage = SettingsPage.appearance,
+  });
   final PiRpcClient? control;
+  final SettingsPage initialPage;
   @override
   State<SettingsView> createState() => _SettingsViewState();
 }
@@ -47,9 +61,10 @@ class _SettingsViewState extends State<SettingsView> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
   String _query = '';
-  _SettingsPage _page = _SettingsPage.appearance;
+  late _SettingsPage _page = widget.initialPage;
   PiUpdateController? _pi;
   PackagesController? _plugins;
+  QuotaController? _quota;
 
   @override
   void dispose() {
@@ -57,6 +72,7 @@ class _SettingsViewState extends State<SettingsView> {
     _scroll.dispose();
     _pi?.dispose();
     _plugins?.dispose();
+    _quota?.dispose();
     super.dispose();
   }
 
@@ -85,6 +101,9 @@ class _SettingsViewState extends State<SettingsView> {
     // and is kept alive until the settings route closes. The plugins
     // controller needs the shared control channel for package management.
     if (page == _SettingsPage.pi) _pi ??= PiUpdateController()..load();
+    if (page == _SettingsPage.quota) {
+      _quota ??= QuotaController()..load();
+    }
     if (page == _SettingsPage.plugins) {
       final control = widget.control;
       if (control != null) {
@@ -144,6 +163,7 @@ class _SettingsViewState extends State<SettingsView> {
                 AppSelectOption(_SettingsPage.appearance, l.appearanceTitle),
                 AppSelectOption(_SettingsPage.pi, l.piPageTitle),
                 AppSelectOption(_SettingsPage.plugins, l.pluginsPageTitle),
+                AppSelectOption(_SettingsPage.quota, l.quotaPageTitle),
               ],
               onChanged: (page) => _select(page),
             );
@@ -181,6 +201,11 @@ class _SettingsViewState extends State<SettingsView> {
                       l.pluginsPageTitle,
                       Icons.extension_rounded,
                     ),
+                    navTile(
+                      _SettingsPage.quota,
+                      l.quotaPageTitle,
+                      Icons.data_usage_outlined,
+                    ),
                   ],
                 ),
               ),
@@ -204,6 +229,10 @@ class _SettingsViewState extends State<SettingsView> {
                   query: _query,
                 );
               }(),
+              _SettingsPage.quota => QuotaSettingsContent(
+                controller: _quota ??= QuotaController()..load(),
+                query: _query,
+              ),
             };
             final page = Column(
               children: [
