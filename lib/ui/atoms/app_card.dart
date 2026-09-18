@@ -73,7 +73,7 @@ class AppCard extends StatelessWidget {
         material.opacity < 1 &&
         WindowMaterialScope.statusOf(context) == WindowMaterialStatus.active &&
         !MediaQuery.highContrastOf(context);
-    final inheritedBlur = _CardBackdropScope.of(context);
+    final inheritedBlur = AppCardBackdropScope.of(context);
     final blur = active && material.blurSigma > 0 && !inheritedBlur;
     final effectiveBg = active
         ? background.withValues(alpha: background.a * material.opacity)
@@ -118,7 +118,7 @@ class AppCard extends StatelessWidget {
                   ? Border.all(color: effectiveBorder, width: 1.0)
                   : null,
             ),
-            child: _CardBackdropScope(
+            child: AppCardBackdropScope(
               active: inheritedBlur || blur,
               child: child,
             ),
@@ -129,16 +129,22 @@ class AppCard extends StatelessWidget {
   }
 }
 
-/// Nested cards keep their tint but do not blur the same background repeatedly.
-class _CardBackdropScope extends InheritedWidget {
-  const _CardBackdropScope({required this.active, required super.child});
+/// Nested surfaces keep their tint but do not blur the same background
+/// repeatedly. Public so other glass consumers (e.g. AppTextField) can opt
+/// out of a second blur when already inside a blurred card.
+class AppCardBackdropScope extends InheritedWidget {
+  const AppCardBackdropScope({
+    super.key,
+    required super.child,
+    required this.active,
+  });
   final bool active;
   static bool of(BuildContext context) =>
       context
-          .dependOnInheritedWidgetOfExactType<_CardBackdropScope>()
+          .dependOnInheritedWidgetOfExactType<AppCardBackdropScope>()
           ?.active ??
       false;
   @override
-  bool updateShouldNotify(_CardBackdropScope oldWidget) =>
+  bool updateShouldNotify(AppCardBackdropScope oldWidget) =>
       active != oldWidget.active;
 }

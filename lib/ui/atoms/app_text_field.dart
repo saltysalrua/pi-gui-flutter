@@ -1,6 +1,12 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
+import 'package:pi_gui/core/services/window_material_service.dart';
+import 'package:pi_gui/ui/atoms/app_card.dart';
+import 'package:pi_gui/ui/core/theme/app_card_theme.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
+import 'package:pi_gui/ui/core/window_material_scope.dart';
 
 /// 通用文本输入原子：搜索与扩展输入复用，状态样式统一交给主题。
 class AppTextField extends StatelessWidget {
@@ -37,11 +43,31 @@ class AppTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // Same material rules as AppCard: the appearance settings promise that
+    // input fields follow the card glass. Opt out of a second blur when the
+    // field already sits inside a blurred card (nested surfaces keep tint).
+    final material =
+        Theme.of(context).extension<AppCardTheme>() ?? const AppCardTheme();
+    final baseFill = enabled ? colors.cardBackground : colors.mutedBackground;
+    final glassActive =
+        !borderless &&
+        enabled &&
+        baseFill.a > 0 &&
+        material.opacity < 1 &&
+        WindowMaterialScope.statusOf(context) == WindowMaterialStatus.active &&
+        !MediaQuery.highContrastOf(context);
+    final blur =
+        glassActive &&
+        material.blurSigma > 0 &&
+        !AppCardBackdropScope.of(context);
+    final fill = glassActive
+        ? baseFill.withValues(alpha: baseFill.a * material.opacity)
+        : baseFill;
     OutlineInputBorder border(Color color) => OutlineInputBorder(
       borderRadius: BorderRadius.circular(AppRadius.md),
       borderSide: BorderSide(color: color),
     );
-    final field = TextField(
+    Widget field = TextField(
       controller: controller,
       focusNode: focusNode,
       minLines: minLines,
@@ -102,9 +128,40 @@ class AppTextField extends StatelessWidget {
             : border(colors.mutedBackground),
         hoverColor: colors.hoverBackground,
         filled: !borderless,
-        fillColor: enabled ? colors.cardBackground : colors.mutedBackground,
+        fillColor: fill,
       ),
     );
+    // Constant tree shape whether glass is on or off, so focus, selection
+    // and the text editing state survive appearance toggles untouched.
+    if (!borderless) {
+      final radius = BorderRadius.circular(AppRadius.md);
+      field = DecoratedBox(
+        decoration: BoxDecoration(borderRadius: radius),
+        child: Stack(
+          fit: StackFit.passthrough,
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: radius,
+                child: BackdropFilter(
+                  enabled: blur,
+                  filter: ImageFilter.blur(
+                    sigmaX: material.blurSigma,
+                    sigmaY: material.blurSigma,
+                  ),
+                  // Replace, rather than composite a second copy of the
+                  // already translucent desktop tint, matching AppCard.
+                  blendMode: BlendMode.src,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+            field,
+          ],
+        ),
+      );
+    }
     if (onPaste == null) return field;
     return Actions(
       actions: {
