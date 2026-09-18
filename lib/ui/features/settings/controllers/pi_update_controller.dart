@@ -39,6 +39,22 @@ enum PiSelfUpdateStatus { idle, running, succeeded, failed }
 class PiUpdateController extends ChangeNotifier {
   PiUpdateController();
 
+  /// Set in [dispose]; async continuations (npm subprocess waits) must not
+  /// notify listeners after the settings page that owned this controller
+  /// has closed — otherwise ChangeNotifier throws used-after-dispose.
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _notify() {
+    if (_disposed) return;
+    notifyListeners();
+  }
+
   static const packageName = '@earendil-works/pi-coding-agent';
   static const _registryPage = 'https://www.npmjs.com/package/$packageName';
   static const updateCommand = 'npm install -g $packageName@latest';
@@ -70,9 +86,10 @@ class PiUpdateController extends ChangeNotifier {
     if (_loading) return;
     _loading = true;
     _infoStatus = PiInfoStatus.loading;
-    notifyListeners();
+    _notify();
     try {
       final root = (await _runNpm(['root', '-g'])).trim();
+      if (_disposed) return;
       if (root.isEmpty) throw StateError('npm root -g returned nothing');
       final resolved = _normalize(Directory(root), packageName);
       final packageJson = File(
@@ -91,22 +108,23 @@ class PiUpdateController extends ChangeNotifier {
       _entries = _parseChangelog(await changelogFile.readAsString());
       _infoStatus = PiInfoStatus.ready;
       _loading = false;
-      notifyListeners();
+      _notify();
       // Silent auto-check once install info is available.
       unawaited(checkForUpdate());
     } catch (_) {
       _infoStatus = PiInfoStatus.failed;
       _loading = false;
-      notifyListeners();
+      _notify();
     }
   }
 
   Future<void> checkForUpdate() async {
     if (_checkStatus == PiCheckStatus.checking) return;
     _checkStatus = PiCheckStatus.checking;
-    notifyListeners();
+    _notify();
     try {
       final latest = await _runNpm(['view', packageName, 'dist-tags.latest']);
+      if (_disposed) return;
       final match = RegExp(r'^\d+(\.\d+)+').firstMatch(latest);
       if (match == null) throw StateError('unexpected npm output: $latest');
       _latestVersion = match.group(0);
@@ -118,7 +136,7 @@ class PiUpdateController extends ChangeNotifier {
     } catch (_) {
       _checkStatus = PiCheckStatus.failed;
     }
-    notifyListeners();
+    _notify();
   }
 
   /// Runs `pi update --self` and streams its output. The official command
@@ -128,7 +146,7 @@ class PiUpdateController extends ChangeNotifier {
     if (isSelfUpdating) return false;
     _selfUpdateStatus = PiSelfUpdateStatus.running;
     selfUpdateLog.clear();
-    notifyListeners();
+    _notify();
     Process? process;
     var success = false;
     try {
@@ -141,7 +159,7 @@ class PiUpdateController extends ChangeNotifier {
         if (text.isEmpty) return;
         selfUpdateLog.add(text);
         if (selfUpdateLog.length > 500) selfUpdateLog.removeAt(0);
-        notifyListeners();
+        _notify();
       }
 
       final collecting = [
@@ -171,9 +189,9 @@ class PiUpdateController extends ChangeNotifier {
     _selfUpdateStatus = success
         ? PiSelfUpdateStatus.succeeded
         : PiSelfUpdateStatus.failed;
-    notifyListeners();
+    _notify();
     // The npm install replaced the package on disk; re-read version and log.
-    if (success) await load();
+    if (success && !_disposed) await load();
     return success;
   }
 

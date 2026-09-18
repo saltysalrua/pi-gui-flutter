@@ -138,6 +138,22 @@ class CodexAuthEntry {
 class QuotaController extends ChangeNotifier {
   QuotaController();
 
+  /// Set in [dispose]; the settings page disposes its instance while a
+  /// network refresh may still be in flight, so async continuations must
+  /// not notify after that (ChangeNotifier throws used-after-dispose).
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _notify() {
+    if (_disposed) return;
+    notifyListeners();
+  }
+
   static const _usageUrl = 'https://chatgpt.com/backend-api/wham/usage';
 
   /// Cached snapshots older than this are quietly re-fetched on hover.
@@ -256,14 +272,14 @@ class QuotaController extends ChangeNotifier {
     if (!silent || _status != QuotaStatus.ready) {
       _status = QuotaStatus.loading;
     }
-    notifyListeners();
+    _notify();
     try {
       final file = File(authJsonPath(Platform.environment));
       _auth = parseAuthEntry(await file.readAsString());
       if (_auth == null) {
         _status = QuotaStatus.missing;
         _loading = false;
-        notifyListeners();
+        _notify();
         return;
       }
       _snapshot = await _fetchUsage(_auth!);
@@ -283,7 +299,7 @@ class QuotaController extends ChangeNotifier {
       }
     }
     _loading = false;
-    notifyListeners();
+    _notify();
   }
 
   Future<CodexUsageSnapshot> _fetchUsage(CodexAuthEntry auth) async {
