@@ -651,7 +651,23 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get piUpdateHint => '更新前请先完全退出本应用和正在运行的 Pi，然后在终端里运行上面的命令。';
+  String get piUpdateHint =>
+      '更新会直接在本页运行 pi update --self，完成后无需重启本应用：正在运行的会话继续使用当前版本，之后新开的会话自动使用新版本。';
+
+  @override
+  String get piUpdateNow => '立即更新';
+
+  @override
+  String get piUpdateRunning => '正在更新…';
+
+  @override
+  String get piUpdateFailedHint => '更新失败了。可以看看下方输出找原因，或复制手动命令到终端执行。';
+
+  @override
+  String get piUpdateOutput => '更新输出';
+
+  @override
+  String get piUpdateManualCommand => '手动更新命令';
 
   @override
   String get piCheckFailed => '检查更新失败，请检查网络后重试。';
@@ -682,6 +698,166 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get piCurrentTag => '当前';
+
+  @override
+  String get pluginsPageTitle => '插件';
+
+  @override
+  String get pluginsPageSubtitle => '安装和管理 Pi 的扩展、技能、提示词与主题包。';
+
+  @override
+  String get pluginsTabGallery => '市场';
+
+  @override
+  String get pluginsTabManage => '管理';
+
+  @override
+  String get pluginsGalleryHint =>
+      '列表来自 npm 上带 pi-package 关键词的公开包，与 pi.dev/packages 同源。';
+
+  @override
+  String get pluginsSearchGalleryHint => '搜索插件市场…';
+
+  @override
+  String get pluginsGalleryEmpty => '没有找到匹配的插件。';
+
+  @override
+  String get pluginsGalleryFailed => '插件市场查询失败，请检查网络后重试。';
+
+  @override
+  String pluginsGalleryFailedDetail(Object error) {
+    return '插件市场查询失败：$error';
+  }
+
+  @override
+  String get pluginsShowMore => '显示更多';
+
+  @override
+  String get pluginsSortLabel => '排序方式';
+
+  @override
+  String get pluginsSortRelevance => '相关性';
+
+  @override
+  String get pluginsSortDownloads => '下载量';
+
+  @override
+  String get pluginsSortUpdated => '最近更新';
+
+  @override
+  String get pluginsSortName => '名称';
+
+  @override
+  String get pluginsInstall => '安装';
+
+  @override
+  String get pluginsInstalling => '正在安装…';
+
+  @override
+  String get pluginsInstalled => '已安装';
+
+  @override
+  String pluginsMonthlyDownloads(int count) {
+    return '$count 次下载/月';
+  }
+
+  @override
+  String get pluginsOpenRepo => '打开仓库';
+
+  @override
+  String get pluginsOpenNpm => '打开 npm 页面';
+
+  @override
+  String get pluginsLoadFailed => '无法读取插件列表。';
+
+  @override
+  String pluginsLoadFailedDetail(Object error) {
+    return '无法读取插件列表：$error';
+  }
+
+  @override
+  String get pluginsBusyHint => '有操作正在进行，请稍候。';
+
+  @override
+  String pluginsActionFailed(Object error) {
+    return '操作失败：$error';
+  }
+
+  @override
+  String get pluginsEmpty => '还没有安装任何插件，去市场页安装一个吧。';
+
+  @override
+  String get pluginsScopeUser => '全局';
+
+  @override
+  String get pluginsScopeProject => '项目';
+
+  @override
+  String get pluginsFiltered => '已筛选';
+
+  @override
+  String get pluginsNotInstalled => '未安装';
+
+  @override
+  String get pluginsRemove => '移除';
+
+  @override
+  String get pluginsRemoveConfirmTitle => '移除插件';
+
+  @override
+  String pluginsRemoveConfirmMessage(Object source) {
+    return '会从全局设置里移除 $source，并删除它的安装目录。确定要移除吗？';
+  }
+
+  @override
+  String get pluginsUpdate => '更新';
+
+  @override
+  String get pluginsUpdateAll => '全部更新';
+
+  @override
+  String get pluginsCheckUpdates => '检查更新';
+
+  @override
+  String get pluginsChecking => '正在检查…';
+
+  @override
+  String pluginsUpdatesAvailable(int count) {
+    return '$count 个插件有新版本';
+  }
+
+  @override
+  String get pluginsUpToDate => '所有插件都是最新版本。';
+
+  @override
+  String get pluginsOperationLog => '操作输出';
+
+  @override
+  String get pluginsTopLevelGroup => '本机插件';
+
+  @override
+  String get pluginsResourcesExtensions => '扩展';
+
+  @override
+  String get pluginsResourcesSkills => '技能';
+
+  @override
+  String get pluginsResourcesPrompts => '提示词';
+
+  @override
+  String get pluginsResourcesThemes => '主题';
+
+  @override
+  String get pluginsToggleOn => '启用';
+
+  @override
+  String get pluginsToggleOff => '停用';
+
+  @override
+  String get pluginsProjectScopeHint => '项目级插件请在对应项目目录用 pi config -l 管理。';
+
+  @override
+  String get pluginsNoChannel => '插件管理需要连接 Pi 后端，请回到主界面后重试。';
 
   @override
   String get appearanceTitle => '外观';

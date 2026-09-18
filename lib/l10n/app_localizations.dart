@@ -1325,8 +1325,38 @@ abstract class AppLocalizations {
   /// No description provided for @piUpdateHint.
   ///
   /// In zh, this message translates to:
-  /// **'更新前请先完全退出本应用和正在运行的 Pi，然后在终端里运行上面的命令。'**
+  /// **'更新会直接在本页运行 pi update --self，完成后无需重启本应用：正在运行的会话继续使用当前版本，之后新开的会话自动使用新版本。'**
   String get piUpdateHint;
+
+  /// No description provided for @piUpdateNow.
+  ///
+  /// In zh, this message translates to:
+  /// **'立即更新'**
+  String get piUpdateNow;
+
+  /// No description provided for @piUpdateRunning.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在更新…'**
+  String get piUpdateRunning;
+
+  /// No description provided for @piUpdateFailedHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新失败了。可以看看下方输出找原因，或复制手动命令到终端执行。'**
+  String get piUpdateFailedHint;
+
+  /// No description provided for @piUpdateOutput.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新输出'**
+  String get piUpdateOutput;
+
+  /// No description provided for @piUpdateManualCommand.
+  ///
+  /// In zh, this message translates to:
+  /// **'手动更新命令'**
+  String get piUpdateManualCommand;
 
   /// No description provided for @piCheckFailed.
   ///
@@ -1387,6 +1417,300 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'当前'**
   String get piCurrentTag;
+
+  /// No description provided for @pluginsPageTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件'**
+  String get pluginsPageTitle;
+
+  /// No description provided for @pluginsPageSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装和管理 Pi 的扩展、技能、提示词与主题包。'**
+  String get pluginsPageSubtitle;
+
+  /// No description provided for @pluginsTabGallery.
+  ///
+  /// In zh, this message translates to:
+  /// **'市场'**
+  String get pluginsTabGallery;
+
+  /// No description provided for @pluginsTabManage.
+  ///
+  /// In zh, this message translates to:
+  /// **'管理'**
+  String get pluginsTabManage;
+
+  /// No description provided for @pluginsGalleryHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'列表来自 npm 上带 pi-package 关键词的公开包，与 pi.dev/packages 同源。'**
+  String get pluginsGalleryHint;
+
+  /// No description provided for @pluginsSearchGalleryHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索插件市场…'**
+  String get pluginsSearchGalleryHint;
+
+  /// No description provided for @pluginsGalleryEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有找到匹配的插件。'**
+  String get pluginsGalleryEmpty;
+
+  /// No description provided for @pluginsGalleryFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件市场查询失败，请检查网络后重试。'**
+  String get pluginsGalleryFailed;
+
+  /// No description provided for @pluginsGalleryFailedDetail.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件市场查询失败：{error}'**
+  String pluginsGalleryFailedDetail(Object error);
+
+  /// No description provided for @pluginsShowMore.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示更多'**
+  String get pluginsShowMore;
+
+  /// No description provided for @pluginsSortLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'排序方式'**
+  String get pluginsSortLabel;
+
+  /// No description provided for @pluginsSortRelevance.
+  ///
+  /// In zh, this message translates to:
+  /// **'相关性'**
+  String get pluginsSortRelevance;
+
+  /// No description provided for @pluginsSortDownloads.
+  ///
+  /// In zh, this message translates to:
+  /// **'下载量'**
+  String get pluginsSortDownloads;
+
+  /// No description provided for @pluginsSortUpdated.
+  ///
+  /// In zh, this message translates to:
+  /// **'最近更新'**
+  String get pluginsSortUpdated;
+
+  /// No description provided for @pluginsSortName.
+  ///
+  /// In zh, this message translates to:
+  /// **'名称'**
+  String get pluginsSortName;
+
+  /// No description provided for @pluginsInstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装'**
+  String get pluginsInstall;
+
+  /// No description provided for @pluginsInstalling.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在安装…'**
+  String get pluginsInstalling;
+
+  /// No description provided for @pluginsInstalled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已安装'**
+  String get pluginsInstalled;
+
+  /// No description provided for @pluginsMonthlyDownloads.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 次下载/月'**
+  String pluginsMonthlyDownloads(int count);
+
+  /// No description provided for @pluginsOpenRepo.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开仓库'**
+  String get pluginsOpenRepo;
+
+  /// No description provided for @pluginsOpenNpm.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开 npm 页面'**
+  String get pluginsOpenNpm;
+
+  /// No description provided for @pluginsLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法读取插件列表。'**
+  String get pluginsLoadFailed;
+
+  /// No description provided for @pluginsLoadFailedDetail.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法读取插件列表：{error}'**
+  String pluginsLoadFailedDetail(Object error);
+
+  /// No description provided for @pluginsBusyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'有操作正在进行，请稍候。'**
+  String get pluginsBusyHint;
+
+  /// No description provided for @pluginsActionFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'操作失败：{error}'**
+  String pluginsActionFailed(Object error);
+
+  /// No description provided for @pluginsEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有安装任何插件，去市场页安装一个吧。'**
+  String get pluginsEmpty;
+
+  /// No description provided for @pluginsScopeUser.
+  ///
+  /// In zh, this message translates to:
+  /// **'全局'**
+  String get pluginsScopeUser;
+
+  /// No description provided for @pluginsScopeProject.
+  ///
+  /// In zh, this message translates to:
+  /// **'项目'**
+  String get pluginsScopeProject;
+
+  /// No description provided for @pluginsFiltered.
+  ///
+  /// In zh, this message translates to:
+  /// **'已筛选'**
+  String get pluginsFiltered;
+
+  /// No description provided for @pluginsNotInstalled.
+  ///
+  /// In zh, this message translates to:
+  /// **'未安装'**
+  String get pluginsNotInstalled;
+
+  /// No description provided for @pluginsRemove.
+  ///
+  /// In zh, this message translates to:
+  /// **'移除'**
+  String get pluginsRemove;
+
+  /// No description provided for @pluginsRemoveConfirmTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'移除插件'**
+  String get pluginsRemoveConfirmTitle;
+
+  /// No description provided for @pluginsRemoveConfirmMessage.
+  ///
+  /// In zh, this message translates to:
+  /// **'会从全局设置里移除 {source}，并删除它的安装目录。确定要移除吗？'**
+  String pluginsRemoveConfirmMessage(Object source);
+
+  /// No description provided for @pluginsUpdate.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新'**
+  String get pluginsUpdate;
+
+  /// No description provided for @pluginsUpdateAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部更新'**
+  String get pluginsUpdateAll;
+
+  /// No description provided for @pluginsCheckUpdates.
+  ///
+  /// In zh, this message translates to:
+  /// **'检查更新'**
+  String get pluginsCheckUpdates;
+
+  /// No description provided for @pluginsChecking.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在检查…'**
+  String get pluginsChecking;
+
+  /// No description provided for @pluginsUpdatesAvailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 个插件有新版本'**
+  String pluginsUpdatesAvailable(int count);
+
+  /// No description provided for @pluginsUpToDate.
+  ///
+  /// In zh, this message translates to:
+  /// **'所有插件都是最新版本。'**
+  String get pluginsUpToDate;
+
+  /// No description provided for @pluginsOperationLog.
+  ///
+  /// In zh, this message translates to:
+  /// **'操作输出'**
+  String get pluginsOperationLog;
+
+  /// No description provided for @pluginsTopLevelGroup.
+  ///
+  /// In zh, this message translates to:
+  /// **'本机插件'**
+  String get pluginsTopLevelGroup;
+
+  /// No description provided for @pluginsResourcesExtensions.
+  ///
+  /// In zh, this message translates to:
+  /// **'扩展'**
+  String get pluginsResourcesExtensions;
+
+  /// No description provided for @pluginsResourcesSkills.
+  ///
+  /// In zh, this message translates to:
+  /// **'技能'**
+  String get pluginsResourcesSkills;
+
+  /// No description provided for @pluginsResourcesPrompts.
+  ///
+  /// In zh, this message translates to:
+  /// **'提示词'**
+  String get pluginsResourcesPrompts;
+
+  /// No description provided for @pluginsResourcesThemes.
+  ///
+  /// In zh, this message translates to:
+  /// **'主题'**
+  String get pluginsResourcesThemes;
+
+  /// No description provided for @pluginsToggleOn.
+  ///
+  /// In zh, this message translates to:
+  /// **'启用'**
+  String get pluginsToggleOn;
+
+  /// No description provided for @pluginsToggleOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'停用'**
+  String get pluginsToggleOff;
+
+  /// No description provided for @pluginsProjectScopeHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'项目级插件请在对应项目目录用 pi config -l 管理。'**
+  String get pluginsProjectScopeHint;
+
+  /// No description provided for @pluginsNoChannel.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件管理需要连接 Pi 后端，请回到主界面后重试。'**
+  String get pluginsNoChannel;
 
   /// No description provided for @appearanceTitle.
   ///

@@ -29,6 +29,8 @@ enum PiInfoStatus { loading, ready, failed }
 
 enum PiCheckStatus { idle, checking, upToDate, available, failed }
 
+enum PiSelfUpdateStatus { idle, running, succeeded, failed }
+
 /// Reads the npm-installed Pi backend (package version + CHANGELOG.md) and
 /// queries the npm registry for the latest published version.
 ///
@@ -49,15 +51,20 @@ class PiUpdateController extends ChangeNotifier {
   PiCheckStatus _checkStatus = PiCheckStatus.idle;
   String? _latestVersion;
 
+  PiSelfUpdateStatus _selfUpdateStatus = PiSelfUpdateStatus.idle;
+  final selfUpdateLog = <String>[];
+
   PiInfoStatus get infoStatus => _infoStatus;
   String? get currentVersion => _currentVersion;
   String? get installPath => _installPath;
   List<PiChangelogEntry> get entries => _entries;
   PiCheckStatus get checkStatus => _checkStatus;
   String? get latestVersion => _latestVersion;
+  PiSelfUpdateStatus get selfUpdateStatus => _selfUpdateStatus;
   static String get registryPage => _registryPage;
 
   bool _loading = false;
+  bool get isSelfUpdating => _selfUpdateStatus == PiSelfUpdateStatus.running;
 
   Future<void> load() async {
     if (_loading) return;
@@ -112,6 +119,62 @@ class PiUpdateController extends ChangeNotifier {
       _checkStatus = PiCheckStatus.failed;
     }
     notifyListeners();
+  }
+
+  /// Runs `pi update --self` and streams its output. The official command
+  /// picks the right install method (npm/pnpm/yarn/bun) for this machine.
+  /// Running sessions keep the old code; newly spawned Pi uses the new one.
+  Future<bool> runSelfUpdate() async {
+    if (isSelfUpdating) return false;
+    _selfUpdateStatus = PiSelfUpdateStatus.running;
+    selfUpdateLog.clear();
+    notifyListeners();
+    Process? process;
+    var success = false;
+    try {
+      process = await Process.start('pi', [
+        'update',
+        '--self',
+      ], runInShell: Platform.isWindows);
+      void push(String line) {
+        final text = line.trimRight();
+        if (text.isEmpty) return;
+        selfUpdateLog.add(text);
+        if (selfUpdateLog.length > 500) selfUpdateLog.removeAt(0);
+        notifyListeners();
+      }
+
+      final collecting = [
+        process.stdout
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .listen(push),
+        process.stderr
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .listen(push),
+      ];
+      try {
+        final code = await process.exitCode.timeout(
+          const Duration(minutes: 10),
+        );
+        success = code == 0;
+      } finally {
+        for (final subscription in collecting) {
+          await subscription.cancel();
+        }
+      }
+    } catch (_) {
+      if (process != null) await _killTree(process);
+      success = false;
+    }
+    _selfUpdateStatus = success
+        ? PiSelfUpdateStatus.succeeded
+        : PiSelfUpdateStatus.failed;
+    notifyListeners();
+    // The npm install replaced the package on disk; re-read version and log.
+    if (success) await load();
+    return success;
   }
 
   /// Runs npm on a detached-shell child and kills the whole tree on timeout,

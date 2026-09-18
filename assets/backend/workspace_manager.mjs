@@ -27,8 +27,9 @@ const inside = (parent, child) => {
 };
 
 export class WorkspaceManager {
-  constructor(service, createChild, emit, { resizeImage } = {}) {
+  constructor(service, createChild, emit, { resizeImage, packageRoot } = {}) {
     this.resizeImage = resizeImage;
+    this.packageRoot = packageRoot;
     this.service = service;
     this.createChild = createChild;
     this.emit = emit;
@@ -183,6 +184,18 @@ export class WorkspaceManager {
   }
   changed() {
     this.output("control", { type: "gui_catalog_changed" });
+  }
+  // Settings-page package management reuses Pi's own PackageManager; the
+  // module is only imported once a gui_packages_* command arrives.
+  async packages(request) {
+    if (!this.packagesBridge) {
+      const { GuiPackagesBridge } = await import("./gui_packages.mjs");
+      this.packagesBridge = new GuiPackagesBridge({
+        packageRoot: this.packageRoot,
+        emit: (message) => this.output("control", message),
+      });
+    }
+    return this.packagesBridge.handle(request);
   }
   output(channel, message) {
     this.emit(JSON.stringify({ type: "gui_channel", channel, message }));
@@ -496,6 +509,13 @@ export class WorkspaceManager {
       case "gui_add_worktree":
       case "gui_delete_worktree":
         return this.worktreeJob(request);
+      case "gui_packages_state":
+      case "gui_packages_check_updates":
+      case "gui_packages_install":
+      case "gui_packages_remove":
+      case "gui_packages_update":
+      case "gui_packages_toggle":
+        return this.packages(request);
       // Browse any registered worktree without creating an Agent.
       case "gui_list_files":
       case "gui_get_git_graph":

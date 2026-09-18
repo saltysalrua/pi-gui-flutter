@@ -703,7 +703,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get piUpdateHint =>
-      'Fully exit this app and any running Pi first, then run the command above in a terminal.';
+      'Runs pi update --self right on this page — no terminal needed. Running sessions keep the current version; new sessions automatically use the new one.';
+
+  @override
+  String get piUpdateNow => 'Update now';
+
+  @override
+  String get piUpdateRunning => 'Updating…';
+
+  @override
+  String get piUpdateFailedHint =>
+      'The update failed. Check the output below, or copy the manual command to a terminal.';
+
+  @override
+  String get piUpdateOutput => 'Update output';
+
+  @override
+  String get piUpdateManualCommand => 'Manual update command';
 
   @override
   String get piCheckFailed =>
@@ -737,6 +753,171 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get piCurrentTag => 'Installed';
+
+  @override
+  String get pluginsPageTitle => 'Plugins';
+
+  @override
+  String get pluginsPageSubtitle =>
+      'Install and manage Pi extension, skill, prompt-template and theme packages.';
+
+  @override
+  String get pluginsTabGallery => 'Gallery';
+
+  @override
+  String get pluginsTabManage => 'Manage';
+
+  @override
+  String get pluginsGalleryHint =>
+      'Listed from public npm packages tagged pi-package, the same source as pi.dev/packages.';
+
+  @override
+  String get pluginsSearchGalleryHint => 'Search the package gallery…';
+
+  @override
+  String get pluginsGalleryEmpty => 'No matching packages found.';
+
+  @override
+  String get pluginsGalleryFailed =>
+      'Could not reach the package gallery. Check your network and try again.';
+
+  @override
+  String pluginsGalleryFailedDetail(Object error) {
+    return 'Could not reach the package gallery: $error';
+  }
+
+  @override
+  String get pluginsShowMore => 'Show more';
+
+  @override
+  String get pluginsSortLabel => 'Sort by';
+
+  @override
+  String get pluginsSortRelevance => 'Relevance';
+
+  @override
+  String get pluginsSortDownloads => 'Downloads';
+
+  @override
+  String get pluginsSortUpdated => 'Recently updated';
+
+  @override
+  String get pluginsSortName => 'Name';
+
+  @override
+  String get pluginsInstall => 'Install';
+
+  @override
+  String get pluginsInstalling => 'Installing…';
+
+  @override
+  String get pluginsInstalled => 'Installed';
+
+  @override
+  String pluginsMonthlyDownloads(int count) {
+    return '$count downloads/mo';
+  }
+
+  @override
+  String get pluginsOpenRepo => 'Open repository';
+
+  @override
+  String get pluginsOpenNpm => 'Open npm page';
+
+  @override
+  String get pluginsLoadFailed => 'Could not load the plugin list.';
+
+  @override
+  String pluginsLoadFailedDetail(Object error) {
+    return 'Could not load the plugin list: $error';
+  }
+
+  @override
+  String get pluginsBusyHint => 'An operation is in progress. Please wait.';
+
+  @override
+  String pluginsActionFailed(Object error) {
+    return 'Operation failed: $error';
+  }
+
+  @override
+  String get pluginsEmpty =>
+      'No plugins installed yet. Install one from the gallery.';
+
+  @override
+  String get pluginsScopeUser => 'Global';
+
+  @override
+  String get pluginsScopeProject => 'Project';
+
+  @override
+  String get pluginsFiltered => 'Filtered';
+
+  @override
+  String get pluginsNotInstalled => 'Not installed';
+
+  @override
+  String get pluginsRemove => 'Remove';
+
+  @override
+  String get pluginsRemoveConfirmTitle => 'Remove plugin';
+
+  @override
+  String pluginsRemoveConfirmMessage(Object source) {
+    return 'Removes $source from global settings and deletes its install directory. Remove it?';
+  }
+
+  @override
+  String get pluginsUpdate => 'Update';
+
+  @override
+  String get pluginsUpdateAll => 'Update all';
+
+  @override
+  String get pluginsCheckUpdates => 'Check for updates';
+
+  @override
+  String get pluginsChecking => 'Checking…';
+
+  @override
+  String pluginsUpdatesAvailable(int count) {
+    return '$count plugin(s) have updates';
+  }
+
+  @override
+  String get pluginsUpToDate => 'All plugins are up to date.';
+
+  @override
+  String get pluginsOperationLog => 'Operation output';
+
+  @override
+  String get pluginsTopLevelGroup => 'Local resources';
+
+  @override
+  String get pluginsResourcesExtensions => 'Extensions';
+
+  @override
+  String get pluginsResourcesSkills => 'Skills';
+
+  @override
+  String get pluginsResourcesPrompts => 'Prompts';
+
+  @override
+  String get pluginsResourcesThemes => 'Themes';
+
+  @override
+  String get pluginsToggleOn => 'On';
+
+  @override
+  String get pluginsToggleOff => 'Off';
+
+  @override
+  String get pluginsProjectScopeHint =>
+      'Project-scoped plugins are managed with pi config -l inside the project.';
+
+  @override
+  String get pluginsNoChannel =>
+      'Plugin management needs a connected Pi backend. Go back to the home view and try again.';
 
   @override
   String get appearanceTitle => 'Appearance';

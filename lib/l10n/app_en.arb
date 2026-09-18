@@ -281,7 +281,12 @@
   "piChecking": "Checking for updates…",
   "piUpToDate": "Pi is up to date.",
   "piUpdateAvailable": "Version {version} is available.",
-  "piUpdateHint": "Fully exit this app and any running Pi first, then run the command above in a terminal.",
+  "piUpdateHint": "Runs pi update --self right on this page — no terminal needed. Running sessions keep the current version; new sessions automatically use the new one.",
+  "piUpdateNow": "Update now",
+  "piUpdateRunning": "Updating…",
+  "piUpdateFailedHint": "The update failed. Check the output below, or copy the manual command to a terminal.",
+  "piUpdateOutput": "Update output",
+  "piUpdateManualCommand": "Manual update command",
   "piCheckFailed": "Could not check for updates. Check your network and try again.",
   "piLoading": "Reading the Pi installation…",
   "piLoadFailed": "Could not read the Pi installation. Make sure Pi is installed globally with npm, then retry.",
@@ -292,6 +297,69 @@
   "piChangelogEmpty": "No matching versions.",
   "piShowMore": "Show more versions",
   "piCurrentTag": "Installed",
+  "pluginsPageTitle": "Plugins",
+  "pluginsPageSubtitle": "Install and manage Pi extension, skill, prompt-template and theme packages.",
+  "pluginsTabGallery": "Gallery",
+  "pluginsTabManage": "Manage",
+  "pluginsGalleryHint": "Listed from public npm packages tagged pi-package, the same source as pi.dev/packages.",
+  "pluginsSearchGalleryHint": "Search the package gallery…",
+  "pluginsGalleryEmpty": "No matching packages found.",
+  "pluginsGalleryFailed": "Could not reach the package gallery. Check your network and try again.",
+  "pluginsGalleryFailedDetail": "Could not reach the package gallery: {error}",
+  "pluginsShowMore": "Show more",
+  "pluginsSortLabel": "Sort by",
+  "pluginsSortRelevance": "Relevance",
+  "pluginsSortDownloads": "Downloads",
+  "pluginsSortUpdated": "Recently updated",
+  "pluginsSortName": "Name",
+  "pluginsInstall": "Install",
+  "pluginsInstalling": "Installing…",
+  "pluginsInstalled": "Installed",
+  "pluginsMonthlyDownloads": "{count} downloads/mo",
+  "@pluginsMonthlyDownloads": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pluginsOpenRepo": "Open repository",
+  "pluginsOpenNpm": "Open npm page",
+  "pluginsLoadFailed": "Could not load the plugin list.",
+  "pluginsLoadFailedDetail": "Could not load the plugin list: {error}",
+  "pluginsBusyHint": "An operation is in progress. Please wait.",
+  "pluginsActionFailed": "Operation failed: {error}",
+  "pluginsEmpty": "No plugins installed yet. Install one from the gallery.",
+  "pluginsScopeUser": "Global",
+  "pluginsScopeProject": "Project",
+  "pluginsFiltered": "Filtered",
+  "pluginsNotInstalled": "Not installed",
+  "pluginsRemove": "Remove",
+  "pluginsRemoveConfirmTitle": "Remove plugin",
+  "pluginsRemoveConfirmMessage": "Removes {source} from global settings and deletes its install directory. Remove it?",
+  "pluginsUpdate": "Update",
+  "pluginsUpdateAll": "Update all",
+  "pluginsCheckUpdates": "Check for updates",
+  "pluginsChecking": "Checking…",
+  "pluginsUpdatesAvailable": "{count} plugin(s) have updates",
+  "@pluginsUpdatesAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pluginsUpToDate": "All plugins are up to date.",
+  "pluginsOperationLog": "Operation output",
+  "pluginsTopLevelGroup": "Local resources",
+  "pluginsResourcesExtensions": "Extensions",
+  "pluginsResourcesSkills": "Skills",
+  "pluginsResourcesPrompts": "Prompts",
+  "pluginsResourcesThemes": "Themes",
+  "pluginsToggleOn": "On",
+  "pluginsToggleOff": "Off",
+  "pluginsProjectScopeHint": "Project-scoped plugins are managed with pi config -l inside the project.",
+  "pluginsNoChannel": "Plugin management needs a connected Pi backend. Go back to the home view and try again.",
   "@piUpdateAvailable": {
     "placeholders": {
       "version": {

@@ -281,7 +281,12 @@
   "piChecking": "正在检查更新…",
   "piUpToDate": "已是最新版本。",
   "piUpdateAvailable": "发现新版本 {version}。",
-  "piUpdateHint": "更新前请先完全退出本应用和正在运行的 Pi，然后在终端里运行上面的命令。",
+  "piUpdateHint": "更新会直接在本页运行 pi update --self，完成后无需重启本应用：正在运行的会话继续使用当前版本，之后新开的会话自动使用新版本。",
+  "piUpdateNow": "立即更新",
+  "piUpdateRunning": "正在更新…",
+  "piUpdateFailedHint": "更新失败了。可以看看下方输出找原因，或复制手动命令到终端执行。",
+  "piUpdateOutput": "更新输出",
+  "piUpdateManualCommand": "手动更新命令",
   "piCheckFailed": "检查更新失败，请检查网络后重试。",
   "piLoading": "正在读取 Pi 的安装信息…",
   "piLoadFailed": "无法读取 Pi 的安装信息。请确认 Pi 是用 npm 全局安装的，然后重试。",
@@ -292,6 +297,69 @@
   "piChangelogEmpty": "没有匹配的版本。",
   "piShowMore": "显示更多版本",
   "piCurrentTag": "当前",
+  "pluginsPageTitle": "插件",
+  "pluginsPageSubtitle": "安装和管理 Pi 的扩展、技能、提示词与主题包。",
+  "pluginsTabGallery": "市场",
+  "pluginsTabManage": "管理",
+  "pluginsGalleryHint": "列表来自 npm 上带 pi-package 关键词的公开包，与 pi.dev/packages 同源。",
+  "pluginsSearchGalleryHint": "搜索插件市场…",
+  "pluginsGalleryEmpty": "没有找到匹配的插件。",
+  "pluginsGalleryFailed": "插件市场查询失败，请检查网络后重试。",
+  "pluginsGalleryFailedDetail": "插件市场查询失败：{error}",
+  "pluginsShowMore": "显示更多",
+  "pluginsSortLabel": "排序方式",
+  "pluginsSortRelevance": "相关性",
+  "pluginsSortDownloads": "下载量",
+  "pluginsSortUpdated": "最近更新",
+  "pluginsSortName": "名称",
+  "pluginsInstall": "安装",
+  "pluginsInstalling": "正在安装…",
+  "pluginsInstalled": "已安装",
+  "pluginsMonthlyDownloads": "{count} 次下载/月",
+  "@pluginsMonthlyDownloads": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pluginsOpenRepo": "打开仓库",
+  "pluginsOpenNpm": "打开 npm 页面",
+  "pluginsLoadFailed": "无法读取插件列表。",
+  "pluginsLoadFailedDetail": "无法读取插件列表：{error}",
+  "pluginsBusyHint": "有操作正在进行，请稍候。",
+  "pluginsActionFailed": "操作失败：{error}",
+  "pluginsEmpty": "还没有安装任何插件，去市场页安装一个吧。",
+  "pluginsScopeUser": "全局",
+  "pluginsScopeProject": "项目",
+  "pluginsFiltered": "已筛选",
+  "pluginsNotInstalled": "未安装",
+  "pluginsRemove": "移除",
+  "pluginsRemoveConfirmTitle": "移除插件",
+  "pluginsRemoveConfirmMessage": "会从全局设置里移除 {source}，并删除它的安装目录。确定要移除吗？",
+  "pluginsUpdate": "更新",
+  "pluginsUpdateAll": "全部更新",
+  "pluginsCheckUpdates": "检查更新",
+  "pluginsChecking": "正在检查…",
+  "pluginsUpdatesAvailable": "{count} 个插件有新版本",
+  "@pluginsUpdatesAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pluginsUpToDate": "所有插件都是最新版本。",
+  "pluginsOperationLog": "操作输出",
+  "pluginsTopLevelGroup": "本机插件",
+  "pluginsResourcesExtensions": "扩展",
+  "pluginsResourcesSkills": "技能",
+  "pluginsResourcesPrompts": "提示词",
+  "pluginsResourcesThemes": "主题",
+  "pluginsToggleOn": "启用",
+  "pluginsToggleOff": "停用",
+  "pluginsProjectScopeHint": "项目级插件请在对应项目目录用 pi config -l 管理。",
+  "pluginsNoChannel": "插件管理需要连接 Pi 后端，请回到主界面后重试。",
   "@piUpdateAvailable": {
     "placeholders": {
       "version": {

@@ -931,7 +931,7 @@ async function main() {
     (cwd, output, sessionPath, onExit) =>
       new PiChild(root, cwd, output, onExit, sessionPath),
     emit,
-    { resizeImage },
+    { resizeImage, packageRoot: root },
   );
   await manager.initialize();
   const ready = manager.start();

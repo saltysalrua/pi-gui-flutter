@@ -111,7 +111,7 @@ Windows 下 Git 的 worktree 列表可能返回 `D:/Code/pi-gui`，Node 的会�
 - 文本预览最多 **256 KiB UTF-8**；非 UTF-8 / 二进制 / 特殊文件显示原因。单份 Diff 上限 256 KiB，超过后提示，不截断成伪完整补丁。其他 Git 输出最大 16 MiB，每次 Git 命令超时 15 秒。
 - 此处是文件系统和 Git 的只读快照，不是跨进程事务；其他程序同时编辑时可能需要再次刷新。不实现自动磁盘 watcher、仓库搜索、多提交比较或编辑审批。
 
-`PiWorkspaceTransport` 同时解包五个资源：`workspace_rpc.mjs`、`workspace_manager.mjs`、`workspace_browser.mjs`、`gui_tool_diff.mjs`、`gui_image_upload.mjs`。**新后端在下次正常启动更新后的应用时装载**，热重载不能替换已运行的 Node 模块。旧后端收到未知命令时右栏给出更新提示，不中断聊天。
+`PiWorkspaceTransport` 同时解包六个资源：`workspace_rpc.mjs`、`workspace_manager.mjs`、`workspace_browser.mjs`、`gui_tool_diff.mjs`、`gui_image_upload.mjs`、`gui_packages.mjs`。**新后端在下次正常启动更新后的应用时装载**，热重载不能替换已运行的 Node 模块。旧后端收到未知命令时右栏给出更新提示，不中断聊天。
 
 ## 关键路径
 

@@ -42,6 +42,7 @@ flutter:
     - assets/backend/workspace_browser.mjs
     - assets/backend/gui_tool_diff.mjs
     - assets/backend/gui_image_upload.mjs
+    - assets/backend/gui_packages.mjs
     - assets/images/
 
   fonts:

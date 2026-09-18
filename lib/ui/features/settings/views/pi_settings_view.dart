@@ -159,38 +159,94 @@ class PiSettingsContent extends StatelessWidget {
         if (controller.checkStatus == PiCheckStatus.available) ...[
           const SizedBox(height: AppSpacing.xl),
           AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.system_update, size: 18, color: colors.warning),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        l.piUpdateAvailable(controller.latestVersion!),
-                        style: context.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
+            child: ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.system_update,
+                        size: 18,
+                        color: colors.warning,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          l.piUpdateAvailable(controller.latestVersion!),
+                          style: context.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    l.piUpdateHint,
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                  if (controller.selfUpdateStatus ==
+                      PiSelfUpdateStatus.failed) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      l.piUpdateFailedHint,
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: colors.warning,
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  l.piUpdateHint,
-                  style: context.textTheme.bodySmall?.copyWith(
-                    color: colors.textSecondary,
+                  const SizedBox(height: AppSpacing.md),
+                  AppActionButton(
+                    label: controller.isSelfUpdating
+                        ? l.piUpdateRunning
+                        : l.piUpdateNow,
+                    leading: const Icon(Icons.download_rounded),
+                    isLoading: controller.isSelfUpdating,
+                    onPressed: controller.isSelfUpdating
+                        ? null
+                        : controller.runSelfUpdate,
                   ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppCodeBlock(
-                  code: PiUpdateController.updateCommand,
-                  label: 'npm',
-                  language: 'bash',
-                  framed: false,
-                ),
-              ],
+                  if (controller.selfUpdateLog.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    AppDisclosure(
+                      framed: false,
+                      initiallyExpanded: true,
+                      title: l.piUpdateOutput,
+                      builder: (_) => AppCodeBlock(
+                        code: controller.selfUpdateLog
+                            .skip(
+                              (controller.selfUpdateLog.length - 200).clamp(
+                                0,
+                                controller.selfUpdateLog.length,
+                              ),
+                            )
+                            .join('\n'),
+                        label: 'pi update --self',
+                        language: 'bash',
+                        framed: false,
+                      ),
+                    ),
+                  ],
+                  if (controller.selfUpdateStatus ==
+                      PiSelfUpdateStatus.idle) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    AppDisclosure(
+                      framed: false,
+                      title: l.piUpdateManualCommand,
+                      builder: (_) => AppCodeBlock(
+                        code: PiUpdateController.updateCommand,
+                        label: 'npm',
+                        language: 'bash',
+                        framed: false,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ],

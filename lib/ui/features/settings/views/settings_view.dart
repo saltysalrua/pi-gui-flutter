@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../atoms/app_action_button.dart';
+import '../../../atoms/app_card.dart';
 import '../../../atoms/app_desktop_scaffold.dart';
 import '../../../atoms/app_icon_button.dart';
 import '../../../atoms/app_nav_tile.dart';
@@ -13,19 +14,22 @@ import '../../../core/sidebar_layout_controller.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/theme/theme_context_extensions.dart';
 import '../../../core/window_material_scope.dart';
+import '../../../../core/rpc/pi_rpc_client.dart';
 import '../../../../core/services/window_material_service.dart';
 import '../controllers/appearance_controller.dart';
+import '../controllers/packages_controller.dart';
 import '../controllers/pi_update_controller.dart';
 import 'appearance_settings_view.dart';
+import 'packages_settings_view.dart';
 import 'pi_settings_view.dart';
 
-enum _SettingsPage { appearance, pi }
+enum _SettingsPage { appearance, pi, plugins }
 
-Future<void> showSettings(BuildContext context) =>
+Future<void> showSettings(BuildContext context, {PiRpcClient? control}) =>
     Navigator.of(context).push<void>(
       AppDesktopPageRoute<void>(
         reduceMotion: MediaQuery.disableAnimationsOf(context),
-        builder: (_) => const SettingsView(),
+        builder: (_) => SettingsView(control: control),
       ),
     );
 
@@ -33,7 +37,8 @@ Future<void> showSettings(BuildContext context) =>
 /// HomeView. The sidebar hosts one tile per settings page; compact widths
 /// switch pages through an inline select instead.
 class SettingsView extends StatefulWidget {
-  const SettingsView({super.key});
+  const SettingsView({super.key, this.control});
+  final PiRpcClient? control;
   @override
   State<SettingsView> createState() => _SettingsViewState();
 }
@@ -44,12 +49,14 @@ class _SettingsViewState extends State<SettingsView> {
   String _query = '';
   _SettingsPage _page = _SettingsPage.appearance;
   PiUpdateController? _pi;
+  PackagesController? _plugins;
 
   @override
   void dispose() {
     _search.dispose();
     _scroll.dispose();
     _pi?.dispose();
+    _plugins?.dispose();
     super.dispose();
   }
 
@@ -75,8 +82,15 @@ class _SettingsViewState extends State<SettingsView> {
       return;
     }
     // The Pi controller loads install info + changelog on first selection
-    // and is kept alive until the settings route closes.
+    // and is kept alive until the settings route closes. The plugins
+    // controller needs the shared control channel for package management.
     if (page == _SettingsPage.pi) _pi ??= PiUpdateController()..load();
+    if (page == _SettingsPage.plugins) {
+      final control = widget.control;
+      if (control != null) {
+        _plugins ??= PackagesController(control)..load();
+      }
+    }
     setState(() => _page = page);
     _scrollToTop();
   }
@@ -129,6 +143,7 @@ class _SettingsViewState extends State<SettingsView> {
               options: [
                 AppSelectOption(_SettingsPage.appearance, l.appearanceTitle),
                 AppSelectOption(_SettingsPage.pi, l.piPageTitle),
+                AppSelectOption(_SettingsPage.plugins, l.pluginsPageTitle),
               ],
               onChanged: (page) => _select(page),
             );
@@ -161,6 +176,11 @@ class _SettingsViewState extends State<SettingsView> {
                       l.piPageTitle,
                       Icons.terminal_rounded,
                     ),
+                    navTile(
+                      _SettingsPage.plugins,
+                      l.pluginsPageTitle,
+                      Icons.extension_rounded,
+                    ),
                   ],
                 ),
               ),
@@ -174,6 +194,16 @@ class _SettingsViewState extends State<SettingsView> {
                 controller: _pi ??= PiUpdateController()..load(),
                 query: _query,
               ),
+              _SettingsPage.plugins => () {
+                final control = widget.control;
+                if (control == null) {
+                  return _PluginsUnavailable();
+                }
+                return PackagesSettingsContent(
+                  controller: _plugins ??= PackagesController(control)..load(),
+                  query: _query,
+                );
+              }(),
             };
             final page = Column(
               children: [
@@ -259,6 +289,31 @@ class _SettingsViewState extends State<SettingsView> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// Shown when the plugins page is opened without a live control channel
+/// (e.g. the home backend failed to start): no partial or fake state here.
+class _PluginsUnavailable extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final colors = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(l.pluginsPageTitle, style: context.textTheme.displaySmall),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          l.pluginsPageSubtitle,
+          style: context.textTheme.bodyMedium?.copyWith(
+            color: colors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xxxl),
+        AppCard(child: Text(l.pluginsNoChannel)),
+      ],
     );
   }
 }
