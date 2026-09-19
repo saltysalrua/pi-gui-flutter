@@ -1,6 +1,6 @@
 ---
 title: "RPC 对话、Markdown 与文件改动"
-version: "1.6.0"
+version: "1.8.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, chat, markdown, diff]
@@ -132,7 +132,7 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 - 0.85.1 的 `message_update` 没有累计 `message`，按 `contentIndex` 拼装文字、thinking 与 toolcall；`message_end.message` 才是最终权威内容。
 - `agent_end` 可能后接重试、压缩或续跑。只有 `agent_settled` 或已确认的 `abort` 才解除运行锁。
 - `auto_retry_start/end`、`compaction_start/end` 及摘要重试有独立状态。手动压缩结束后可通过状态查询回到空闲。
-- `get_messages` 与实时事件竞态时，不能覆盖更晚的流式内容；运行中保留本地投影，settled 后重新同步历史。
+- `get_messages` 与实时事件竞态时，不能覆盖更晚的流式内容；运行中保留本地投影，需要校正时在 settled 后重新同步历史。普通完整回复只回读 `get_state`，不再每轮搬运全部历史；具体校正条件见下方“内存与重复处理”。
 - 历史工具结果按 toolCallId 合并，不额外制造重复消息。没有前置工具调用的历史结果仍有可见的回退卡片。
 
 ### 思考动画的启停
@@ -229,9 +229,46 @@ dart run tool/check_session_performance.dart 1000 5000
 
 这不是 GUI 首帧或整个会话切换耗时。另一次通过官方 SDK **只读**测量本项目 23 个会话，强制扫描约 179–231 ms，适配层缓存命中约 0.01 ms；此值不含 SDK 导入、IPC 和界面渲染。
 
-本次未改变 SDK 冷启动、`get_messages` 整包传输、Dart 主 isolate 的整包 JSON 解码或 Markdown 渲染。上述大样本的 `jsonDecode` 仍约 57 ms；若继续优化超长会话，应针对真实 GUI 的分段/帧耗时评估后台 isolate 或官方分页接口，不能把合成测试结果宣传成整个页面“瞬间加载”。
+首次加载或需要校正时，仍未改变 SDK 冷启动、`get_messages` 整包传输、Dart 主 isolate 的整包 JSON 解码或 Markdown 渲染。普通完整回复现在省略重复的整包读取，见下节。上述大样本的 `jsonDecode` 仍约 57 ms；若继续优化超长会话，应针对真实 GUI 的分段/帧耗时评估后台 isolate 或后端分页能力，不能把合成测试结果宣传成整个页面“瞬间加载”。
 
 回归集中在 `test/pi_rpc_client_test.dart` 的大帧/UTF-8/尾行与协议隔离，`test/chat_rpc_test.dart` 的草稿/最终引用替换、重复引用、孤立结果与重载，以及工作区文档列出的缓存状态机。验证全程不热重启或切换当前活动聊天，新后端资源在下次正常启动更新后的 GUI 时装载。
+
+## 内存与重复处理
+
+本次不增加设置或改变操作：历史、工具输出、复制全文与 Diff 证据都保留；没有进程休眠、旧消息截断或毛玻璃调整。非活动标签的重型视图卸载见 [工作区与并行会话](workspaces_sessions.md#标签视图有界保留apptabworkspace)。
+
+### 工具输出字节预算（旧输出按需重读）
+
+历史正文与实时流式内容仍然全量保留在时间线里；只有**已结束的工具输出**受 `ChatTimeline.defaultOutputBudgetBytes`（8 MiB，按 UTF-16 码元×2 估算）约束：
+
+- 预算触发点：完整历史装载后、`tool_execution_end`（单个长任务期间也会释放）与 `agent_settled`。释放顺序按会话可见顺序从最旧开始，正在执行/准备中的工具、被 pin 的行绝不释放。
+- 释放内容：输出正文截到 2000 字符预览、丢弃图片块、write 的 `arguments.content`、`details.patch/diff`（Diff 证据随之降级）；保留标题身份（path/命令/行数信息）与 `guiWrite` 小字段，卡片标记 `evicted`。孤立 toolResult 消息自持的结果副本同步释放，否则压缩历史会绕过预算。
+- 展开/收起 pin：工具行 AppDisclosure 通过 `ChatToolOutputScope`（lib/ui/core/chat_tool_output_scope.dart）上报展开态，展开 pin、收起解除；标签 pane 重挂载后恢复的展开态会重新上报。自定义工具渲染器不接入则无 pin，但也不受影响。
+- 按需重读：`ChatController.reloadToolOutput(id)` pin 该行并发起一次权威 `get_messages` 全量刷新（当前后端无分页接口，只能整批回读），其余落在预算内的旧输出随刷新恢复、超出预算的下一批最旧行重新释放；绝不重发 Prompt。会话切换/工作区变化清空 pin。
+- 回归：`test/chat_rpc_test.dart` 覆盖释放顺序/预览/孤立副本/运行中豁免/pin 保护、重读往返与 live 定结释放。验收标准是反复开关会话后的存活对象与长会话每轮分配量，不是任务管理器数字立即回落。
+
+### 正常回复不重复搬运完整历史
+
+`ChatController.refresh()` 仍是显式完整同步入口。内部 `_refresh()` 根据 `_needsHistory` 决定是否读取正文：
+
+- 初次打开、显式刷新、重新连接、会话身份变化、迟到写确认和已确认停止，仍读取 `get_state` + `get_messages`。
+- 从完整初始快照开始、收到完整实时消息和工具结果的普通回复，在 `agent_settled` 后只读 `get_state`，保留实时投影。会话标题、模型等状态和后端最近会话书签照常更新。
+- 压缩、自动重试、坏聊天事件、缺少最终消息或工具结果会将历史标为待校正；不能把部分草稿当成最终记录。`ChatTimeline.hasUnsettledContent` 必须在 `settle()` 清除活动标记前检查。
+- 完整快照与事件竞争时，`_revision` 阻止旧快照覆盖新内容，待校正标记保留到下次安全同步。在运行中首次加载，即使没有事件竞争，也要在 settled 后补读。
+- Prompt 确认在 settled 之后才返回时，`_runRevision` 区分“完整 Agent 已运行完毕”和“扩展命令未启动 Agent”；只有后者主动请求完整同步。已排队的完整刷新不会被轻量状态读取降级。
+
+不更改运行锁：`agent_end` 不能解锁；未知写入仍等待确认，读取超时不杀 Pi，也不重发 Prompt。`test/chat_rpc_test.dart` 覆盖普通轮次请求计数、确认晚于 settled、扩展命令、重试/压缩/坏事件/缺失结束、快照竞态及刷新合并。
+
+### 工具 Diff 只保留当前工具行的一份解析
+
+`ToolCardRegistry` 的默认工具行持有一个 `DiffDocumentMemo`，供展开提示、8 行预览和完整详情复用；`ToolChangeDetails.document` 将解析结果交给公共 `AppDiffView.document`。自定义 renderer 注册接口不变，不另建工具卡片样式。
+
+- 单槽、延迟解析；同一输入重复读取返回同一文档，源文本/编号格式/中性写入模式改变时替换旧文档。
+- 缓存只属于挂载的工具行，不放在 `ChatTimeline` 上，不建立跨会话或全局无限缓存；工具行回收后即可释放。
+- `DiffDocument.added/removed` 统计按不可变文档只计算一次。仍保留完整行和原始 source，预览截短不影响复制全文；超大单份 Diff 本轮尚未改成增量解析。
+- 解析与模式失效回归位于 `test/chat_rpc_test.dart`，不增加纯样式测试。
+
+通道与目录缓存释放见 [工作区与并行会话](workspaces_sessions.md#前端资源释放)。上述自动测试没有测量生产进程的堆/显存下降；后续应在独立实例中比较重复开关会话后的存活对象和长会话每轮分配量，不能只看任务管理器是否立即回落。
 
 ## 扩展槽位
 

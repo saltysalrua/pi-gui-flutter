@@ -33,6 +33,7 @@ class FakeChatGateway implements PiChatGateway {
   Completer<void>? pendingPrompt;
   List<PiImage> sentImages = const [];
   Completer<List<PiChatMessage>>? pendingHistory;
+  Completer<PiSessionState>? pendingState;
   @override
   bool hasUnsettledConversationMutation = false;
   @override
@@ -45,7 +46,7 @@ class FakeChatGateway implements PiChatGateway {
   @override
   Future<PiSessionState> getState() async {
     commands.add('get_state');
-    return state;
+    return pendingState?.future ?? state;
   }
 
   @override
@@ -816,6 +817,158 @@ void main() {
     expect(chat.canSend, true);
   });
 
+  test('complete live runs only refresh metadata, including acknowledgement after settled', () async {
+    final pi = FakeChatGateway();
+    final chat = ChatController(pi);
+    addTearDown(() async {
+      chat.dispose();
+      await pi.stream.close();
+    });
+    await chat.refresh();
+    pi.pendingPrompt = Completer<void>();
+    final sending = chat.send('once');
+    final finalMessage = message('assistant', [text('kept live')]);
+    pi.stream.add(event('agent_start'));
+    pi.stream.add(
+      event('message_start', {'message': message('assistant', [])}),
+    );
+    pi.stream.add(event('message_end', {'message': finalMessage}));
+    pi.stream.add(event('agent_end'));
+    expect(chat.canSend, false);
+    pi.stream.add(event('agent_settled'));
+    // The saved fixture stays empty: a redundant snapshot would erase the live reply.
+    pi.pendingPrompt!.complete();
+    expect(await sending, true);
+    await tick();
+    expect(chat.timeline.messages.single.text, 'kept live');
+    expect(pi.commands.where((c) => c == 'get_messages').length, 1);
+    expect(pi.commands.where((c) => c == 'get_state').length, 2);
+    expect(chat.canSend, true);
+    expect(pi.commands.where((c) => c.startsWith('prompt:')).length, 1);
+
+    // A command handled by an extension without an agent run still reads history.
+    pi.pendingPrompt = null;
+    pi.history = [PiChatMessage.fromJson(message('user', 'extension result'))];
+    expect(await chat.send('/custom'), true);
+    await tick();
+    expect(chat.timeline.messages.single.text, 'extension result');
+    expect(pi.commands.where((c) => c == 'get_messages').length, 2);
+  });
+
+  test('changed branches, bad events and incomplete content force authoritative history', () async {
+    for (final reason in [
+      'compaction',
+      'retry',
+      'invalid',
+      'missing_end',
+      'missing_tool_end',
+    ]) {
+      final pi = FakeChatGateway();
+      final chat = ChatController(pi);
+      try {
+        await chat.refresh();
+        pi.stream.add(event('agent_start'));
+        pi.stream.add(
+          event('message_start', {
+            'message': message('assistant', [text('draft')]),
+          }),
+        );
+        if (reason != 'missing_end') {
+          pi.stream.add(
+            event('message_end', {
+              'message': message('assistant', [text('old')]),
+            }),
+          );
+        }
+        if (reason == 'compaction') {
+          pi.stream.add(event('compaction_start'));
+          pi.stream.add(event('compaction_end'));
+        }
+        if (reason == 'retry') {
+          pi.stream.add(event('auto_retry_start'));
+          pi.stream.add(event('auto_retry_end'));
+        }
+        if (reason == 'missing_tool_end') {
+          pi.stream.add(
+            event('tool_execution_start', {
+              'toolCallId': 'unfinished',
+              'toolName': 'read',
+              'args': {'path': 'a'},
+            }),
+          );
+        }
+        if (reason == 'invalid') {
+          pi.stream.add(
+            const PiRpcDiagnostic(
+              PiRpcDiagnosticKind.invalidEvent,
+              command: 'message_end',
+            ),
+          );
+        }
+        pi.history = [
+          PiChatMessage.fromJson(message('assistant', [text('saved')])),
+        ];
+        pi.stream.add(event('agent_settled'));
+        await tick();
+        expect(chat.timeline.messages.single.text, 'saved', reason: reason);
+        expect(
+          pi.commands.where((c) => c == 'get_messages').length,
+          2,
+          reason: reason,
+        );
+        expect(chat.canSend, true);
+      } finally {
+        chat.dispose();
+        await pi.stream.close();
+      }
+    }
+  });
+
+  test('explicit refresh queued behind metadata retains authoritative history intent', () async {
+    final pi = FakeChatGateway();
+    final chat = ChatController(pi);
+    addTearDown(() async {
+      chat.dispose();
+      await pi.stream.close();
+    });
+    await chat.refresh();
+    pi.pendingState = Completer<PiSessionState>();
+    pi.stream.add(event('agent_settled'));
+    await tick();
+    await chat
+        .refresh(); // Mark the in-flight metadata read as needing history.
+    pi.history = [
+      PiChatMessage.fromJson(message('assistant', [text('authoritative')])),
+    ];
+    pi.pendingState!.complete(pi.state);
+    pi.pendingState = null;
+    await tick();
+    expect(chat.timeline.messages.single.text, 'authoritative');
+    expect(chat.canSend, true);
+    expect(
+      pi.commands.where((c) => c == 'get_messages').length,
+      greaterThan(1),
+    );
+  });
+
+  test('diff memo shares one parse and invalidates source, format and neutral write mode', () {
+    final memo = DiffDocumentMemo();
+    const source = '-1 before\n+1 after\n';
+    final numbered = memo.resolve(source, numbered: true);
+    expect(numbered.added, 1);
+    expect(numbered.removed, 1);
+    expect(memo.resolve(source, numbered: true), same(numbered));
+    expect(memo.resolve(source), isNot(same(numbered)));
+    final written = memo.resolve(source, written: true);
+    expect(written.added, 0);
+    expect(written.removed, 0);
+    expect(written.lines.map((line) => line.newLine), [1, 2]);
+    expect(memo.resolve(source, written: true), same(written));
+    expect(memo.resolve('new', written: true).lines.single.text, 'new');
+    memo.clear();
+    expect(memo.resolve(source, written: true), isNot(same(written)));
+  });
+
   test('cancelled session switch preserves history; reconnect restores saved session without replay', () async {
     final pi = FakeChatGateway();
     final chat = ChatController(pi);
@@ -835,5 +988,181 @@ void main() {
     expect(pi.commands, contains('switch_session:/first.jsonl'));
     expect(pi.commands.where((c) => c.startsWith('prompt:')), isEmpty);
     expect(chat.isReady, true);
+  });
+
+  test('output budget releases the oldest settled tools, keeps previews, skips running and pinned', () {
+    Map<String, dynamic> call(String id, [String name = 'read']) => {
+      'type': 'toolCall',
+      'id': id,
+      'name': name,
+      'arguments': name == 'write'
+          ? {'path': id, 'content': 'BIG' * 2000}
+          : {'path': id},
+    };
+    Map<String, dynamic> result(String id, String body) => {
+      'role': 'toolResult',
+      'toolCallId': id,
+      'toolName': 'read',
+      'content': [text(body)],
+    };
+    final big = 'x' * 6000;
+    final timeline = ChatTimeline();
+    timeline.load([
+      PiChatMessage.fromJson(message('assistant', [call('old')], 1)),
+      PiChatMessage.fromJson(message('assistant', [call('pinned')], 2)),
+      PiChatMessage.fromJson(message('assistant', [call('write', 'write')], 3)),
+    ]);
+    timeline.apply(event('message_end', {'message': result('old', big)}));
+    timeline.apply(event('message_end', {'message': result('pinned', big)}));
+    timeline.apply(
+      event('message_end', {
+        'message': {
+          'role': 'toolResult',
+          'toolCallId': 'write',
+          'toolName': 'write',
+          'content': [text('ok')],
+          'details': {
+            'patch': '--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n',
+            'guiWrite': {'kind': 'modified'},
+          },
+        },
+      }),
+    );
+    // Still running: never released by the budget.
+    timeline.apply(
+      event('tool_execution_start', {'toolCallId': 'live', 'toolName': 'read'}),
+    );
+    timeline.applyOutputBudget(0, pinned: {'pinned'});
+    final released = timeline.tools['old']!;
+    expect(released.evicted, true);
+    expect(released.result!.text.length, 2000);
+    expect(released.result!.text, big.substring(0, 2000));
+    expect(timeline.tools['pinned']!.evicted, false);
+    expect(timeline.tools['live']!.evicted, false);
+    expect(timeline.tools['live']!.phase, ToolPhase.running);
+    final write = timeline.tools['write']!;
+    expect(write.evicted, true);
+    expect(write.result!.patch, null);
+    expect(write.result!.details!.containsKey('patch'), false);
+    expect(write.writtenContent, null);
+    // Small identity arguments survive so the title stays meaningful.
+    expect(write.path, 'write');
+    // Idempotent: released previews are not counted or re-processed.
+    timeline.applyOutputBudget(0, pinned: {'pinned'});
+    expect(timeline.tools['old']!.result!.text.length, 2000);
+  });
+
+  test('output budget releases orphan result copies held by messages', () {
+    final timeline = ChatTimeline();
+    final big = 'y' * 5000;
+    timeline.load([]);
+    timeline.apply(
+      event('message_end', {
+        'message': {
+          'role': 'toolResult',
+          'toolCallId': 'orphan',
+          'toolName': 'read',
+          'content': [text(big)],
+        },
+      }),
+    );
+    expect(timeline.messages.single.result!.text, big);
+    timeline.applyOutputBudget(0);
+    expect(timeline.tools['orphan']!.evicted, true);
+    expect(timeline.messages.single.result!.text.length, 2000);
+  });
+
+  test('reloadToolOutput restores a released row through a history read and pins it', () async {
+    final pi = FakeChatGateway();
+    final chat = ChatController(pi, outputBudget: 12000);
+    addTearDown(() async {
+      chat.dispose();
+      await pi.stream.close();
+    });
+    Map<String, dynamic> call(String id) => {
+      'type': 'toolCall',
+      'id': id,
+      'name': 'read',
+      'arguments': {'path': id},
+    };
+    final big = 'z' * 4000;
+    pi.history = [
+      PiChatMessage.fromJson(message('assistant', [call('a')], 1)),
+      PiChatMessage.fromJson(message('assistant', [call('b')], 2)),
+      PiChatMessage.fromJson({
+        'role': 'toolResult',
+        'toolCallId': 'a',
+        'toolName': 'read',
+        'content': [text(big)],
+        'timestamp': 3,
+      }),
+      PiChatMessage.fromJson({
+        'role': 'toolResult',
+        'toolCallId': 'b',
+        'toolName': 'read',
+        'content': [text(big)],
+        'timestamp': 4,
+      }),
+    ];
+    await chat.refresh();
+    expect(chat.timeline.tools['a']!.evicted, true);
+    expect(chat.timeline.tools['b']!.evicted, false);
+    await chat.reloadToolOutput('a');
+    expect(pi.commands.where((c) => c == 'get_messages').length, 2);
+    expect(pi.commands.where((c) => c.startsWith('prompt:')), isEmpty);
+    expect(chat.timeline.tools['a']!.evicted, false);
+    expect(chat.timeline.tools['a']!.result!.text, big);
+    // The pinned reload pushed the next oldest unpinned row out instead.
+    expect(chat.timeline.tools['b']!.evicted, true);
+    // Collapsing the row releases the pin; the next read can release it too.
+    chat.pinToolOutput('a', false);
+    await chat.refresh();
+    expect(chat.timeline.tools['a']!.evicted, true);
+  });
+
+  test('settling applies the output budget to live tool results', () async {
+    final pi = FakeChatGateway();
+    final chat = ChatController(pi, outputBudget: 0);
+    addTearDown(() async {
+      chat.dispose();
+      await pi.stream.close();
+    });
+    final big = 'w' * 6000;
+    // The first settled refresh is the authoritative read: it rebuilds the
+    // timeline from history and must apply the budget to what it loaded.
+    pi.history = [
+      PiChatMessage.fromJson(
+        message('assistant', [
+          {
+            'type': 'toolCall',
+            'id': 'live',
+            'name': 'read',
+            'arguments': {'path': 'p'},
+          },
+        ], 1),
+      ),
+      PiChatMessage.fromJson({
+        'role': 'toolResult',
+        'toolCallId': 'live',
+        'toolName': 'read',
+        'content': [text(big)],
+        'timestamp': 2,
+      }),
+    ];
+    pi.stream.add(event('agent_start'));
+    pi.stream.add(
+      event('tool_execution_end', {
+        'toolCallId': 'live',
+        'result': {
+          'content': [text(big)],
+        },
+      }),
+    );
+    pi.stream.add(event('agent_settled'));
+    await tick();
+    await tick();
+    expect(chat.timeline.tools['live']!.evicted, true);
+    expect(chat.timeline.tools['live']!.result!.text.length, 2000);
+    expect(pi.commands.where((c) => c.startsWith('prompt:')), isEmpty);
   });
 }

@@ -19,6 +19,7 @@ import 'model_picker_controller.dart';
 import 'pi_extension_ui_bridge.dart';
 import 'workspace_browser_controller.dart';
 import 'workspace_tabs_controller.dart';
+import '../../settings/controllers/appearance_controller.dart';
 
 class WorkbenchSession {
   WorkbenchSession(this.id, this.workspace, this.client, VoidCallback changed) {
@@ -66,6 +67,14 @@ class WorkbenchSession {
       hydrating = false,
       disposed = false,
       _hydrateAgain = false;
+
+  /// The background Pi process was ended to free memory; the tab, controllers,
+  /// timeline and drafts stay. Waking reopens the same saved session.
+  bool hibernating = false, waking = false;
+
+  /// Updated on channel events and tab activation; the idle sweep hibernates
+  /// sessions whose last activity is older than the user's timeout.
+  DateTime lastActivity = DateTime.now();
   String? historyPath;
   bool get busy =>
       chat.isRunning ||
@@ -140,7 +149,7 @@ class WorkbenchTabs extends AppTabsController<WorkspaceDocument> {
 class WorkbenchController extends ChangeNotifier {
   WorkbenchController({PiChannelHub? hub})
     : hub = hub ?? PiChannelHub(PiWorkspaceTransport.start) {
-    control = PiRpcClient(transportFactory: () => this.hub.attach('control'));
+    control = PiRpcClient(transportFactory: this.hub.transportFor('control'));
     api = PiCatalogService(control);
     _events = control.events.listen((event) {
       if (event is PiAgentEvent && event.type == 'gui_catalog_changed' ||
@@ -154,6 +163,7 @@ class WorkbenchController extends ChangeNotifier {
   late final PiRpcClient control;
   late final PiCatalogService api;
   late final StreamSubscription<PiRpcEvent> _events;
+  Timer? _idleSweep;
   final tabs = WorkbenchTabs();
   final sessions = <String, WorkbenchSession>{};
   final history = <String, List<PiSessionSummary>>{};
@@ -176,6 +186,7 @@ class WorkbenchController extends ChangeNotifier {
   bool loading = false, opening = false, _disposed = false, _again = false;
   bool _expandedInitial = false, _searchingHistory = false;
   final _historyAgain = <String>{};
+  final _historyReads = <String, Object>{};
   int _sequence = 0;
   String operationId() =>
       'op-${DateTime.now().microsecondsSinceEpoch}-${++_sequence}';
@@ -199,6 +210,17 @@ class WorkbenchController extends ChangeNotifier {
 
   Future<void> initialize() async {
     await refresh();
+  }
+
+  /// Arms the once-a-minute idle sweep; it is a no-op unless the user opted in
+  /// from appearance settings (sessionIdleMinutes, default off). HomeView
+  /// calls this once so controller-only tests never hold a pending timer.
+  void startIdleSweep() {
+    if (_disposed || _idleSweep != null) return;
+    _idleSweep = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => sweepIdleSessions(),
+    );
   }
 
   Future<void> refresh() async {
@@ -244,15 +266,17 @@ class WorkbenchController extends ChangeNotifier {
       }
     } while (_again && !_disposed);
     loading = false;
+    _pruneWorkspaceCaches();
     _notify();
   }
 
   WorkbenchSession _makeSession(String id, String workspace) {
-    final client = PiRpcClient(transportFactory: () => hub.attach(id));
+    final client = PiRpcClient(transportFactory: hub.transportFor(id));
     final session = WorkbenchSession(id, workspace, client, _notify);
     _sessionEvents[id] = client.events.listen((event) {
       if (_disposed || session.disposed) return;
       if (event is PiChatEvent) {
+        session.lastActivity = DateTime.now();
         if (tabs.selected.sessionId != id &&
             const {'message_end', 'agent_settled'}.contains(event.type)) {
           session.unread = true;
@@ -288,6 +312,8 @@ class WorkbenchController extends ChangeNotifier {
       sessions[id]?.extensions.setForeground(true);
     }
     if (sessions[id] case final session?) {
+      if (session.hibernating) unawaited(wakeSession(session.id));
+      session.lastActivity = DateTime.now();
       session.unread = false;
       expandedWorktrees.add(session.workspace);
       unawaited(loadHistory(session.workspace));
@@ -297,11 +323,157 @@ class WorkbenchController extends ChangeNotifier {
         }
       }
     }
+    _pruneWorkspaceCaches();
     _notify();
+  }
+
+  /// Registered directories keep their navigation state. Removed directories
+  /// remain pinned only while a live session or document still uses them.
+  void _pruneWorkspaceCaches() {
+    final snapshot = catalog;
+    if (_disposed || snapshot == null) return;
+    final retained = HashSet<String>(equals: p.equals, hashCode: p.hash)
+      ..addAll(snapshot.projects.map((project) => project.path))
+      ..addAll(
+        snapshot.projects
+            .expand((project) => project.worktrees)
+            .map((tree) => tree.path),
+      )
+      ..addAll(sessions.values.map((session) => session.workspace))
+      ..addAll(tabs.tabs.map((tab) => tab.workspace).whereType<String>());
+    if (selectedWorkspace != null && !retained.contains(selectedWorkspace)) {
+      selectedWorkspace = snapshot.projects
+          .expand((project) => project.worktrees)
+          .map((tree) => tree.path)
+          .firstOrNull;
+    }
+    final documents = <WorkspaceTabsController>[];
+    final browsers = <WorkspaceBrowserController>[];
+    for (final path in _documentTabs.keys.toList()) {
+      if (!retained.contains(path)) documents.add(_documentTabs.remove(path)!);
+    }
+    for (final path in _browsers.keys.toList()) {
+      if (!retained.contains(path)) {
+        final browser = _browsers.remove(path)!..removeListener(_notify);
+        browsers.add(browser);
+      }
+    }
+    history.removeWhere((path, _) => !retained.contains(path));
+    historyErrors.removeWhere((path) => !retained.contains(path));
+    loadingHistory.removeWhere((path) => !retained.contains(path));
+    _historyAgain.removeWhere((path) => !retained.contains(path));
+    _historyReads.removeWhere((path, _) => !retained.contains(path));
+    expandedWorktrees.removeWhere((path) => !retained.contains(path));
+    expandedProjects.removeWhere((path) => !retained.contains(path));
+    if (documents.isNotEmpty || browsers.isNotEmpty) {
+      // The current frame can still have listeners on the removed directory.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final document in documents) {
+          document.dispose();
+        }
+        for (final browser in browsers) {
+          browser.dispose();
+        }
+      });
+      WidgetsBinding.instance.scheduleFrame();
+    }
   }
 
   List<WorkbenchSession> sessionsFor(String workspace) =>
       sessions.values.where((s) => p.equals(s.workspace, workspace)).toList();
+
+  /// Ends idle background Pi processes to free memory. Opt-in only
+  /// (appearance preference, default off): extension state kept inside the
+  /// Pi process may not survive, so hibernation never happens unrequested.
+  /// Running sessions, drafts, unconfirmed results, unidentified sessions and
+  /// the currently selected tab are exempt. Waking reopens the SAME saved
+  /// session; prompts are never replayed.
+  void sweepIdleSessions({int? idleMinutes}) {
+    if (_disposed) return;
+    final minutes =
+        idleMinutes ??
+        AppearanceController.instance.preferences.sessionIdleMinutes;
+    if (minutes <= 0) return;
+    final cutoff = DateTime.now().subtract(Duration(minutes: minutes));
+    for (final session in sessions.values.toList()) {
+      if (session.hibernating ||
+          session.waking ||
+          session.busy ||
+          session.hasDraft ||
+          session.chat.sessionFile == null ||
+          tabs.selected.sessionId == session.id ||
+          session.lastActivity.isAfter(cutoff)) {
+        continue;
+      }
+      unawaited(hibernateSession(session.id));
+    }
+  }
+
+  Future<void> hibernateSession(String id) async {
+    final session = sessions[id];
+    if (session == null || session.hibernating || session.waking) return;
+    // Guards are re-checked here: state may have changed since the sweep.
+    if (session.busy ||
+        session.hasDraft ||
+        session.chat.sessionFile == null ||
+        tabs.selected.sessionId == id) {
+      return;
+    }
+    session.hibernating = true;
+    _notify();
+    try {
+      await api.close(id, stop: false);
+    } catch (error) {
+      if (sessions[id] == session) session.hibernating = false;
+      failure = errorCode(error);
+      _notify();
+    }
+  }
+
+  /// Reopens a hibernated session's saved history in a fresh Pi process. The
+  /// dead client and its tab are replaced; the new tab returns to the old
+  /// position and whatever the user typed while it slept carries over.
+  Future<void> wakeSession(String id) async {
+    final session = sessions[id];
+    if (session == null || !session.hibernating || session.waking) return;
+    final path = session.chat.sessionFile;
+    if (path == null) return;
+    session.waking = true;
+    _notify();
+    final workspace = session.workspace;
+    final draftText = session.input.text;
+    final images = session.attachments.items;
+    final files = session.attachments.files;
+    final tab = session.document;
+    final group = tabs.groupOf(tab);
+    final index = group?.tabs.indexOf(tab) ?? -1;
+    sessions.remove(id);
+    tabs.remove(tab);
+    await _sessionEvents.remove(id)?.cancel();
+    // Let the current frame unmount the sleeping pane before disposing.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(session.dispose()),
+    );
+    WidgetsBinding.instance.scheduleFrame();
+    await openSession(workspace, sessionPath: path);
+    final fresh = sessions.values
+        .where((s) => s.chat.sessionFile == path || s.historyPath == path)
+        .firstOrNull;
+    if (fresh != null) {
+      if (draftText.isNotEmpty) fresh.input.text = draftText;
+      if (images.isNotEmpty || files.isNotEmpty) {
+        fresh.attachments.restore(images, files);
+      }
+      final target = group != null && tabs.groups.any((g) => g.id == group.id)
+          ? group.id
+          : null;
+      if (target != null && index > 0) {
+        tabs.move(fresh.document, target, index: index);
+      }
+    }
+    _notify();
+  }
+
   WorkspaceBrowserController browserFor(String workspace) =>
       _browsers.putIfAbsent(workspace, () {
         final browser = WorkspaceBrowserController(control)
@@ -329,22 +501,29 @@ class WorkbenchController extends ChangeNotifier {
       return;
     }
     if (!force && history.containsKey(workspace)) return;
+    final request = Object();
+    _historyReads[workspace] = request;
     loadingHistory.add(workspace);
     _notify();
+    bool current() =>
+        !_disposed && identical(_historyReads[workspace], request);
     try {
       final list = await api.history(workspace, force: force);
-      if (!_disposed) {
+      if (current()) {
         history[workspace] = list;
         historyErrors.remove(workspace);
       }
     } catch (_) {
-      if (!_disposed) historyErrors.add(workspace);
+      if (current()) historyErrors.add(workspace);
     } finally {
-      loadingHistory.remove(workspace);
-      if (_historyAgain.remove(workspace)) {
-        unawaited(loadHistory(workspace, force: true));
+      if (current()) {
+        _historyReads.remove(workspace);
+        loadingHistory.remove(workspace);
+        if (_historyAgain.remove(workspace)) {
+          unawaited(loadHistory(workspace, force: true));
+        }
+        _notify();
       }
-      _notify();
     }
   }
 
@@ -548,6 +727,7 @@ class WorkbenchController extends ChangeNotifier {
   Future<void> shutdown() async {
     if (_disposed) return;
     _disposed = true;
+    _idleSweep?.cancel();
     await _events.cancel();
     for (final event in _sessionEvents.values) {
       await event.cancel();

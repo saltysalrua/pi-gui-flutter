@@ -93,7 +93,11 @@ class AppCard extends StatelessWidget {
           Positioned.fill(
             child: ClipRRect(
               borderRadius: radius,
-              child: BackdropFilter(
+              // Grouped: inside a BackdropGroup scope (chat timeline, settings
+              // list) every card blur shares one engine pass; without a group
+              // ancestor the key is null and this behaves standalone. Popups
+              // and dialogs render outside those scopes, so no overlaps.
+              child: BackdropFilter.grouped(
                 enabled: blur,
                 filter: ImageFilter.blur(
                   sigmaX: material.blurSigma,

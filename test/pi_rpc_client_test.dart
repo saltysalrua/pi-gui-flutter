@@ -23,8 +23,9 @@ class TestTransport implements PiRpcTransport {
   Stream<List<int>> get stdout => output.stream;
   @override
   Future<void> send(String line) async {
-    expect(line.endsWith('\n'), isTrue);
-    expect(line.split('\n').length, 2);
+    // Sends can run from a callback during a lifecycle test's frame pump.
+    expectSync(line.endsWith('\n'), isTrue);
+    expectSync(line.split('\n').length, 2);
     final command = jsonDecode(line) as Map<String, dynamic>;
     commands.add(command);
     onSend?.call(command);

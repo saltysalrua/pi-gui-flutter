@@ -279,6 +279,30 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
           ),
         ),
       ]);
+      group(l.appearanceHibernate, l.appearanceHibernateHint, [
+        AppSettingRow(
+          title: l.appearanceHibernate,
+          description: switch (p.sessionIdleMinutes) {
+            0 => l.hibernateNever,
+            15 => l.hibernate15Minutes,
+            _ => l.hibernate60Minutes,
+          },
+          control: AppSelect<int>(
+            value: p.sessionIdleMinutes,
+            label: l.appearanceHibernate,
+            options: [
+              for (final v in AppearancePreferences.idleMinuteChoices)
+                AppSelectOption(v, switch (v) {
+                  0 => l.hibernateNever,
+                  15 => l.hibernate15Minutes,
+                  _ => l.hibernate60Minutes,
+                }),
+            ],
+            onChanged: (v) =>
+                controller.update(p.copyWith(sessionIdleMinutes: v)),
+          ),
+        ),
+      ]);
       AppSettingRow slotRow(ExtensibleSlotId slot, String title, String hint) =>
           AppSettingRow(
             title: title,

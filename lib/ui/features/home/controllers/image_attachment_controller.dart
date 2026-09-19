@@ -89,6 +89,16 @@ class ImageAttachmentController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Carries draft attachments to a replacement session (wake from
+  /// hibernation adopts a fresh controller). The source stays untouched.
+  void restore(List<ImageAttachment> images, List<FileAttachment> files) {
+    if (images.isEmpty && files.isEmpty) return;
+    _items.addAll(images);
+    _files.addAll(files);
+    _clearFailure();
+    notifyListeners();
+  }
+
   Future<void> choose(String label) async {
     await _load(() async => AttachmentBatch(images: await _pick(label)));
   }

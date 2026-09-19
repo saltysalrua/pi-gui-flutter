@@ -248,6 +248,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatShowLess => 'Show less';
 
   @override
+  String get chatOutputEvicted =>
+      'The full output was released from memory to save space. The saved session history is unaffected.';
+
+  @override
+  String get chatReloadOutput => 'Reload';
+
+  @override
+  String get chatHibernated =>
+      'This conversation was hibernated to free memory. Its history is saved and continues after waking.';
+
+  @override
+  String get chatWake => 'Wake';
+
+  @override
+  String get chatWaking => 'Waking…';
+
+  @override
   String get chatToolPreparing => 'Preparing';
 
   @override
@@ -1030,6 +1047,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get appearanceToolExpandedHint =>
       'Show the full command, output and file changes right away. Clearest but takes space.';
+
+  @override
+  String get appearanceHibernate => 'Idle session hibernation';
+
+  @override
+  String get appearanceHibernateHint =>
+      'Conversations unused for a long time end their background Pi process to free memory; history stays saved on disk. Waking reopens the same conversation and never resends messages. Running sessions, drafts or unconfirmed results are never hibernated.';
+
+  @override
+  String get hibernateNever => 'Never';
+
+  @override
+  String get hibernate15Minutes => '15 minutes';
+
+  @override
+  String get hibernate60Minutes => '1 hour';
 
   @override
   String get appearanceOn => 'On';

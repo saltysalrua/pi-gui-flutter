@@ -74,6 +74,7 @@ class AppearancePreferences {
     this.canvasGlass = defaultCanvasGlass,
     GlassPreferences this._cardGlass = defaultCardGlass,
     this.toolDisplay = ToolDisplayMode.compact,
+    int this._sessionIdleMinutes = 0,
     Map<String, bool> slotVisibility = const {},
     Map<AppearanceColor, int> lightColors = const {},
     Map<AppearanceColor, int> darkColors = const {},
@@ -102,6 +103,13 @@ class AppearancePreferences {
   /// 工具卡片展示挡位；`compact` 是一直以来的默认样式。
   final ToolDisplayMode toolDisplay;
 
+  /// 闲置多少分钟后自动休眠后台 Pi 进程（0 = 从不）。默认关闭：扩展的
+  /// 内存状态能否随休眠恢复尚未验证，休眠必须是用户主动选择的行为。
+  /// 可空后背字段与 cardGlass 同理：长驻偏好实例可能早于本字段热重载。
+  final int? _sessionIdleMinutes;
+  int get sessionIdleMinutes => _sessionIdleMinutes ?? 0;
+  static const idleMinuteChoices = [0, 15, 60];
+
   /// Pi 扩展槽位开关，键为 [ExtensibleSlotId.name]，缺省视为开启。
   /// 只写入被关闭的键，旧配置文件里没有也能保持兼容。
   final Map<String, bool> slotVisibility;
@@ -122,6 +130,7 @@ class AppearancePreferences {
     GlassPreferences? canvasGlass,
     GlassPreferences? cardGlass,
     ToolDisplayMode? toolDisplay,
+    int? sessionIdleMinutes,
     Map<String, bool>? slotVisibility,
     Map<AppearanceColor, int>? lightColors,
     Map<AppearanceColor, int>? darkColors,
@@ -135,6 +144,7 @@ class AppearancePreferences {
     canvasGlass: canvasGlass ?? this.canvasGlass,
     cardGlass: cardGlass ?? this.cardGlass,
     toolDisplay: toolDisplay ?? this.toolDisplay,
+    sessionIdleMinutes: sessionIdleMinutes ?? this.sessionIdleMinutes,
     slotVisibility: slotVisibility ?? this.slotVisibility,
     lightColors: lightColors ?? this.lightColors,
     darkColors: darkColors ?? this.darkColors,
@@ -201,6 +211,10 @@ class AppearancePreferences {
         json['toolDisplay'],
         ToolDisplayMode.compact,
       ),
+      sessionIdleMinutes:
+          json['sessionIdleMinutes'] is num && json['sessionIdleMinutes'] >= 0
+          ? (json['sessionIdleMinutes'] as num).round()
+          : 0,
       slotVisibility: {
         if (json['slotVisibility'] case final Map raw)
           for (final entry in raw.entries)
@@ -222,6 +236,7 @@ class AppearancePreferences {
     'canvasGlass': canvasGlass.toJson(),
     'cardGlass': cardGlass.toJson(),
     'toolDisplay': toolDisplay.name,
+    'sessionIdleMinutes': sessionIdleMinutes,
     // 只保存关闭的槽位，避免文件随槽位枚举增长膨胀。
     'slotVisibility': {
       for (final entry in slotVisibility.entries)

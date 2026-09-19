@@ -1,3 +1,29 @@
+/// A single retained parse owned by a mounted consumer, not a global history
+/// cache. Replacing the input releases the previous document and its lines.
+class DiffDocumentMemo {
+  DiffDocument? _document;
+  bool _numbered = false, _written = false;
+
+  DiffDocument resolve(
+    String source, {
+    bool numbered = false,
+    bool written = false,
+  }) {
+    if (_document?.source != source ||
+        _numbered != numbered ||
+        _written != written) {
+      _numbered = numbered;
+      _written = written;
+      _document = written
+          ? DiffDocument.written(source)
+          : DiffDocument(source, numbered: numbered);
+    }
+    return _document!;
+  }
+
+  void clear() => _document = null;
+}
+
 enum DiffLineKind { context, added, removed, header }
 
 class DiffLine {
@@ -28,8 +54,12 @@ class DiffDocument {
                   line.text.startsWith('==='))),
     ),
   );
-  int get added => lines.where((l) => l.kind == DiffLineKind.added).length;
-  int get removed => lines.where((l) => l.kind == DiffLineKind.removed).length;
+  late final int added = lines
+      .where((l) => l.kind == DiffLineKind.added)
+      .length;
+  late final int removed = lines
+      .where((l) => l.kind == DiffLineKind.removed)
+      .length;
 
   static List<DiffLine> _written(String source) {
     if (source.isEmpty) return const [];

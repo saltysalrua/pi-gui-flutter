@@ -5,6 +5,7 @@ import 'package:pi_gui/core/models/chat_timeline.dart';
 import 'package:pi_gui/core/models/appearance_preferences.dart';
 import 'package:pi_gui/core/models/diff_document.dart';
 import 'package:pi_gui/core/rpc/pi_chat_types.dart';
+import 'package:pi_gui/ui/atoms/app_action_button.dart';
 import 'package:pi_gui/ui/atoms/app_activity_label.dart';
 import 'package:pi_gui/ui/atoms/app_code_block.dart';
 import 'package:pi_gui/ui/atoms/app_diff_view.dart';
@@ -12,6 +13,7 @@ import 'package:pi_gui/ui/atoms/app_disclosure.dart';
 import 'package:pi_gui/ui/atoms/app_icon_button.dart';
 import 'package:pi_gui/ui/atoms/app_image.dart';
 import 'package:pi_gui/ui/core/chat_resource_scope.dart';
+import 'package:pi_gui/ui/core/chat_tool_output_scope.dart';
 import 'package:pi_gui/ui/core/context_l10n.dart';
 import 'package:pi_gui/ui/core/theme/app_theme.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
@@ -41,6 +43,17 @@ class ToolCardRegistry {
     BuildContext context,
     ChatToolCall call,
     VoidCallback? showChanges,
+  ) => _DefaultToolCard(
+    key: ValueKey(call.id),
+    call: call,
+    showChanges: showChanges,
+  );
+
+  static Widget _buildDefault(
+    BuildContext context,
+    ChatToolCall call,
+    VoidCallback? showChanges,
+    DiffDocument? Function() document,
   ) {
     final l10n = context.l10n;
     final colors = context.colors;
@@ -52,7 +65,8 @@ class ToolCardRegistry {
     final label = shell ? r'$' : call.name;
     final target = _target(call);
     final range = _readRange(call);
-    final written = call.writtenContent;
+    final evicted = call.evicted;
+    final written = evicted ? null : call.writtenContent;
     final stats = written == null
         ? ''
         : l10n.chatToolFileStats(
@@ -63,16 +77,18 @@ class ToolCardRegistry {
         '$label${target.isEmpty ? '' : ' $target'}$range${stats.isEmpty ? '' : ' ($stats)'}';
     final output = call.result?.text ?? '';
     final failed = call.phase == ToolPhase.failed;
-    final preview = switch (display) {
-      // 收起：只留标题一行，不渲染任何预览。
-      ToolDisplayMode.collapsed => false,
-      // 展开：直接平铺完整详情（命令、输出、Diff、图片）。
-      ToolDisplayMode.expanded => call.isFileChange || output.isNotEmpty,
-      // 简略：既有默认样式（成功 read 一行、预览 6/3 行、Diff 8 行）。
-      ToolDisplayMode.compact =>
-        call.isFileChange ||
-            output.isNotEmpty && (call.name != 'read' || failed),
-    };
+    final preview =
+        evicted ||
+        switch (display) {
+          // 收起：只留标题一行，不渲染任何预览。
+          ToolDisplayMode.collapsed => false,
+          // 展开：直接平铺完整详情（命令、输出、Diff、图片）。
+          ToolDisplayMode.expanded => call.isFileChange || output.isNotEmpty,
+          // 简略：既有默认样式（成功 read 一行、预览 6/3 行、Diff 8 行）。
+          ToolDisplayMode.compact =>
+            call.isFileChange ||
+                output.isNotEmpty && (call.name != 'read' || failed),
+        };
     final phase = switch (call.phase) {
       ToolPhase.preparing => l10n.chatToolPreparing,
       ToolPhase.running => l10n.chatToolRunning,
@@ -84,7 +100,24 @@ class ToolCardRegistry {
     Widget details(BuildContext context) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (shell && args['command'] is String) ...[
+        if (evicted) ...[
+          Text(
+            l10n.chatOutputEvicted,
+            style: context.textTheme.bodySmall?.copyWith(
+              color: colors.textMuted,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: AppActionButton.subtle(
+              label: l10n.chatReloadOutput,
+              leading: const Icon(Icons.refresh),
+              onPressed: () =>
+                  ChatToolOutputScope.maybeOf(context)?.reload(call.id),
+            ),
+          ),
+        ] else if (shell && args['command'] is String) ...[
           AppCodeBlock(
             code: args['command'] as String,
             framed: false,
@@ -97,8 +130,8 @@ class ToolCardRegistry {
             ),
           const SizedBox(height: AppSpacing.sm),
         ],
-        if (call.isFileChange)
-          ToolChangeDetails(call: call)
+        if (call.isFileChange && !evicted)
+          ToolChangeDetails(call: call, document: document())
         else if (output.isNotEmpty)
           AppCodeBlock(
             code: output,
@@ -106,11 +139,12 @@ class ToolCardRegistry {
             framed: false,
             textColor: failed ? colors.error : colors.textSecondary,
           )
-        else if (call.result != null &&
+        else if (!evicted &&
+            call.result != null &&
             call.result!.content.every((b) => b.kind != PiContentKind.image))
           Text(l10n.chatNoOutput, style: context.textTheme.bodySmall),
         for (final block in call.result?.content ?? <PiContent>[])
-          if (block.kind == PiContentKind.image)
+          if (block.kind == PiContentKind.image && !evicted)
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.sm),
               child: AppImage(image: block.image),
@@ -191,8 +225,22 @@ class ToolCardRegistry {
           ? null
           : display == ToolDisplayMode.expanded
           ? details
+          : evicted
+          ? (_) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              child: Text(
+                l10n.chatOutputEvicted,
+                style: context.textTheme.bodySmall?.copyWith(
+                  color: colors.textMuted,
+                ),
+              ),
+            )
           : (_) => call.isFileChange
-                ? ToolChangeDetails(call: call, previewLines: 8)
+                ? ToolChangeDetails(
+                    call: call,
+                    previewLines: 8,
+                    document: document(),
+                  )
                 : AppCodeBlock(
                     code: output,
                     framed: false,
@@ -203,9 +251,17 @@ class ToolCardRegistry {
       previewHint:
           display == ToolDisplayMode.compact &&
               preview &&
-              _previewTruncated(call, failed ? 3 : 6)
+              !evicted &&
+              _previewTruncated(call, failed ? 3 : 6, document)
           ? l10n.chatShowMore
           : null,
+      // Expanded rows pin their full output against the byte budget;
+      // collapsing releases the pin again.
+      onExpandedChanged: ChatToolOutputScope.maybeOf(context) == null
+          ? null
+          : (expanded) =>
+                ChatToolOutputScope.maybeOf(context)!
+                    .setPinned(call.id, expanded),
       builder: details,
     );
   }
@@ -243,29 +299,73 @@ class ToolCardRegistry {
       ? 0
       : '\n'.allMatches(text).length + (text.endsWith('\n') ? 0 : 1);
 
-  static bool _previewTruncated(ChatToolCall call, int outputLines) {
+  static bool _previewTruncated(
+    ChatToolCall call,
+    int outputLines,
+    DiffDocument? Function() document,
+  ) {
     if (!call.isFileChange) {
       return _lineCount(call.result?.text ?? '') > outputLines;
     }
-    final patch = call.result?.patch ?? call.result?.diff;
-    return patch == null
-        ? _lineCount(call.writtenContent ?? '') > 8
-        : DiffDocument(
-                patch,
-                numbered: call.result?.patch == null,
-              ).displayLines.length >
-              8;
+    return (document()?.displayLines.length ?? 0) > 8;
   }
 
   static String _size(int bytes) =>
       bytes < 1024 ? '$bytes B' : '${(bytes / 1024).toStringAsFixed(1)} KiB';
 }
 
+/// One lazy parse per mounted tool row, shared by its hint, preview and details.
+/// No cache is attached to the timeline or shared across closed sessions.
+class _DefaultToolCard extends StatefulWidget {
+  const _DefaultToolCard({super.key, required this.call, this.showChanges});
+  final ChatToolCall call;
+  final VoidCallback? showChanges;
+
+  @override
+  State<_DefaultToolCard> createState() => _DefaultToolCardState();
+}
+
+class _DefaultToolCardState extends State<_DefaultToolCard> {
+  final _diff = DiffDocumentMemo();
+
+  @override
+  void didUpdateWidget(_DefaultToolCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.call, widget.call)) _diff.clear();
+  }
+
+  DiffDocument? _document() {
+    final call = widget.call;
+    final patch = call.result?.patch ?? call.result?.diff;
+    final source = patch ?? call.writtenContent;
+    if (source == null) return null;
+    return _diff.resolve(
+      source,
+      numbered: call.result?.patch == null,
+      written: patch == null,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => ToolCardRegistry._buildDefault(
+    context,
+    widget.call,
+    widget.showChanges,
+    _document,
+  );
+}
+
 /// Inline previews and the changes panel show the same backend evidence.
 class ToolChangeDetails extends StatelessWidget {
-  const ToolChangeDetails({super.key, required this.call, this.previewLines});
+  const ToolChangeDetails({
+    super.key,
+    required this.call,
+    this.previewLines,
+    this.document,
+  });
   final ChatToolCall call;
   final int? previewLines;
+  final DiffDocument? document;
   @override
   Widget build(BuildContext context) {
     final result = call.result;
@@ -278,6 +378,7 @@ class ToolChangeDetails extends StatelessWidget {
         if (patch != null)
           AppDiffView(
             source: patch,
+            document: document,
             label: created ? context.l10n.chatFileCreated : null,
             emptyLabel: created ? context.l10n.chatEmptyFile : null,
             numbered: result?.patch == null,
@@ -294,6 +395,7 @@ class ToolChangeDetails extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           AppDiffView(
             source: written,
+            document: document,
             written: true,
             framed: false,
             previewLines: previewLines,

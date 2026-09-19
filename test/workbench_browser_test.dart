@@ -3,12 +3,95 @@ import 'package:path/path.dart' as p;
 import 'package:pi_gui/core/rpc/pi_channel_hub.dart';
 import 'package:pi_gui/ui/features/home/controllers/workbench_controller.dart';
 import 'package:pi_gui/ui/features/home/controllers/workspace_browser_controller.dart';
+import 'package:pi_gui/ui/features/home/controllers/workspace_tabs_controller.dart';
 
 import 'pi_rpc_client_test.dart' show TestTransport;
+import 'parallel_session_test.dart' show reply;
 import 'workspace_browser_test.dart' show listing;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  // Uses a frame only to exercise deferred controller disposal, not UI rendering.
+  testWidgets(
+    'removed workspaces release caches after the last document closes and reject late history',
+    (tester) async {
+      final a = p.absolute('A'), b = p.absolute('B');
+      Map<String, Object?> project(String path) => {
+        'path': path,
+        'name': p.basename(path),
+        'branches': <String>[],
+        'worktrees': [
+          {'path': path, 'name': p.basename(path), 'main': true},
+        ],
+      };
+      final projects = [project(a), project(b)];
+      final transport = TestTransport();
+      final workbench = WorkbenchController(
+        hub: PiChannelHub(() async => transport),
+      );
+      addTearDown(() async {
+        await workbench.shutdown();
+        workbench.dispose();
+      });
+      final historyRequests = <Map<String, dynamic>>[];
+      transport.onSend = (packet) {
+        final command = packet['message'] as Map;
+        switch (command['type']) {
+          case 'gui_get_catalog':
+            reply(transport, packet, {
+              'projects': projects,
+              'channels': [],
+              'jobs': [],
+            });
+          case 'gui_forget_project':
+            projects.removeWhere(
+              (project) => project['path'] == command['path'],
+            );
+            reply(transport, packet, null);
+          case 'gui_workspace_history':
+            historyRequests.add(packet);
+          default:
+            throw StateError('Unexpected command: ${command['type']}');
+        }
+      };
+      await workbench.initialize();
+      final browserA = workbench.browserFor(a),
+          browserB = workbench.browserFor(b);
+      final documentsA = workbench.documentTabsFor(a);
+      final file = WorkspaceDocument.file(a, 'note.txt');
+      workbench.tabs.add(file);
+      final firstRead = workbench.loadHistory(a);
+      await tester.pump();
+      await workbench.forgetProject(a);
+      expect(workbench.failure, isNull);
+      expect(workbench.catalog!.projects.map((project) => project.path), [b]);
+      expect(workbench.browserFor(a), same(browserA)); // Open document pins it.
+      expect(workbench.documentTabsFor(a), same(documentsA));
+      workbench.tabs.remove(file);
+      expect(workbench.tabs.tabs.map((tab) => tab.workspace), [null]);
+      await tester.pump(); // Consumers unmount before controller disposal.
+      expect(workbench.selectedWorkspace, b);
+      expect(workbench.loadingHistory, isNot(contains(a)));
+      expect(workbench.browserFor(b), same(browserB));
+
+      // Re-registering starts a new read, while the old request is still pending.
+      projects.add(project(a));
+      await workbench.refresh();
+      expect(workbench.browserFor(a), isNot(same(browserA)));
+      expect(workbench.documentTabsFor(a), isNot(same(documentsA)));
+      final secondRead = workbench.loadHistory(a);
+      await tester.pump();
+      reply(transport, historyRequests.first, {'sessions': []});
+      await firstRead;
+      expect(workbench.history.containsKey(a), false);
+      expect(workbench.loadingHistory, contains(a));
+      reply(transport, historyRequests.last, {'sessions': []});
+      await secondRead;
+      expect(workbench.history[a], isEmpty);
+      expect(workbench.loadingHistory, isNot(contains(a)));
+    },
+  );
 
   test('second session shares file/graph state despite a differently spelled workspace', () async {
     final cwd = p.absolute('Workspace');

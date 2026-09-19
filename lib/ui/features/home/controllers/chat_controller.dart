@@ -27,21 +27,30 @@ class ChatSessionBookmark {
 
 /// One conversation projection over HomeView's shared RPC process. Never replays prompts.
 class ChatController extends ChangeNotifier {
-  ChatController(this._pi) {
+  ChatController(
+    this._pi, {
+    this.outputBudget = ChatTimeline.defaultOutputBudgetBytes,
+  }) {
     _subscription = _pi.events.listen(_onEvent);
   }
   final PiChatGateway _pi;
+
+  /// Retained tool output beyond this budget is released oldest-first; an
+  /// evicted row re-reads history on demand. Tests shrink this value.
+  final int outputBudget;
   final timeline = ChatTimeline();
   final sessions = <ChatSessionBookmark>[];
+  final _pinnedToolIds = <String>{};
   late final StreamSubscription<PiRpcEvent> _subscription;
   Timer? _frame;
   bool _disposed = false,
       _lost = false,
       _resync = false,
+      _needsHistory = true,
       _awaitingSettled = false;
   bool isLoading = false, isSending = false, isReady = false;
   bool workspaceLocked = false;
-  int _revision = 0;
+  int _revision = 0, _runRevision = 0;
   ChatActivity activity = ChatActivity.idle;
   ChatFailure? failure;
   PiSessionState? state;
@@ -83,6 +92,27 @@ class ChatController extends ChangeNotifier {
     _notify();
   }
 
+  void _applyOutputBudget() =>
+      timeline.applyOutputBudget(outputBudget, pinned: _pinnedToolIds);
+
+  /// Restores an output released by the byte budget with one authoritative
+  /// history read. The id stays pinned so the next budget pass keeps it; the
+  /// current get_messages interface is full-batch, so everything else that
+  /// fits the budget returns with it and older unpinned rows release again.
+  Future<void> reloadToolOutput(String id) {
+    _pinnedToolIds.add(id);
+    return refresh();
+  }
+
+  /// Expanded tool rows keep their full output; collapsing releases the pin.
+  void pinToolOutput(String id, bool pinned) {
+    if (pinned) {
+      _pinnedToolIds.add(id);
+    } else {
+      _pinnedToolIds.remove(id);
+    }
+  }
+
   void dismissFailure() {
     failure = null;
     _notify();
@@ -100,7 +130,15 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  Future<void> refresh() async {
+  /// Explicit refresh is authoritative; ordinary settled events only need
+  /// metadata when the live projection has remained complete.
+  Future<void> refresh() {
+    _needsHistory = true;
+    _revision++;
+    return _refresh();
+  }
+
+  Future<void> _refresh() async {
     if (workspaceLocked) return;
     if (_disposed || isLoading || isSending) {
       _resync = true;
@@ -121,14 +159,25 @@ class ChatController extends ChangeNotifier {
       _lost = false;
       final version = _revision;
       final next = await _pi.getState();
-      final history = await _pi.getMessages();
+      if (state != null &&
+          (state!.sessionId != next.sessionId ||
+              state!.sessionFile != next.sessionFile)) {
+        _needsHistory = true;
+      }
+      final history = _needsHistory ? await _pi.getMessages() : null;
       if (_disposed) return;
       state = next;
       // A snapshot racing a live delta cannot overwrite newer content. Re-read at settled.
       if (version == _revision) {
         // get_messages excludes the in-flight assistant. Keep the active projection intact.
-        if (!_awaitingSettled || timeline.messages.isEmpty) {
+        if (history != null &&
+            (!_awaitingSettled || timeline.messages.isEmpty)) {
           timeline.load(history);
+          _applyOutputBudget();
+          // An initial snapshot during a run omits the in-flight assistant.
+          // Reconcile at settled even if no delta raced this read.
+          _needsHistory =
+              _awaitingSettled || next.isStreaming || next.isCompacting;
         }
         if (!_awaitingSettled) {
           activity = next.isCompacting
@@ -162,11 +211,15 @@ class ChatController extends ChangeNotifier {
     isSending = true;
     failure = null;
     _notify();
+    final runBeforePrompt = _runRevision;
     try {
       await _pi.prompt(text.trim(), images: images);
       if (_disposed) return true;
       // Extension slash commands can be handled without starting an agent run.
-      _resync = !isRunning;
+      if (!isRunning) {
+        if (_runRevision == runBeforePrompt) _needsHistory = true;
+        _resync = true;
+      }
       return true;
     } catch (error) {
       if (_disposed) return false;
@@ -229,6 +282,7 @@ class ChatController extends ChangeNotifier {
       if (changed) {
         _lost = false;
         _awaitingSettled = false;
+        _pinnedToolIds.clear();
         timeline.load([]);
         queue = const PiPromptQueue();
         state = null;
@@ -256,6 +310,8 @@ class ChatController extends ChangeNotifier {
       _lost = false;
       _awaitingSettled = false;
       _resync = false;
+      _needsHistory = true;
+      _pinnedToolIds.clear();
       timeline.load([]);
       sessions.clear();
       state = null;
@@ -268,6 +324,7 @@ class ChatController extends ChangeNotifier {
     }
     if (event is PiRpcDisconnected) {
       _lost = true;
+      _needsHistory = true;
       _awaitingSettled = false;
       _revision++;
       isReady = false;
@@ -277,6 +334,10 @@ class ChatController extends ChangeNotifier {
       _notify();
       return;
     }
+    if (event is PiRpcSessionChanged) {
+      _needsHistory = true;
+      _revision++;
+    }
     if (event is PiRpcConversationSettled ||
         event is PiRpcConnected && _lost && !isLoading) {
       unawaited(refresh());
@@ -284,25 +345,36 @@ class ChatController extends ChangeNotifier {
     if (event is PiRpcDiagnostic &&
         event.kind == PiRpcDiagnosticKind.invalidEvent &&
         event.command != 'extension_ui_request') {
+      _needsHistory = true;
+      _revision++;
       failure = ChatFailure.invalidEvent;
       _notify();
     }
     if (event is! PiChatEvent) return;
     _revision++;
+    if (event.type == 'agent_settled' && timeline.hasUnsettledContent) {
+      // Missing final messages/tool results must not make partial drafts authoritative.
+      _needsHistory = true;
+    }
     timeline.apply(event);
     switch (event.type) {
       case 'agent_start':
+        _runRevision++;
         _awaitingSettled = true;
         activity = ChatActivity.working;
       case 'agent_settled':
         _awaitingSettled = false;
         activity = ChatActivity.idle;
+        _applyOutputBudget();
         _remember();
-        unawaited(refresh());
+        unawaited(_refresh());
       case 'compaction_start':
+        _needsHistory = true;
         activity = ChatActivity.compacting;
       case 'auto_retry_start':
       case 'summarization_retry_scheduled':
+        // Retries can remove a failed assistant turn from the saved branch.
+        _needsHistory = true;
         activity = ChatActivity.retrying;
       case 'summarization_retry_attempt_start':
         activity = ChatActivity.compacting;
@@ -310,9 +382,13 @@ class ChatController extends ChangeNotifier {
         activity = ChatActivity.working;
         if (event.failed) failure = ChatFailure.reply;
       case 'compaction_end':
+        _needsHistory = true;
         activity = _awaitingSettled ? ChatActivity.working : ChatActivity.idle;
         if (event.failed) failure = ChatFailure.reply;
         if (!_awaitingSettled) unawaited(refresh());
+      case 'tool_execution_end':
+        // A single long run can outgrow the budget before settling.
+        _applyOutputBudget();
       case 'queue_update':
         queue = event.queued ?? const PiPromptQueue();
       case 'message_end':
@@ -332,7 +408,7 @@ class ChatController extends ChangeNotifier {
   void _flushResync() {
     if (_resync && !_disposed && !isLoading && !isSending) {
       _resync = false;
-      scheduleMicrotask(refresh);
+      scheduleMicrotask(_refresh);
     }
   }
 

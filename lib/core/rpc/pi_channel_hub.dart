@@ -14,7 +14,23 @@ class PiChannelHub {
   StreamSubscription<String>? _subscription;
   bool _closed = false, _lost = false;
 
-  Future<PiRpcTransport> attach(String id) async {
+  /// One client owns one lease. Reconnecting that client must never resurrect
+  /// an exited channel, even after the hub has released its routing entry.
+  Future<PiRpcTransport> Function() transportFor(String id) {
+    Future<_ChannelTransport>? attached;
+    return () async {
+      final channel = await (attached ??= _attach(id));
+      if (_closed || _lost || channel.closed) {
+        throw StateError('Session disconnected');
+      }
+      return channel;
+    };
+  }
+
+  /// Includes the buffered primary channel, but never closed routing entries.
+  int get channelCount => _channels.length;
+
+  Future<_ChannelTransport> _attach(String id) async {
     if (_closed || _lost) throw StateError('Supervisor disconnected');
     final channel = _channels.putIfAbsent(
       id,
@@ -22,6 +38,9 @@ class PiChannelHub {
     );
     if (channel.closed) throw StateError('Session disconnected');
     await (_starting ??= _start());
+    if (_closed || _lost || channel.closed) {
+      throw StateError('Session disconnected');
+    }
     return channel;
   }
 
@@ -70,8 +89,14 @@ class PiChannelHub {
 
   void _disconnect() {
     _lost = true;
-    for (final channel in _channels.values) {
+    for (final channel in _channels.values.toList()) {
       unawaited(channel.close());
+    }
+  }
+
+  void _detach(_ChannelTransport channel) {
+    if (identical(_channels[channel.id], channel)) {
+      _channels.remove(channel.id);
     }
   }
 
@@ -114,6 +139,7 @@ class _ChannelTransport implements PiRpcTransport {
   Future<void> close() async {
     if (closed) return;
     closed = true;
+    hub._detach(this);
     // An unlistened buffered startup stream must not block app shutdown.
     unawaited(output.close());
   }

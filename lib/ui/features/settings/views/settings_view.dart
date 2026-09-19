@@ -268,20 +268,25 @@ class _SettingsViewState extends State<SettingsView> {
                         alignment: Alignment.topCenter,
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 880),
-                          child: AnimatedSwitcher(
-                            duration: reduceMotion
-                                ? Duration.zero
-                                : AppDurations.fast,
-                            switchInCurve: AppCurves.inOut,
-                            switchOutCurve: AppCurves.inOut,
-                            transitionBuilder: (child, animation) =>
-                                FadeTransition(
-                                  opacity: animation,
-                                  child: child,
-                                ),
-                            child: KeyedSubtree(
-                              key: ValueKey(_page),
-                              child: content,
+                          // One shared backdrop pass for the settings cards;
+                          // pickers and dropdowns render in the overlay and
+                          // never share this group key.
+                          child: BackdropGroup(
+                            child: AnimatedSwitcher(
+                              duration: reduceMotion
+                                  ? Duration.zero
+                                  : AppDurations.fast,
+                              switchInCurve: AppCurves.inOut,
+                              switchOutCurve: AppCurves.inOut,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  ),
+                              child: KeyedSubtree(
+                                key: ValueKey(_page),
+                                child: content,
+                              ),
                             ),
                           ),
                         ),

@@ -51,6 +51,7 @@ class _HomeViewState extends State<HomeView> with WindowListener {
     windowManager.addListener(this);
     unawaited(windowManager.setPreventClose(true).catchError((Object _) {}));
     unawaited(_workbench.initialize());
+    _workbench.startIdleSweep();
   }
 
   Future<bool> _confirm(String title, String message, {String? action}) async =>
@@ -150,7 +151,15 @@ class _HomeViewState extends State<HomeView> with WindowListener {
   }
 
   @override
-  void onWindowFocus() => _workbench.activeBrowser?.refreshIfOpen();
+  void onWindowFocus() {
+    _workbench.activeBrowser?.refreshIfOpen();
+    // Returning to the app wakes a hibernated foreground session instead
+    // of leaving a dead-looking editor behind.
+    if (_workbench.activeSession?.hibernating == true) {
+      unawaited(_workbench.wakeSession(_workbench.activeSession!.id));
+    }
+  }
+
   @override
   void onWindowClose() async {
     if (_closing) return;
@@ -274,6 +283,9 @@ class _HomeViewState extends State<HomeView> with WindowListener {
           sharedDirectoryWarning: _workbench
               .sessionsFor(session.workspace)
               .any((s) => s.id != session.id && s.chat.isRunning),
+          hibernating: session.hibernating,
+          waking: session.waking,
+          onWake: () => _workbench.wakeSession(session.id),
           contentBackground: Colors.transparent,
           panelBackground: Colors.transparent,
         ),

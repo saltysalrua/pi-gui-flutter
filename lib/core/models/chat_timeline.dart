@@ -9,11 +9,17 @@ class ChatToolCall {
     this.arguments = const {},
     this.phase = ToolPhase.preparing,
     this.result,
+    this.evicted = false,
   });
   final String id, name;
   final Map<String, dynamic> arguments;
   final ToolPhase phase;
   final PiToolResult? result;
+
+  /// The full output is no longer retained: a short preview stays and a
+  /// history re-read restores the complete text. Never true for unsettled
+  /// tools, which the budget pass skips.
+  final bool evicted;
   String? get path =>
       arguments['path'] is String ? arguments['path'] as String : null;
   String get summary =>
@@ -41,6 +47,7 @@ class ChatToolCall {
     arguments: arguments ?? this.arguments,
     phase: phase ?? this.phase,
     result: result ?? this.result,
+    evicted: evicted,
   );
 }
 
@@ -54,6 +61,130 @@ class ChatTimeline {
   int? _active;
   int? _thinkingContentIndex;
   int _fallbackTimestamp = -1;
+
+  /// Retained tool output stays bounded: beyond this many bytes (UTF-16 code
+  /// units doubled as a byte approximation) the oldest settled outputs are
+  /// reduced to short previews. [applyOutputBudget] releases them.
+  static const int defaultOutputBudgetBytes = 8 << 20;
+  static const int _evictedPreviewLength = 2000;
+
+  /// Releases the oldest settled tool outputs until the retained total fits
+  /// [budgetBytes]. Conversation order comes from the messages, so "oldest"
+  /// follows the user-visible order. Pinned ids (expanded rows) and unsettled
+  /// tools are never released; already evicted previews are not counted.
+  void applyOutputBudget(int budgetBytes, {Set<String> pinned = const {}}) {
+    final order = _toolOrder();
+    var total = 0;
+    for (final id in order) {
+      final tool = tools[id];
+      if (tool != null) total += _retainedBytes(tool);
+    }
+    for (final id in order) {
+      if (total <= budgetBytes) break;
+      final tool = tools[id];
+      if (tool == null ||
+          tool.evicted ||
+          pinned.contains(id) ||
+          tool.phase == ToolPhase.preparing ||
+          tool.phase == ToolPhase.running) {
+        continue;
+      }
+      final replacement = _evict(tool);
+      total += _retainedBytes(replacement) - _retainedBytes(tool);
+      tools[id] = replacement;
+      _releaseOrphanResult(id, replacement.result);
+    }
+  }
+
+  List<String> _toolOrder() {
+    final order = <String>[];
+    for (final message in messages) {
+      for (final block in message.content) {
+        if (block.kind == PiContentKind.toolCall &&
+            block.id.isNotEmpty &&
+            !order.contains(block.id)) {
+          order.add(block.id);
+        }
+      }
+    }
+    return order;
+  }
+
+  static int _retainedBytes(ChatToolCall tool) {
+    var bytes = 0;
+    void add(String? value) => bytes += (value?.length ?? 0) * 2;
+    final result = tool.result;
+    if (result != null) {
+      add(result.patch);
+      add(result.diff);
+      for (final block in result.content) {
+        add(block.text);
+        bytes += (block.image?.data.length ?? 0) * 2;
+      }
+    }
+    add(tool.writtenContent);
+    return bytes;
+  }
+
+  ChatToolCall _evict(ChatToolCall tool) {
+    final result = tool.result;
+    final preview = result?.text ?? '';
+    final trimmed = preview.length <= _evictedPreviewLength
+        ? preview
+        : preview.substring(0, _evictedPreviewLength);
+    final details = result?.details;
+    return ChatToolCall(
+      id: tool.id,
+      name: tool.name,
+      arguments: Map.of(tool.arguments)..remove('content'),
+      phase: tool.phase,
+      result: result == null
+          ? null
+          : PiToolResult(
+              content: trimmed.isEmpty
+                  ? const <PiContent>[]
+                  : [PiContent(PiContentKind.text, text: trimmed)],
+              details: details == null
+                  ? null
+                  : (Map<String, dynamic>.of(details)
+                      ..remove('patch')
+                      ..remove('diff')),
+              isError: result.isError,
+            ),
+      evicted: true,
+    );
+  }
+
+  /// Orphan tool-result messages hold their own result copy; release it too,
+  /// otherwise the budget would be defeated by compacted-history orphans.
+  void _releaseOrphanResult(String id, PiToolResult? replacement) {
+    for (var i = 0; i < messages.length; i++) {
+      final current = messages[i];
+      if (current.toolCallId == id && current.result != null) {
+        messages[i] = PiChatMessage(
+          role: current.role,
+          content: current.content,
+          timestamp: current.timestamp,
+          model: current.model,
+          stopReason: current.stopReason,
+          toolCallId: current.toolCallId,
+          toolName: current.toolName,
+          result: replacement,
+          isStreaming: current.isStreaming,
+        );
+      }
+    }
+  }
+
+  /// Checked before settling: incomplete messages/tools require an authoritative
+  /// history read rather than treating a partial draft as a final result.
+  bool get hasUnsettledContent =>
+      _active != null ||
+      tools.values.any(
+        (tool) =>
+            tool.phase == ToolPhase.preparing ||
+            tool.phase == ToolPhase.running,
+      );
 
   /// Only the currently streaming thinking block animates, not every thinking
   /// block in a message that is still producing text or tool-call arguments.

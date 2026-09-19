@@ -1,6 +1,6 @@
 ---
 title: "项目、Worktree 与并行会话"
-version: "2.0.0"
+version: "2.3.0"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, pi-rpc, session, workspace, git-worktree, parallel]
@@ -33,6 +33,39 @@ tags: [flutter, pi-rpc, session, workspace, git-worktree, parallel]
 - 同一份历史在本 GUI 内只允许一个运行实例；重复点击或并发打开会定位已经存在的会话。
 - 单个 Pi 退出只影响该通道，其余会话继续；不会自动重放 Prompt。关闭失败会保留会话条目，避免把未确认停止误报为已结束。
 - 打开的标签、草稿和扩展状态是本次运行的内存状态，不承诺跨重启保留。重启恢复注册项目、最后打开的目录，并自动重开该目录**最近一次有内容的会话**（见下“重启回到上一个对话”）；找不到已保存内容时才从空会话开始，其余历史仍从侧边栏显式打开。
+
+### 前端资源释放
+
+关闭会话仍走原有 `gui_close_channel`，不自动关闭切到后台的 Pi，也不添加休眠策略。
+
+- `PiChannelHub.transportFor(id)` 为一个逻辑客户端创建一次性通道工厂。客户端重试连接时只能取回自己原来的连接；该连接已退出就报断连，不能悄悄创建新连接或重发 Prompt。
+- `_ChannelTransport.close()` 从 Hub 路由 Map 移除自身，按对象身份校验，避免清理旧对象时误删替代对象。Hub 断连遍历 Map 的快照，允许逐个关闭时安全删除。没有另建永久累积的“已关闭 ID”集合。
+- 由客户端工厂持有已关闭连接的状态，随所属会话销毁一起回收，而不是由全局 Hub 永久保留。`channelCount` 用于生命周期检查；启动缓冲的 primary 也计入，关闭后归零。
+- `WorkbenchController._pruneWorkspaceCaches()` 在成功目录刷新及标签变化时清理不再登记、也没有会话/文件/提交标签使用的目录。仍登记的目录继续保留文件树、Git graph、展开和选择状态；路径别名沿用 `path.equals/hash`，不因切换同目录会话丢状态。
+- 从项目列表移除或删除 Worktree 后，仍打开的只读文档暂时保留其目录控制器；关闭最后一个使用者后释放浏览器、文档控制器和历史摘要。控制器实际 dispose 延后到当前帧卸载监听者之后。此处只释放 GUI 内存，不删除目录或 Pi 历史。
+- 目录历史读取带独立请求身份。目录释放后，旧请求的成功/失败/结束回调都不能恢复旧缓存，也不能清除同路径重新打开后的加载状态。
+
+### 标签视图有界保留（AppTabWorkspace）
+
+公共组件 `lib/ui/atoms/app_tab_workspace.dart` 的隐藏 pane 不再保留重型视图：非可见标签把正文（Markdown、代码块、Diff、图片）换成零开销占位，重新激活时由会话 Controller 重建。Controller、草稿、附件、模型选择与扩展桥都在视图外，不随卸载丢失；不杀后台 Pi，不改“空会话居中/发送后沉底”的两态输入布局。
+
+- 可见性沿用原有规则：分屏时每个分组选中的标签保持挂载，压缩布局只挂载活动组；pane 的薄 State（PageStorageBucket、淡入动画）按标签身份长期保留。
+- 滚动锚点：pane 各自的 PageStorageBucket 跨卸载存活。ScrollPosition 仅在滚到 PageStorageKey 才落盘，因此聊天时间线 ListView 使用显式 `PageStorageKey('chat-timeline')`；重挂载后按恢复的偏移回读，`_HomeChatPanelState` 的“跟随最新”标记也从恢复偏移重算（阈值 80px 共用），不会把重挂载当成会话切换跳回最新。
+- 没有显式 PageStorageKey 的滚动体（只读文档、Diff/代码块内部）不落盘锚点，重挂载回到顶部；文件/提交文档重新读取内容。AppDisclosure 展开状态走原有显式 identifier，自动保留。
+- 回归：`test/app_tab_workspace_test.dart` 验证隐藏标签卸载、PageStorage 锚点往返、分屏双挂载与压缩布局卸载。
+
+内存优化四批次全部落地：历史字节预算与闲置会话休眠见 [rpc_chat](rpc_chat.md#工具输出字节预算旧输出按需重读)与下文“闲置会话休眠”；标签视图卸载见上文“标签视图有界保留”；BackdropGroup 合并模糊及显存实测见 [外观设置](appearance_settings.md#卡片毛玻璃)。
+
+回归：`test/parallel_session_test.dart` 连续打开/关闭 40 个通道，验证路由恢复基线、旧连接不能复活、启动失败及启动中关闭；`test/workbench_browser_test.dart` 验证同目录共享、文档占用、目录释放与迟到历史隔离；`test/app_tab_workspace_test.dart` 验证标签视图卸载与锚点保留。生命周期测试仅借一帧执行延迟 dispose，不做脆弱的样式断言。完整历史仍驻留在已打开会话中，本次不宣称这些内存已有容量上限。
+
+## 闲置会话休眠
+
+入口在 **设置 → 外观 → 闲置会话休眠**（`appearance.json` 的 `sessionIdleMinutes`：0 = 从不，默认关闭；可选 15 分钟 / 1 小时）。扩展在 Pi 进程内的内存状态能否随休眠完整恢复尚未验证，所以默认从不、必须用户主动选择。
+
+- **扫描**：`WorkbenchController` 每分钟 `sweepIdleSessions()`（`HomeView` 启动时 `startIdleSweep()` 挂载，纯控制器测试不持有定时器），按各会话 `lastActivity`（通道事件与选中标签刷新）判定闲置。
+- **禁止休眠**：正在运行/发送/加载、模型写入、扩展等待回答、结果未确认、有文本草稿或附件、还没有 sessionFile 的新会话、以及当前选中标签，一律豁免；`hibernateSession` 在关闭前重检同一套守卫。
+- **休眠动作**：仅结束该会话的 Pi 子进程（`gui_close_channel`，stop=false），标签、控制器、时间线、扩展槽与会话目录缓存全部保留；Pi 内进程状态随进程消失，历史仍保存在磁盘。
+- **唤醒**：选中标签或窗口重新聚焦自动唤醒，也可以点聊天里的“唤醒”按钮。`wakeSession` 丢弃死客户端，按原 `sessionFile` 走常规 `gui_open_channel` 重开同一会话，绝不重发 Prompt；新标签回到原位置，休眠期间输入的文本与附件转移到新会话；旧控制器延迟到当前帧后释放。测试 `test/parallel_session_test.dart` 覆盖草稿守卫、休眠后标签保留、重开同一路径与草稿转移。
 
 ## Worktree 生命周期与安全
 

@@ -1,6 +1,6 @@
 ---
 title: "外观设置：动态配色、分区毛玻璃与缩放"
-version: "1.5.0"
+version: "1.7.0"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, settings, material3, windows, theme]
@@ -19,6 +19,7 @@ tags: [flutter, settings, material3, windows, theme]
 - **桌面毛玻璃**：顶部与侧边栏、主界面、卡片分别开关和调节底色不透明度，默认关闭。
 - **分区颜色**：强调色、主背景、顶部与侧边栏、输入框、卡片、代码区、用户消息。
 - **工具显示**：agent 工具卡片默认密度，收起 / 简略 / 展开三挡，默认简略。
+- **闲置会话休眠**：从不（默认）/ 15 分钟 / 1 小时，闲置后台会话自动结束 Pi 进程释放内存，唤醒时重开同一会话。
 - **扩展显示位置**：输入框上方、输入框下方、状态栏徽章、侧边栏面板、通知浮层各自开关；扩展弹窗提问始终显示。
 - **高级颜色**：浮层与菜单、三层文字、边框、成功 / Diff 新增、警告、错误 / Diff 删除。默认折叠；搜索匹配其中的项目时自动展开。
 
@@ -88,6 +89,7 @@ tags: [flutter, settings, material3, windows, theme]
 4. 嵌套卡片通过公开的 `AppCardBackdropScope` 复用祖先模糊，只绘制自身底色，避免反复采样同一背景；`AppTextField` 同样读取它，位于已模糊卡片内的输入框不再叠加第二层模糊。无材质、100% 或回退状态下 `BackdropFilter.enabled` 为 false；完全透明的背景和 `glass: false` 显式退出材质，但保留原本的透明语义。
 5. `AppTextField`（非 `borderless`）沿用与 `AppCard` 相同的 `AppCardTheme` + `WindowMaterialScope` 规则：开启时底色乘以不透明度、圆角范围内背后铺 `BackdropFilter(BlendMode.src)`，无边框 / 禁用 / 高对比度 / 原生不可用时回退纯色。树结构在开关变化时保持恒定，不重建 TextField 元素路径，不丢焦点和编辑状态；`onPaste` 动作仍包在最外层。
 6. 只有原生状态为 `active` 且没有高对比度时才启用卡片效果。系统关闭透明、节电、缺失通道或平台不支持时立即恢复原本实色，保存的选项不变。没有修改原生 C++，已具备毛玻璃通道的 GUI 可热重载使用；旧 Runner 仍需下次启动新版本。
+7. **合并模糊（BackdropGroup）**：每张卡片一个 `BackdropFilter` 的显存代价实测高达约 25 MB/张（Impeller OpenGLESSDF，24 张卡片的独立显存占用从 145 MB 涨到 739 MB）。`AppCard` / `AppTextField` 改用 `BackdropFilter.grouped`，并在不会互相重叠的卡片流（会话时间线＋输入区 `HomeChatPanel`、设置页身 `SettingsView`）外层挂 `BackdropGroup`，让同区域所有卡片共享一次引擎模糊通道：实测 24 张卡降到约 5.6 MB/张（286 MB，相对每卡独立模糊节省 61%）。全局 Overlay 里的弹窗、菜单、取色器在这些子树之外，永远不共享组键，重叠区域不会共用同一键；无 `BackdropGroup` 祖先时键为空，退化为独立行为，第三方/自定义用法不受影响。原生 Acrylic 本身几乎不占应用显存（实测差异在噪声内），无需为省显存关闭它。测量 fixture 在 `.dart_tool/glass_qa`（junction 到真仓库 lib，`flutter build windows --debug` 后运行自动写 `results.json` 自退出）；**清理 fixture 进程必须用启动时记录的 PID，不能 `taskkill /IM pi_gui.exe`**——与生产 GUI 同名会误杀。
 
 ### 两页共用可拖拽侧栏
 
@@ -118,6 +120,12 @@ Windows 设置中开启“从背景自动选取强调色”后，应用可间接
 实现位于 `lib/ui/features/home/widgets/tool_card_registry.dart`：默认渲染器通过 `AppearanceScope.maybeOf(context).preferences.toolDisplay` 读挡位，随偏好全局响应式刷新。挡位名参与每张卡片的 `PageStorageKey`，切换挡位会重置单张卡片的局部展开记忆，避免“收起”下残留旧展开状态。自定义工具渲染器（`ToolCardRegistry.register`）不受影响，不接入挡位逻辑。
 
 **扩展显示位置**在 **设置 → 外观 → 扩展显示位置**（可搜索“扩展”）：输入框上方、输入框下方、状态栏徽章、侧边栏扩展面板、通知浮层各自开关，关闭后该槽位不渲染任何扩展内容。扩展的弹窗提问（select / confirm / input / editor）是必答交互，始终显示、不做开关。关闭只隐藏界面展示，不拒绝或丢弃 Pi 的 `extension_ui_request` 事件；重新开启后插槽内容立即恢复。实现：`lib/ui/atoms/slot_container.dart` 在 build 时按 `preferences.isSlotVisible(slotId.name)` 拦截，见 [扩展槽位](extension_ui_slots.md)。
+
+### 闲置会话休眠
+
+**闲置会话休眠**在 **设置 → 外观 → 闲置会话休眠** 选择从不（默认）/ 15 分钟 / 1 小时，偏好键 `sessionIdleMinutes`。默认关闭的原因：扩展在 Pi 进程内的内存状态能否随休眠完整恢复尚未验证，休眠必须是用户主动选择的行为。
+
+开启后，`WorkbenchController` 每分钟扫描一次：闲置超时且不在运行、无草稿/附件、无未确认结果、已识别 sessionFile、非当前选中标签的会话，自动结束其后台 Pi 进程；标签、控制器、时间线保留，聊天里显示“已休眠”卡片。选中该标签或窗口重新聚焦时自动唤醒，按原会话文件重开同一会话、不重发 Prompt，休眠期间的输入草稿与附件转移到新会话。完整规则与回归见 [工作区与并行会话](workspaces_sessions.md#闲置会话休眠)。
 
 ### 明暗模式、字号和缩放的关系
 
@@ -239,6 +247,7 @@ Windows 的“在标题栏和窗口边框上显示强调色”与应用里的“
   "baseFontSize": 14.0,
   "uiScale": 1.1,
   "toolDisplay": "compact",
+  "sessionIdleMinutes": 0,
   "slotVisibility": {"aboveEditor": false},
   "sidebarGlass": {"enabled": true, "opacity": 0.65},
   "canvasGlass": {"enabled": false, "opacity": 0.85},
@@ -258,7 +267,7 @@ Windows 的“在标题栏和窗口边框上显示强调色”与应用里的“
 - 保存失败保留已经生效的内存值，显示人话提示与重试入口；不能悄悄声称已持久化。
 - 自定义颜色仍以不透明六位 HEX 存储。`sidebarGlass` / `canvasGlass` / `cardGlass` 只保存各区底色不透明度，不调用全窗口 `setOpacity`。旧 version 1 文件缺少相应字段时该项默认关闭；非法开关回退默认、有限数值限制到 0.2–1.0、非有限数值恢复该项默认值。
 - `cardGlass` 使用可空私有字段与默认值 getter，使热重载前已存在的长期偏好对象能安全读取新增字段，不要求重启承载 Pi 的 GUI。
-- `toolDisplay` 存 `collapsed` / `compact` / `expanded`，缺省 `compact`；`slotVisibility` 只保存被关闭的槽位键（`ExtensibleSlotId.name`），缺省一律开启，未知枚举回退默认。
+- `toolDisplay` 存 `collapsed` / `compact` / `expanded`，缺省 `compact`；`sessionIdleMinutes` 存分钟数（0 = 从不，可选 15/60，非负整数，非法值回退 0）；`slotVisibility` 只保存被关闭的槽位键（`ExtensibleSlotId.name`），缺省一律开启，未知枚举回退默认。
 
 ## 设置页动效验证
 

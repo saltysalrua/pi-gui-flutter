@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_gui/core/rpc/pi_channel_hub.dart';
@@ -44,8 +46,8 @@ void main() {
       starts++;
       return transport;
     });
-    final a = PiRpcClient(transportFactory: () => hub.attach('a'));
-    final b = PiRpcClient(transportFactory: () => hub.attach('b'));
+    final a = PiRpcClient(transportFactory: hub.transportFor('a'));
+    final b = PiRpcClient(transportFactory: hub.transportFor('b'));
     addTearDown(() async {
       await a.close();
       await b.close();
@@ -84,10 +86,10 @@ void main() {
       final transport = TestTransport();
       final hub = PiChannelHub(() async => transport);
       final a = PiRpcClient(
-        transportFactory: () => hub.attach('a'),
+        transportFactory: hub.transportFor('a'),
         requestTimeout: const Duration(milliseconds: 25),
       );
-      final b = PiRpcClient(transportFactory: () => hub.attach('b'));
+      final b = PiRpcClient(transportFactory: hub.transportFor('b'));
       addTearDown(() async {
         await a.close();
         await b.close();
@@ -123,8 +125,8 @@ void main() {
   test('per-session extension widgets, editor updates and identical question IDs cannot cross channels', () async {
     final transport = TestTransport();
     final hub = PiChannelHub(() async => transport);
-    final a = PiRpcClient(transportFactory: () => hub.attach('a'));
-    final b = PiRpcClient(transportFactory: () => hub.attach('b'));
+    final a = PiRpcClient(transportFactory: hub.transportFor('a'));
+    final b = PiRpcClient(transportFactory: hub.transportFor('b'));
     final sa = SlotManager(), sb = SlotManager();
     final ia = TextEditingController(), ib = TextEditingController();
     final ba = PiExtensionUiBridge(a, ia, slots: sa, foreground: false);
@@ -200,6 +202,52 @@ void main() {
     expect(transport.commands.last['channel'], 'b');
   });
 
+  test(
+    'closing channel leases releases routes without resurrecting old clients',
+    () async {
+      final transport = TestTransport();
+      final hub = PiChannelHub(() async => transport);
+      addTearDown(hub.close);
+      for (var i = 0; i < 40; i++) {
+        final lease = hub.transportFor('session-$i');
+        final channel = await lease();
+        expect(hub.channelCount, 2); // This lease plus buffered primary.
+        await channel.close();
+        expect(hub.channelCount, 1);
+        await expectLater(lease(), throwsStateError);
+        expect(hub.channelCount, 1);
+      }
+      final primary = await hub.transportFor('primary')();
+      await primary.close();
+      expect(hub.channelCount, 0);
+      expect(transport.closed, false);
+      await hub.close();
+      expect(hub.channelCount, 0);
+    },
+  );
+
+  test(
+    'startup failure and shutdown during attachment release all routes',
+    () async {
+      final failed = PiChannelHub(
+        () async => throw StateError('startup failed'),
+      );
+      await expectLater(failed.transportFor('a')(), throwsStateError);
+      expect(failed.channelCount, 0);
+      await failed.close();
+
+      final startup = Completer<TestTransport>();
+      final hub = PiChannelHub(() => startup.future);
+      final attaching = expectLater(hub.transportFor('a')(), throwsStateError);
+      await hub.close();
+      final transport = TestTransport();
+      startup.complete(transport);
+      await attaching;
+      expect(hub.channelCount, 0);
+      expect(transport.closed, true);
+    },
+  );
+
   test('parallel chat tabs can split, close the original and recreate the empty fallback', () {
     final tabs = WorkbenchTabs();
     addTearDown(tabs.dispose);
@@ -217,5 +265,144 @@ void main() {
     expect(tabs.tabs, [const WorkspaceDocument.chat()]);
     tabs.add(a);
     expect(tabs.tabs, [a]);
+  });
+
+  test('idle sweep hibernates exempt-checked background sessions and wake reopens the same history', () async {
+    final transport = TestTransport();
+    final workbench = WorkbenchController(
+      hub: PiChannelHub(() async => transport),
+    );
+    addTearDown(() async {
+      await workbench.shutdown();
+      workbench.dispose();
+    });
+    final channels = <Map<String, Object?>>[
+      {
+        'id': 'a',
+        'workspace': '/h',
+        'sessionFile': '/h/a.jsonl',
+        'status': 'ready',
+      },
+      {
+        'id': 'b',
+        'workspace': '/h',
+        'sessionFile': '/h/b.jsonl',
+        'status': 'ready',
+      },
+    ];
+    transport.onSend = (packet) {
+      final command = packet['message'] as Map<String, dynamic>;
+      Object? data;
+      switch (command['type']) {
+        case 'gui_get_catalog':
+          data = {
+            'projects': <Object>[],
+            'channels': channels,
+            'jobs': <Object>[],
+          };
+        case 'gui_workspace_history':
+          data = {'sessions': <Object>[]};
+        case 'gui_close_channel':
+          channels.removeWhere((c) => c['id'] == command['channelId']);
+          data = <String, Object?>{};
+        case 'gui_open_channel':
+          final channel = <String, Object?>{
+            'id': command['channelId'],
+            'workspace': '/h',
+            'sessionFile': command['sessionPath'],
+            'status': 'ready',
+          };
+          channels.add(channel);
+          data = channel;
+        case 'get_state':
+          final channel = channels.firstWhere(
+            (c) => c['id'] == packet['channel'],
+            orElse: () => channels.first,
+          );
+          data = {
+            'model': null,
+            'thinkingLevel': 'off',
+            'sessionFile': channel['sessionFile'],
+          };
+        case 'get_messages':
+          data = {'messages': <Object>[]};
+        case 'get_available_models':
+          data = {'models': <Object>[]};
+        case 'get_available_thinking_levels':
+          data = {
+            'levels': ['off'],
+          };
+        default:
+          throw StateError('Unexpected command: ${command['type']}');
+      }
+      reply(transport, packet, data);
+    };
+    await workbench.initialize();
+    Future<void> settle() async {
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    await settle();
+    // 'b' was adopted last and is selected; 'a' runs in the background.
+    expect(workbench.tabs.selected.sessionId, 'b');
+    final a = workbench.sessions['a']!;
+    expect(a.chat.sessionFile, '/h/a.jsonl');
+    a.lastActivity = DateTime.now().subtract(const Duration(minutes: 30));
+
+    // A pending draft forbids hibernation.
+    a.input.text = 'draft';
+    workbench.sweepIdleSessions(idleMinutes: 15);
+    await settle();
+    expect(a.hibernating, false);
+    expect(
+      transport.commands.where(
+        (c) => c['message']['type'] == 'gui_close_channel',
+      ),
+      isEmpty,
+    );
+
+    a.input.clear();
+    workbench.sweepIdleSessions(idleMinutes: 15);
+    await settle();
+    expect(a.hibernating, true);
+    expect(
+      transport.commands
+          .where((c) => c['message']['type'] == 'gui_close_channel')
+          .single['message']['channelId'],
+      'a',
+    );
+    // The tab and the controller stay; only the process is gone.
+    expect(workbench.sessions['a'], same(a));
+    expect(workbench.tabs.tabs.map((t) => t.sessionId), contains('a'));
+
+    // Typing while asleep carries over; waking reopens the same saved file
+    // and never resends a prompt.
+    a.input.text = 'typed while asleep';
+    await workbench.wakeSession('a');
+    await settle();
+    final opened =
+        transport.commands
+                .where((c) => c['message']['type'] == 'gui_open_channel')
+                .single['message']
+            as Map<String, dynamic>;
+    expect(opened['sessionPath'], '/h/a.jsonl');
+    expect(
+      transport.commands.where((c) => c['message']['type'] == 'prompt'),
+      isEmpty,
+    );
+    expect(workbench.sessions.containsKey('a'), false);
+    final fresh = workbench.sessions.values
+        .where(
+          (s) =>
+              s.chat.sessionFile == '/h/a.jsonl' ||
+              s.historyPath == '/h/a.jsonl',
+        )
+        .single;
+    expect(fresh.input.text, 'typed while asleep');
+    expect(workbench.tabs.tabs.map((t) => t.sessionId), contains(fresh.id));
+    // The sleeping controller is disposed after the current frame, matching
+    // the existing closeSession pattern; nothing references it anymore.
   });
 }

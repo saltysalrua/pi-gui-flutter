@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'app_action_button.dart';
 import 'app_card.dart';
 import '../core/context_l10n.dart';
@@ -20,6 +21,7 @@ class AppDisclosure extends StatefulWidget {
     this.framed = true,
     this.previewBuilder,
     this.previewHint,
+    this.onExpandedChanged,
   });
   final String title;
   final String? subtitle;
@@ -27,6 +29,7 @@ class AppDisclosure extends StatefulWidget {
   final WidgetBuilder builder;
   final WidgetBuilder? previewBuilder;
   final String? previewHint;
+  final ValueChanged<bool>? onExpandedChanged;
   final bool initiallyExpanded, framed;
   @override
   State<AppDisclosure> createState() => _AppDisclosureState();
@@ -40,17 +43,23 @@ class _AppDisclosureState extends State<AppDisclosure> {
     _expanded = widget.initiallyExpanded;
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+  void _restore() {
     if (widget.key != null) {
       _expanded =
-          PageStorage.maybeOf(
-                context,
-              )?.readState(context, identifier: (AppDisclosure, widget.key))
+          PageStorage.maybeOf(context)
+                  ?.readState(context, identifier: (AppDisclosure, widget.key))
               as bool? ??
           _expanded;
     }
+    // A remounted row (e.g. its tab was inactive) re-registers restored
+    // expansion so owners that pin content stay consistent.
+    widget.onExpandedChanged?.call(_expanded);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _restore();
   }
 
   void _toggle() {
@@ -63,6 +72,7 @@ class _AppDisclosureState extends State<AppDisclosure> {
         identifier: (AppDisclosure, widget.key),
       );
     }
+    widget.onExpandedChanged?.call(_expanded);
   }
 
   @override

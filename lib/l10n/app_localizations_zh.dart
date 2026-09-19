@@ -238,6 +238,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatShowLess => '收起内容';
 
   @override
+  String get chatOutputEvicted => '完整输出已从内存释放以节省内存，不影响已保存的会话历史。';
+
+  @override
+  String get chatReloadOutput => '重新读取';
+
+  @override
+  String get chatHibernated => '此会话已休眠以释放内存；历史已保存，唤醒后会继续。';
+
+  @override
+  String get chatWake => '唤醒';
+
+  @override
+  String get chatWaking => '正在唤醒…';
+
+  @override
   String get chatToolPreparing => '准备执行';
 
   @override
@@ -961,6 +976,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get appearanceToolExpandedHint => '直接显示完整命令、输出与文件改动，最直观但占空间。';
+
+  @override
+  String get appearanceHibernate => '闲置会话休眠';
+
+  @override
+  String get appearanceHibernateHint =>
+      '长时间未使用的会话会结束其后台 Pi 进程以释放内存，历史照常保存在磁盘。唤醒时重新打开同一会话，不会重发消息；正在运行、有草稿或结果未确认的会话绝不休眠。';
+
+  @override
+  String get hibernateNever => '从不';
+
+  @override
+  String get hibernate15Minutes => '15 分钟';
+
+  @override
+  String get hibernate60Minutes => '1 小时';
 
   @override
   String get appearanceOn => '开';

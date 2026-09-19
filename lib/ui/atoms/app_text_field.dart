@@ -144,7 +144,9 @@ class AppTextField extends StatelessWidget {
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: radius,
-                child: BackdropFilter(
+                // Grouped like AppCard: one engine pass per BackdropGroup
+                // scope; standalone (null key) outside any group.
+                child: BackdropFilter.grouped(
                   enabled: blur,
                   filter: ImageFilter.blur(
                     sigmaX: material.blurSigma,

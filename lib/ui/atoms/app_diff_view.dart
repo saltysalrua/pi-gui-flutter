@@ -16,6 +16,7 @@ class AppDiffView extends StatefulWidget {
   const AppDiffView({
     super.key,
     required this.source,
+    this.document,
     this.numbered = false,
     this.written = false,
     this.framed = true,
@@ -25,6 +26,10 @@ class AppDiffView extends StatefulWidget {
     this.maxHeight = 360,
   });
   final String source;
+
+  /// Optional shared parse for preview and expanded views of the same evidence.
+  /// The caller must use the same numbered/written mode as this view.
+  final DiffDocument? document;
   final String? label, emptyLabel;
   final bool numbered, written, framed;
   final int? previewLines;
@@ -48,15 +53,19 @@ class _AppDiffViewState extends State<AppDiffView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.source != widget.source ||
         oldWidget.numbered != widget.numbered ||
-        oldWidget.written != widget.written) {
+        oldWidget.written != widget.written ||
+        oldWidget.document != widget.document) {
       _parse();
     }
   }
 
   void _parse() {
-    _document = widget.written
-        ? DiffDocument.written(widget.source)
-        : DiffDocument(widget.source, numbered: widget.numbered);
+    assert(widget.document == null || widget.document!.source == widget.source);
+    _document =
+        widget.document ??
+        (widget.written
+            ? DiffDocument.written(widget.source)
+            : DiffDocument(widget.source, numbered: widget.numbered));
     _lines = _document.displayLines;
     _maxColumns = 0;
     for (final line in _lines) {
