@@ -108,7 +108,12 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
     if (!_restored) _scheduleRestore();
     if (_following) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _scroll.hasClients && _following) _scroll.jumpTo(0);
+        if (mounted &&
+            _scroll.hasClients &&
+            _following &&
+            _scroll.offset != 0) {
+          _scroll.jumpTo(0);
+        }
       });
     }
   }
@@ -192,7 +197,15 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
     onPressed: widget.browser.toggle,
   );
 
-  Widget _timeline(BuildContext context) {
+  Widget _timeline(BuildContext context) => ListenableBuilder(
+    listenable: widget.chat.timelineChanges,
+    builder: (context, _) {
+      _updated();
+      return _timelineBody(context);
+    },
+  );
+
+  Widget _timelineBody(BuildContext context) {
     final chat = widget.chat;
     final assistantNumbers = chat.timeline.assistantNumbers;
     // Tool rows pin expanded outputs against the session byte budget and can

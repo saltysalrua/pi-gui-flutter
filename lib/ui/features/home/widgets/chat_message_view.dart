@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pi_gui/core/services/file_attachments.dart';
@@ -17,6 +18,7 @@ import 'package:pi_gui/ui/atoms/app_step_group.dart';
 import 'package:pi_gui/ui/core/context_l10n.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
+
 import 'tool_card_registry.dart';
 
 class ChatMessageView extends StatelessWidget {
@@ -77,7 +79,9 @@ class ChatMessageView extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => _MessageSnapshot(view: this);
+
+  Widget _render(BuildContext context, ValueChanged<String> showChanges) {
     final l10n = context.l10n;
     final user = message.role == 'user';
     final children = <Widget>[];
@@ -140,7 +144,7 @@ class ChatMessageView extends StatelessWidget {
                 arguments: block.arguments,
               ),
           showChanges: tools[block.id]?.isFileChange == true
-              ? () => onShowChanges(tools[block.id]!.path!)
+              ? () => showChanges(tools[block.id]!.path!)
               : null,
         ),
         PiContentKind.image => AppImage(image: block.image),
@@ -217,5 +221,65 @@ class ChatMessageView extends StatelessWidget {
             )
           : content,
     );
+  }
+}
+
+/// Cache only a mounted message, not the entire session. Theme/resource/slot
+/// dependencies still invalidate this subtree; scrolling it away releases it.
+class _MessageSnapshot extends StatefulWidget {
+  const _MessageSnapshot({required this.view});
+  final ChatMessageView view;
+  @override
+  State<_MessageSnapshot> createState() => _MessageSnapshotState();
+}
+
+class _MessageSnapshotState extends State<_MessageSnapshot> {
+  Widget? _content;
+  List<Object?> _tools = [];
+
+  List<Object?> _snapshot() => [
+    for (final block in widget.view.message.content)
+      if (block.kind == PiContentKind.toolCall) ...[
+        widget.view.tools[block.id],
+        widget.view.registry.builders[widget.view.tools[block.id]?.name ??
+            block.name],
+      ],
+  ];
+
+  @override
+  void didUpdateWidget(_MessageSnapshot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final old = oldWidget.view, next = widget.view;
+    if (!identical(old.message, next.message) ||
+        old.assistantNumber != next.assistantNumber ||
+        old.thinkingIndex != next.thinkingIndex ||
+        !identical(old.registry, next.registry) ||
+        !listEquals(_tools, _snapshot())) {
+      _content = null;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _content = null;
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _content = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_content == null) {
+      _tools = _snapshot();
+      _content = widget.view._render(
+        context,
+        (path) => widget.view.onShowChanges(path),
+      );
+    }
+    return _content!;
   }
 }

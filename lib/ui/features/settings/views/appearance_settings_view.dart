@@ -253,6 +253,38 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
           ),
         ),
       ]);
+      List<AppSelectOption<int>> frameOptions() => [
+        for (final rate in AppearancePreferences.frameRateChoices)
+          AppSelectOption(
+            rate,
+            rate == 0
+                ? l.appearanceFrameRateDisplay
+                : l.appearanceFrameRateValue(rate),
+          ),
+      ];
+      group(l.appearancePerformance, null, [
+        AppSettingRow(
+          title: l.appearanceFrameRate,
+          description: l.appearanceFrameRateHint,
+          control: AppSelect<int>(
+            value: p.frameRate,
+            label: l.appearanceFrameRate,
+            options: frameOptions(),
+            onChanged: (v) => controller.update(p.copyWith(frameRate: v)),
+          ),
+        ),
+        AppSettingRow(
+          title: l.appearanceAnimationFrameRate,
+          description: l.appearanceAnimationFrameRateHint,
+          control: AppSelect<int>(
+            value: p.animationFrameRate,
+            label: l.appearanceAnimationFrameRate,
+            options: frameOptions(),
+            onChanged: (v) =>
+                controller.update(p.copyWith(animationFrameRate: v)),
+          ),
+        ),
+      ]);
       group(l.appearanceToolDisplay, l.appearanceToolDisplayHint, [
         AppSettingRow(
           title: l.appearanceToolDensity,

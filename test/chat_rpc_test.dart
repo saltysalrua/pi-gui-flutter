@@ -87,6 +87,54 @@ class FakeChatGateway implements PiChatGateway {
 }
 
 void main() {
+  test('stream batches only notify content; final state flushes without a stale batch', () async {
+    final gateway = FakeChatGateway();
+    final chat = ChatController(gateway);
+    addTearDown(chat.dispose);
+    addTearDown(gateway.stream.close);
+    var stateChanges = 0, contentChanges = 0;
+    chat.addListener(() => stateChanges++);
+    chat.timelineChanges.addListener(() => contentChanges++);
+    gateway.stream.add(
+      event('message_start', {'message': message('assistant', [], 1)}),
+    );
+    stateChanges = contentChanges = 0;
+    void delta(String value) => gateway.stream.add(
+      event('message_update', {
+        'assistantMessageEvent': {
+          'type': 'text_delta',
+          'contentIndex': 0,
+          'delta': value,
+        },
+      }),
+    );
+    delta('a');
+    delta('b');
+    expect(stateChanges, 0);
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+    expect(contentChanges, 1);
+    expect(stateChanges, 0);
+    expect(chat.timeline.messages.single.text, 'ab');
+    delta('c');
+    gateway.stream.add(
+      event('message_end', {
+        'message': message('assistant', [text('abc')], 1),
+      }),
+    );
+    expect(contentChanges, 2);
+    expect(stateChanges, 1);
+    expect(chat.timeline.messages.single.text, 'abc');
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+    expect(contentChanges, 2);
+    // Missing message_start still moves an empty conversation into its
+    // started layout, rather than notifying only an invisible timeline.
+    chat.timeline.load([]);
+    delta('fallback');
+    expect(stateChanges, 2);
+    expect(contentChanges, 3);
+    expect(chat.timeline.messages.single.text, 'fallback');
+  });
+
   test('thinking activity follows content events, not the whole reply', () {
     final timeline = ChatTimeline();
     timeline.apply(

@@ -1,3 +1,4 @@
+import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -173,7 +174,7 @@ class _HoverCardBody extends StatelessWidget {
               const SizedBox(
                 width: 14,
                 height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: AppProgressIndicator(strokeWidth: 2),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(

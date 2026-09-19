@@ -1,3 +1,4 @@
+import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -155,7 +156,7 @@ class _AppImageState extends State<AppImage> {
                 return Center(
                   child: SizedBox.square(
                     dimension: 24,
-                    child: CircularProgressIndicator(
+                    child: AppProgressIndicator(
                       strokeWidth: 2,
                       semanticsLabel: l10n.chatImageLoading,
                     ),

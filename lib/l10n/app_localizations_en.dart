@@ -1001,6 +1001,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appearanceRefresh => 'Refresh';
 
   @override
+  String get appearancePerformance => 'Frame rate and performance';
+
+  @override
+  String get appearanceFrameRate => 'Global frame rate limit';
+
+  @override
+  String get appearanceFrameRateHint =>
+      'Caps the entire interface, including scrolling, dragging and text updates. Defaults to 120 FPS; the display refresh rate remains the ceiling.';
+
+  @override
+  String get appearanceAnimationFrameRate => 'Continuous animation frame rate';
+
+  @override
+  String get appearanceAnimationFrameRateHint =>
+      'Only controls shimmer and loading spinners. Defaults to 30 FPS and also respects the global limit, without slowing other interactions.';
+
+  @override
+  String get appearanceFrameRateDisplay => 'Follow display';
+
+  @override
+  String appearanceFrameRateValue(int fps) {
+    return '$fps FPS';
+  }
+
+  @override
   String get appearanceSizing => 'Text and interface size';
 
   @override

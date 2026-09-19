@@ -1,6 +1,6 @@
 ---
 title: "RPC 对话、Markdown 与文件改动"
-version: "1.8.0"
+version: "1.9.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, chat, markdown, diff]
@@ -94,11 +94,11 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 - `AppDisclosure` 在减弱动态模式直接绘制正文，不使用零时长 `AnimatedSize`；避免 Flutter beta 在改变宽度时发生布局期间重入，折叠状态仍由原 State/PageStorage 保存。
 - `AppActionButton.labelContent`：复用原有 Hover、Focus、Disabled 和键盘状态，允许富文本标题；纯文本 `label` 保留无障碍名称。
 - `AppCopyButton`：复制反馈。
-- `AppActivityLabel`（`lib/ui/atoms/app_activity_label.dart`）：三处共用的非阻断文字微光，保持工具原有渐变与 `AppDurations.verySlow * 3` 线性周期。内部 Align 松开父布局的最小宽度，让 ShaderMask 始终贴合文字，避免输入栏的 stretch Column 拉长扫描范围。`style/maxLines` 允许标题保留原排版；流式重建不重复启动已运行的 AnimationController，停止/减弱动态时不创建 ShaderMask。
+- `AppActivityLabel`（`lib/ui/atoms/app_activity_label.dart`）：三处共用的非阻断文字微光，保持工具原有渐变与 `AppDurations.verySlow * 3` 线性周期。内部 Align 松开父布局的最小宽度，让 ShaderMask 始终贴合文字，避免输入栏的 stretch Column 拉长扫描范围。`style/maxLines` 允许标题保留原排版；共享 `AppAnimationClock` 按持续动画帧率更新 controller.value，不再 repeat。ShaderMask 有局部 RepaintBoundary，停止/减弱动态时不创建 ShaderMask。时钟在 TickerMode 禁用或卸载时释放订阅；帧率设置见 [帧率与性能](frame_rate_performance.md)。
 
 继续复用 `AppCard`、`AppTextField`、`AppActionButton`、`AppIconButton`、`AppNavTile`、`SlotContainer`。`AppTextField` 增加 focusNode/minLines/多行及无边框模式；图标按钮补齐键盘触发和焦点边框；通用操作按钮的高度改为下限以适配系统字号。代码字体由 `AppTheme.codeStyle` 提供。
 
-动画使用 Motion Tokens，并检测 `MediaQuery.disableAnimationsOf(context)`。流事件以 stagger 时间窗合并通知，最终状态立即刷新。工具输出预览上限 60,000 字符；小于等于 12,000 字符且明确指定语言的代码才尝试高亮，避免对大量终端输出做语言猜测。Diff 行列表按需构建。
+动画使用 Motion Tokens，并检测 `MediaQuery.disableAnimationsOf(context)`。流事件以 40ms 时间窗合并内容通知；当前消息文本超过 12,000 / 60,000 字符时分别使用 micro（80ms）/ quick（150ms），最终状态立即刷新并取消尚未发出的批次。工具输出预览上限 60,000 字符；小于等于 12,000 字符且明确指定语言的代码才尝试高亮，避免对大量终端输出做语言猜测。Diff 行列表按需构建。
 
 ## RPC 命令与数据
 
@@ -232,6 +232,14 @@ dart run tool/check_session_performance.dart 1000 5000
 首次加载或需要校正时，仍未改变 SDK 冷启动、`get_messages` 整包传输、Dart 主 isolate 的整包 JSON 解码或 Markdown 渲染。普通完整回复现在省略重复的整包读取，见下节。上述大样本的 `jsonDecode` 仍约 57 ms；若继续优化超长会话，应针对真实 GUI 的分段/帧耗时评估后台 isolate 或后端分页能力，不能把合成测试结果宣传成整个页面“瞬间加载”。
 
 回归集中在 `test/pi_rpc_client_test.dart` 的大帧/UTF-8/尾行与协议隔离，`test/chat_rpc_test.dart` 的草稿/最终引用替换、重复引用、孤立结果与重载，以及工作区文档列出的缓存状态机。验证全程不热重启或切换当前活动聊天，新后端资源在下次正常启动更新后的 GUI 时装载。
+
+### 界面绘制与流式更新
+
+- `ChatController.timelineChanges` 是独立的内容 Listenable：合并的 `message_update` / `tool_execution_update` 只通知时间线。原 ChangeNotifier 留给加载、运行锁、错误、队列等会话状态；最终消息/工具结果立即同时刷新。缺少 message_start 的首条增量从空态建立消息时，仍刷新布局状态。
+- `HomeChatPanel` 仅在时间线内部订阅内容通知，不再每个文字批次重建标题和输入卡片；倒序列表已经在 offset 0 时不重复 jumpTo。原有居中空态、跟随/查看旧消息及滚动恢复保持不变。
+- `ChatMessageView` 仅复用当前挂载消息的子树，按消息对象、编号、当前思考索引、所引用工具对象和注册 renderer 变化失效；主题、本地化、资源上下文继续走 Inherited 依赖。工具集合会原地修改，因此不能只比较整个 tools Map 的身份。
+- `AppMarkdown` 复用未改变内容块的已构建子树；主题等依赖变化正常失效，卸载即释放。没有跨会话无限缓存。正在增长的单块 Markdown 仍全量解析，通过上述长草稿合并频率减轻压力；不按空行硬拆，避免改变围栏/表格/引用语义。
+- 微光及公共加载转圈共用限速时钟并局部隔离重绘，后台标签的忙碌圆弧静止。全局/持续动画两层设置、数据格式与实测见 [帧率与性能](frame_rate_performance.md)。不增加 RPC，不丢弃/重放数据事件，不替用户关闭毛玻璃。
 
 ## 内存与重复处理
 

@@ -391,6 +391,20 @@
   "appearanceSystemHint": "读取 Windows 强调色，切回应用时自动更新。Windows 开启“从背景自动选取强调色”后可随壁纸变化。",
   "appearanceSystemUnavailable": "暂时无法读取系统强调色，正在使用默认种子色。更新应用后请重新打开，或点击重试。",
   "appearanceRefresh": "重新读取",
+  "appearancePerformance": "帧率与性能",
+  "appearanceFrameRate": "全局帧率上限",
+  "appearanceFrameRateHint": "限制整个界面，包括滚动、拖拽和文字更新。默认 120 FPS；实际帧率不会超过屏幕刷新率。",
+  "appearanceAnimationFrameRate": "持续动画帧率",
+  "appearanceAnimationFrameRateHint": "只控制微光和加载转圈，默认 30 FPS；同时受全局上限限制，不降低其他交互的帧率。",
+  "appearanceFrameRateDisplay": "跟随屏幕",
+  "appearanceFrameRateValue": "{fps} FPS",
+  "@appearanceFrameRateValue": {
+    "placeholders": {
+      "fps": {
+        "type": "int"
+      }
+    }
+  },
   "appearanceSizing": "文字与界面大小",
   "appearanceFont": "基准字号",
   "appearanceFontHint": "只调整文字大小，标题与代码字号按比例变化；保留系统文字缩放。默认 13。",

@@ -1,6 +1,6 @@
 ---
 title: "外观设置：动态配色、分区毛玻璃与缩放"
-version: "1.7.0"
+version: "1.8.0"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, settings, material3, windows, theme]
@@ -17,6 +17,7 @@ tags: [flutter, settings, material3, windows, theme]
 - **基准字号**：12–18，默认 13。只改变文字，标题、正文和代码字号一起按比例变化。
 - **UI 比例**：80%、90%、100%、110%、125%、150%，默认 100%。整体缩放文字、按钮、图标、间距和浮层，不更改 Windows 的显示缩放。
 - **桌面毛玻璃**：顶部与侧边栏、主界面、卡片分别开关和调节底色不透明度，默认关闭。
+- **帧率与性能**：全局上限默认 120 FPS，持续动画默认 30 FPS，分别可选 30 / 60 / 120 / 跟随屏幕。即时生效；持续动画不超过全局上限，减弱动态时静止。实现、保存格式与实测边界见 [帧率设置](frame_rate_performance.md)。
 - **分区颜色**：强调色、主背景、顶部与侧边栏、输入框、卡片、代码区、用户消息。
 - **工具显示**：agent 工具卡片默认密度，收起 / 简略 / 展开三挡，默认简略。
 - **闲置会话休眠**：从不（默认）/ 15 分钟 / 1 小时，闲置后台会话自动结束 Pi 进程释放内存，唤醒时重开同一会话。
@@ -248,6 +249,8 @@ Windows 的“在标题栏和窗口边框上显示强调色”与应用里的“
   "uiScale": 1.1,
   "toolDisplay": "compact",
   "sessionIdleMinutes": 0,
+  "frameRate": 120,
+  "animationFrameRate": 30,
   "slotVisibility": {"aboveEditor": false},
   "sidebarGlass": {"enabled": true, "opacity": 0.65},
   "canvasGlass": {"enabled": false, "opacity": 0.85},
@@ -266,6 +269,7 @@ Windows 的“在标题栏和窗口边框上显示强调色”与应用里的“
 - 正在执行的写入先完成，后续等待中的旧快照可以合并，最终最新设置胜出。
 - 保存失败保留已经生效的内存值，显示人话提示与重试入口；不能悄悄声称已持久化。
 - 自定义颜色仍以不透明六位 HEX 存储。`sidebarGlass` / `canvasGlass` / `cardGlass` 只保存各区底色不透明度，不调用全窗口 `setOpacity`。旧 version 1 文件缺少相应字段时该项默认关闭；非法开关回退默认、有限数值限制到 0.2–1.0、非有限数值恢复该项默认值。
+- `frameRate` / `animationFrameRate` 分别保存全局 / 持续动画上限；支持 30、60、120、0（跟随屏幕），缺失或非法值分别回退 120 / 30。恢复默认外观也重置这两项。
 - `cardGlass` 使用可空私有字段与默认值 getter，使热重载前已存在的长期偏好对象能安全读取新增字段，不要求重启承载 Pi 的 GUI。
 - `toolDisplay` 存 `collapsed` / `compact` / `expanded`，缺省 `compact`；`sessionIdleMinutes` 存分钟数（0 = 从不，可选 15/60，非负整数，非法值回退 0）；`slotVisibility` 只保存被关闭的槽位键（`ExtensibleSlotId.name`），缺省一律开启，未知枚举回退默认。
 

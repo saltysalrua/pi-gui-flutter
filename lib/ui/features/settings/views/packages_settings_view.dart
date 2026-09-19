@@ -1,3 +1,4 @@
+import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -230,7 +231,7 @@ class _GalleryTab extends StatelessWidget {
                   SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: AppProgressIndicator(strokeWidth: 2),
                   ),
                 ],
               ),
@@ -476,7 +477,7 @@ class _ManageTabState extends State<_ManageTab> {
               child: SizedBox(
                 width: 16,
                 height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: AppProgressIndicator(strokeWidth: 2),
               ),
             ),
           ),
@@ -953,7 +954,7 @@ class _OperationCard extends StatelessWidget {
                   width: 16,
                   height: 16,
                   child: operation.running
-                      ? const CircularProgressIndicator(strokeWidth: 2)
+                      ? const AppProgressIndicator(strokeWidth: 2)
                       : Icon(
                           failed ? Icons.error_outline : Icons.check_rounded,
                           size: 16,

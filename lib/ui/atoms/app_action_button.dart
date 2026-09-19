@@ -1,3 +1,4 @@
+import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
@@ -216,9 +217,9 @@ class _AppActionButtonState extends State<AppActionButton> {
           SizedBox(
             width: 14,
             height: 14,
-            child: CircularProgressIndicator(
+            child: AppProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(textColor),
+              color: textColor,
             ),
           ),
           const SizedBox(width: AppSpacing.sm),

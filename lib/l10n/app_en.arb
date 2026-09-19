@@ -391,6 +391,20 @@
   "appearanceSystemHint": "Reads the Windows accent and refreshes when you return to the app. Enable automatic accent selection in Windows to follow your wallpaper.",
   "appearanceSystemUnavailable": "System accent is unavailable; using the default seed. Relaunch after updating the app, or retry.",
   "appearanceRefresh": "Refresh",
+  "appearancePerformance": "Frame rate and performance",
+  "appearanceFrameRate": "Global frame rate limit",
+  "appearanceFrameRateHint": "Caps the entire interface, including scrolling, dragging and text updates. Defaults to 120 FPS; the display refresh rate remains the ceiling.",
+  "appearanceAnimationFrameRate": "Continuous animation frame rate",
+  "appearanceAnimationFrameRateHint": "Only controls shimmer and loading spinners. Defaults to 30 FPS and also respects the global limit, without slowing other interactions.",
+  "appearanceFrameRateDisplay": "Follow display",
+  "appearanceFrameRateValue": "{fps} FPS",
+  "@appearanceFrameRateValue": {
+    "placeholders": {
+      "fps": {
+        "type": "int"
+      }
+    }
+  },
   "appearanceSizing": "Text and interface size",
   "appearanceFont": "Base font size",
   "appearanceFontHint": "Changes text only, including headings and code. System text scaling is preserved. Default: 13.",

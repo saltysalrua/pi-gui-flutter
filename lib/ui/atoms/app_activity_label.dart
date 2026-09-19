@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../core/app_frame_policy.dart';
 import '../core/theme/app_tokens.dart';
 import '../core/theme/theme_context_extensions.dart';
 
@@ -25,12 +27,25 @@ class _AppActivityLabelState extends State<AppActivityLabel>
     vsync: this,
     duration: AppDurations.verySlow * 3,
   );
+  bool? _clockListening;
+  void _tick() => _animation.value = AppAnimationClock.instance.phase(
+    AppDurations.verySlow * 3,
+  );
+
   void _sync() {
-    if (widget.active && !MediaQuery.disableAnimationsOf(context)) {
-      // Streaming rebuilds must not replace an already running simulation.
-      if (!_animation.isAnimating) _animation.repeat();
+    // Drive the controller's value, never its vsync ticker. Keeping the
+    // controller also lets a live, pre-reload repeating label stop safely.
+    _animation.stop();
+    final next =
+        widget.active &&
+        !MediaQuery.disableAnimationsOf(context) &&
+        TickerMode.valuesOf(context).enabled;
+    if (next == (_clockListening == true)) return;
+    _clockListening = next;
+    if (next) {
+      AppAnimationClock.instance.addListener(_tick);
     } else {
-      _animation.stop();
+      AppAnimationClock.instance.removeListener(_tick);
     }
   }
 
@@ -48,6 +63,9 @@ class _AppActivityLabelState extends State<AppActivityLabel>
 
   @override
   void dispose() {
+    if (_clockListening == true) {
+      AppAnimationClock.instance.removeListener(_tick);
+    }
     _animation.dispose();
     super.dispose();
   }
@@ -69,22 +87,24 @@ class _AppActivityLabelState extends State<AppActivityLabel>
       // Composer status, tool rows and thinking then have the same sweep.
       child: !animate
           ? label
-          : AnimatedBuilder(
-              animation: _animation,
-              child: label,
-              builder: (context, child) => ShaderMask(
-                blendMode: BlendMode.srcIn,
-                shaderCallback: (bounds) => LinearGradient(
-                  begin: Alignment(-3 + _animation.value * 4, 0),
-                  end: Alignment(-1 + _animation.value * 4, 0),
-                  colors: [
-                    context.colors.textMuted,
-                    context.colors.textPrimary,
-                    context.colors.textMuted,
-                  ],
-                  stops: const [0, 0.5, 1],
-                ).createShader(bounds),
-                child: child,
+          : RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _animation,
+                child: label,
+                builder: (context, child) => ShaderMask(
+                  blendMode: BlendMode.srcIn,
+                  shaderCallback: (bounds) => LinearGradient(
+                    begin: Alignment(-3 + _animation.value * 4, 0),
+                    end: Alignment(-1 + _animation.value * 4, 0),
+                    colors: [
+                      context.colors.textMuted,
+                      context.colors.textPrimary,
+                      context.colors.textMuted,
+                    ],
+                    stops: const [0, 0.5, 1],
+                  ).createShader(bounds),
+                  child: child,
+                ),
               ),
             ),
     );

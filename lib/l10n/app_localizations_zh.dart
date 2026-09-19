@@ -934,6 +934,31 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appearanceRefresh => '重新读取';
 
   @override
+  String get appearancePerformance => '帧率与性能';
+
+  @override
+  String get appearanceFrameRate => '全局帧率上限';
+
+  @override
+  String get appearanceFrameRateHint =>
+      '限制整个界面，包括滚动、拖拽和文字更新。默认 120 FPS；实际帧率不会超过屏幕刷新率。';
+
+  @override
+  String get appearanceAnimationFrameRate => '持续动画帧率';
+
+  @override
+  String get appearanceAnimationFrameRateHint =>
+      '只控制微光和加载转圈，默认 30 FPS；同时受全局上限限制，不降低其他交互的帧率。';
+
+  @override
+  String get appearanceFrameRateDisplay => '跟随屏幕';
+
+  @override
+  String appearanceFrameRateValue(int fps) {
+    return '$fps FPS';
+  }
+
+  @override
   String get appearanceSizing => '文字与界面大小';
 
   @override

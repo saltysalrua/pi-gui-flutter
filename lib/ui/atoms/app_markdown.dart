@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
+
 import '../core/chat_resource_scope.dart';
 import 'app_image.dart';
 import 'app_code_block.dart';
@@ -13,7 +14,9 @@ class AppMarkdown extends StatelessWidget {
   const AppMarkdown({super.key, required this.data});
   final String data;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => _MarkdownSnapshot(view: this);
+
+  Widget _render(BuildContext context) {
     final colors = context.colors;
     final text = context.textTheme;
     return SelectionArea(
@@ -29,9 +32,8 @@ class AppMarkdown extends StatelessWidget {
           h4: text.titleMedium,
           h5: text.titleSmall,
           h6: text.titleSmall,
-          code: AppTheme.codeStyle(
-            Theme.of(context),
-          ).copyWith(backgroundColor: colors.codeBackground),
+          code: AppTheme.codeStyle(Theme.of(context))
+              .copyWith(backgroundColor: colors.codeBackground),
           a: text.bodyLarge?.copyWith(
             color: colors.primary,
             decoration: TextDecoration.underline,
@@ -71,6 +73,40 @@ class AppMarkdown extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Completed sibling blocks keep their parsed widget tree while another block
+/// streams. The cache belongs to the mounted row and is released on unmount.
+class _MarkdownSnapshot extends StatefulWidget {
+  const _MarkdownSnapshot({required this.view});
+  final AppMarkdown view;
+  @override
+  State<_MarkdownSnapshot> createState() => _MarkdownSnapshotState();
+}
+
+class _MarkdownSnapshotState extends State<_MarkdownSnapshot> {
+  Widget? _content;
+  @override
+  void didUpdateWidget(_MarkdownSnapshot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.view.data != oldWidget.view.data) _content = null;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _content = null;
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _content = null;
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _content ??= widget.view._render(context);
 }
 
 class _CodeBuilder extends MarkdownElementBuilder {

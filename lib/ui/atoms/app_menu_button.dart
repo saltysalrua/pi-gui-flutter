@@ -1,3 +1,4 @@
+import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -73,7 +74,7 @@ class AppMenuButton<T> extends StatelessWidget {
       icon: isBusy
           ? const SizedBox.square(
               dimension: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: AppProgressIndicator(strokeWidth: 2),
             )
           : Icon(icon, size: 20),
       itemBuilder: (context) => [

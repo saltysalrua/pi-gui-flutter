@@ -1,3 +1,4 @@
+import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -103,9 +104,8 @@ class _ModelThinkingPopoverState extends State<ModelThinkingPopover> {
                   child: SizedBox(
                     width: 14,
                     height: 14,
-                    child: CircularProgressIndicator(
+                    child: AppProgressIndicator(
                       strokeWidth: 1.5,
-                      value: reduceMotion ? 0.5 : null,
                       color: context.colors.textMuted,
                     ),
                   ),

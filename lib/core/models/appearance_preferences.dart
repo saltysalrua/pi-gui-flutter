@@ -75,6 +75,8 @@ class AppearancePreferences {
     GlassPreferences this._cardGlass = defaultCardGlass,
     this.toolDisplay = ToolDisplayMode.compact,
     int this._sessionIdleMinutes = 0,
+    int this._frameRate = defaultFrameRate,
+    int this._animationFrameRate = defaultAnimationFrameRate,
     Map<String, bool> slotVisibility = const {},
     Map<AppearanceColor, int> lightColors = const {},
     Map<AppearanceColor, int> darkColors = const {},
@@ -110,6 +112,15 @@ class AppearancePreferences {
   int get sessionIdleMinutes => _sessionIdleMinutes ?? 0;
   static const idleMinuteChoices = [0, 15, 60];
 
+  /// Independent GUI limits; zero follows the display. The decorative clock
+  /// also respects the global ceiling. Nullable fields support live reloads.
+  static const defaultFrameRate = 120, defaultAnimationFrameRate = 30;
+  static const frameRateChoices = [30, 60, 120, 0];
+  final int? _frameRate, _animationFrameRate;
+  int get frameRate => _frameRate ?? defaultFrameRate;
+  int get animationFrameRate =>
+      _animationFrameRate ?? defaultAnimationFrameRate;
+
   /// Pi 扩展槽位开关，键为 [ExtensibleSlotId.name]，缺省视为开启。
   /// 只写入被关闭的键，旧配置文件里没有也能保持兼容。
   final Map<String, bool> slotVisibility;
@@ -131,6 +142,8 @@ class AppearancePreferences {
     GlassPreferences? cardGlass,
     ToolDisplayMode? toolDisplay,
     int? sessionIdleMinutes,
+    int? frameRate,
+    int? animationFrameRate,
     Map<String, bool>? slotVisibility,
     Map<AppearanceColor, int>? lightColors,
     Map<AppearanceColor, int>? darkColors,
@@ -145,6 +158,8 @@ class AppearancePreferences {
     cardGlass: cardGlass ?? this.cardGlass,
     toolDisplay: toolDisplay ?? this.toolDisplay,
     sessionIdleMinutes: sessionIdleMinutes ?? this.sessionIdleMinutes,
+    frameRate: frameRate ?? this.frameRate,
+    animationFrameRate: animationFrameRate ?? this.animationFrameRate,
     slotVisibility: slotVisibility ?? this.slotVisibility,
     lightColors: lightColors ?? this.lightColors,
     darkColors: darkColors ?? this.darkColors,
@@ -215,6 +230,16 @@ class AppearancePreferences {
           json['sessionIdleMinutes'] is num && json['sessionIdleMinutes'] >= 0
           ? (json['sessionIdleMinutes'] as num).round()
           : 0,
+      frameRate:
+          json['frameRate'] is int &&
+              frameRateChoices.contains(json['frameRate'])
+          ? json['frameRate'] as int
+          : defaultFrameRate,
+      animationFrameRate:
+          json['animationFrameRate'] is int &&
+              frameRateChoices.contains(json['animationFrameRate'])
+          ? json['animationFrameRate'] as int
+          : defaultAnimationFrameRate,
       slotVisibility: {
         if (json['slotVisibility'] case final Map raw)
           for (final entry in raw.entries)
@@ -237,6 +262,8 @@ class AppearancePreferences {
     'cardGlass': cardGlass.toJson(),
     'toolDisplay': toolDisplay.name,
     'sessionIdleMinutes': sessionIdleMinutes,
+    'frameRate': frameRate,
+    'animationFrameRate': animationFrameRate,
     // 只保存关闭的槽位，避免文件随槽位枚举增长膨胀。
     'slotVisibility': {
       for (final entry in slotVisibility.entries)

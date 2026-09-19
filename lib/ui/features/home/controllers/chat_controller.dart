@@ -39,6 +39,10 @@ class ChatController extends ChangeNotifier {
   /// evicted row re-reads history on demand. Tests shrink this value.
   final int outputBudget;
   final timeline = ChatTimeline();
+  ChangeNotifier? _timelineChanges;
+
+  /// Content-only batches do not invalidate the editor, header or workbench.
+  Listenable get timelineChanges => _timelineChanges ??= ChangeNotifier();
   final sessions = <ChatSessionBookmark>[];
   final _pinnedToolIds = <String>{};
   late final StreamSubscription<PiRpcEvent> _subscription;
@@ -356,6 +360,7 @@ class ChatController extends ChangeNotifier {
       // Missing final messages/tool results must not make partial drafts authoritative.
       _needsHistory = true;
     }
+    final wasEmpty = timeline.messages.isEmpty;
     timeline.apply(event);
     switch (event.type) {
       case 'agent_start':
@@ -394,11 +399,12 @@ class ChatController extends ChangeNotifier {
       case 'message_end':
         if (event.message?.stopReason == 'error') failure = ChatFailure.reply;
     }
-    if (event.type == 'message_update' ||
-        event.type == 'tool_execution_update') {
-      _frame ??= Timer(AppDurations.stagger, () {
+    if ((event.type == 'message_update' ||
+            event.type == 'tool_execution_update') &&
+        !(wasEmpty && timeline.messages.isNotEmpty)) {
+      _frame ??= Timer(_streamInterval, () {
         _frame = null;
-        _notify();
+        _notifyTimeline();
       });
     } else {
       _notify();
@@ -412,14 +418,38 @@ class ChatController extends ChangeNotifier {
     }
   }
 
+  // The active Markdown block is still parsed authoritatively as a whole.
+  // Coalesce large drafts more, rather than splitting fences/tables/references
+  // at arbitrary token boundaries. Final messages always bypass this delay.
+  Duration get _streamInterval {
+    final length =
+        timeline.messages.lastOrNull?.content.fold<int>(
+          0,
+          (sum, block) => sum + block.text.length,
+        ) ??
+        0;
+    if (length > 60000) return AppDurations.quick;
+    if (length > 12000) return AppDurations.micro;
+    return AppDurations.stagger;
+  }
+
+  void _notifyTimeline() {
+    if (!_disposed) _timelineChanges?.notifyListeners();
+  }
+
   void _notify() {
-    if (!_disposed) notifyListeners();
+    if (_disposed) return;
+    _frame?.cancel();
+    _frame = null;
+    _notifyTimeline();
+    notifyListeners();
   }
 
   @override
   void dispose() {
     _disposed = true;
     _frame?.cancel();
+    _timelineChanges?.dispose();
     unawaited(_subscription.cancel());
     super.dispose();
   }

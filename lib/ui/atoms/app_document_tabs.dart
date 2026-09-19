@@ -1,3 +1,5 @@
+import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -298,7 +300,8 @@ class _AppDocumentTabsState<T extends Object>
                     if (tab.busy)
                       SizedBox.square(
                         dimension: 14,
-                        child: CircularProgressIndicator(
+                        child: AppProgressIndicator(
+                          active: selected && !feedback,
                           strokeWidth: 2,
                           color: foreground,
                         ),

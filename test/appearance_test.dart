@@ -33,6 +33,31 @@ class _Store implements AppearanceStore {
 }
 
 void main() {
+  test(
+    'independent frame caps default, round trip and reject invalid values',
+    () {
+      final defaults = AppearancePreferences.fromJson({'version': 1});
+      expect(defaults.frameRate, 120);
+      expect(defaults.animationFrameRate, 30);
+      final configured = defaults.copyWith(
+        frameRate: 60,
+        animationFrameRate: 0,
+      );
+      final loaded = AppearancePreferences.fromJson(configured.toJson());
+      expect(loaded.frameRate, 60);
+      expect(loaded.animationFrameRate, 0);
+      for (final invalid in [-1, 1, 60.5, '120', double.infinity]) {
+        final value = AppearancePreferences.fromJson({
+          'version': 1,
+          'frameRate': invalid,
+          'animationFrameRate': invalid,
+        });
+        expect(value.frameRate, 120);
+        expect(value.animationFrameRate, 30);
+      }
+    },
+  );
+
   test('versioned preferences tolerate bad fields and isolate brightness overrides', () {
     final p = AppearancePreferences.fromJson({
       'version': 1,

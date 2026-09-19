@@ -1,3 +1,4 @@
+import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -50,7 +51,7 @@ class QuotaSettingsContent extends StatelessWidget {
                     ? const SizedBox(
                         width: 14,
                         height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: AppProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.refresh),
                 onPressed: controller.isRefreshing ? null : controller.refresh,
@@ -65,7 +66,7 @@ class QuotaSettingsContent extends StatelessWidget {
                   const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: AppProgressIndicator(strokeWidth: 2),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(

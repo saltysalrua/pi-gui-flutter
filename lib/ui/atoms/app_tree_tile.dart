@@ -1,3 +1,4 @@
+import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -57,7 +58,7 @@ class AppTreeTile extends StatelessWidget {
               child: loading
                   ? const Padding(
                       padding: EdgeInsets.all(AppSpacing.xxs),
-                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                      child: AppProgressIndicator(strokeWidth: 1.5),
                     )
                   : expanded == null
                   ? null
