@@ -11,6 +11,7 @@ import 'package:pi_gui/ui/atoms/app_icon_button.dart';
 import 'package:pi_gui/ui/atoms/app_split_panel.dart';
 import 'package:pi_gui/ui/atoms/app_document_tabs.dart';
 import 'package:pi_gui/ui/atoms/app_tab_workspace.dart';
+import 'package:pi_gui/ui/core/chat_tool_output_scope.dart';
 import 'package:pi_gui/ui/core/context_l10n.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
@@ -42,6 +43,9 @@ class HomeChatPanel extends StatefulWidget {
     this.animateMaterial = true,
     this.conversationOnly = false,
     this.sharedDirectoryWarning = false,
+    this.hibernating = false,
+    this.waking = false,
+    this.onWake,
   });
   final ChatController chat;
   final ModelPickerController modelPicker;
@@ -53,23 +57,46 @@ class HomeChatPanel extends StatefulWidget {
   final WorkspaceTabsController tabs;
   final Color contentBackground, panelBackground;
   final bool animateMaterial, conversationOnly, sharedDirectoryWarning;
+
+  /// The session's Pi process was hibernated to free memory; the editor shows
+  /// a wake card instead of the stale connection failure.
+  final bool hibernating, waking;
+  final VoidCallback? onWake;
   @override
   State<HomeChatPanel> createState() => _HomeChatPanelState();
 }
 
 class _HomeChatPanelState extends State<HomeChatPanel> {
   final _scroll = ScrollController();
+  static const _followThreshold = 80.0;
   bool _following = true;
+  bool _restored = false;
   String? _session;
   @override
   void initState() {
     super.initState();
+    // Tab bodies unmount while inactive. A remount is not a conversation
+    // switch, so the follow flag must come from the restored scroll anchor
+    // instead of resetting to the latest message.
+    _session = widget.chat.sessionFile;
     widget.chat.addListener(_updated);
     _scroll.addListener(_scrolled);
+    _scheduleRestore();
+  }
+
+  /// Re-reads the follow flag from the PageStorage-restored offset once the
+  /// timeline has clients; retries on the next chat notification otherwise.
+  void _scheduleRestore() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final follow = _scroll.position.pixels < _followThreshold;
+      _restored = true;
+      if (follow != _following) setState(() => _following = follow);
+    });
   }
 
   void _scrolled() {
-    final follow = _scroll.position.pixels < 80;
+    final follow = _scroll.position.pixels < _followThreshold;
     if (follow != _following && mounted) setState(() => _following = follow);
   }
 
@@ -78,6 +105,7 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
       _session = widget.chat.sessionFile;
       _following = true;
     }
+    if (!_restored) _scheduleRestore();
     if (_following) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _scroll.hasClients && _following) _scroll.jumpTo(0);
@@ -167,63 +195,73 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
   Widget _timeline(BuildContext context) {
     final chat = widget.chat;
     final assistantNumbers = chat.timeline.assistantNumbers;
-    return Stack(
-      children: [
-        ListView.builder(
-          controller: _scroll,
-          reverse: true,
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xxl,
-            AppSpacing.lg,
-            AppSpacing.xxl,
-            AppSpacing.sm,
-          ),
-          itemCount: chat.timeline.messages.length,
-          itemBuilder: (context, reverseIndex) {
-            final index = chat.timeline.messages.length - 1 - reverseIndex;
-            final message = chat.timeline.messages[index];
-            return Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 820),
-                child: ChatMessageView(
-                  key: ValueKey('${message.timestamp}-$index'),
-                  message: message,
-                  assistantNumber: assistantNumbers[index],
-                  thinkingIndex: chat.timeline.thinkingIndexFor(index),
-                  tools: chat.timeline.tools,
-                  registry: widget.registry,
-                  onShowChanges: (path) => widget.browser.showFiles(path),
-                ),
-              ),
-            );
-          },
-        ),
-        if (!_following)
-          Positioned(
-            bottom: AppSpacing.sm,
-            right: AppSpacing.xxl,
-            child: AppActionButton.pill(
-              label: context.l10n.chatLatest,
-              leading: const Icon(Icons.arrow_downward),
-              onPressed: () {
-                setState(() => _following = true);
-                if (!_scroll.hasClients) return;
-                if (MediaQuery.disableAnimationsOf(context)) {
-                  _scroll.jumpTo(0);
-                } else {
-                  unawaited(
-                    _scroll.animateTo(
-                      0,
-                      duration: AppDurations.fast,
-                      curve: AppCurves.smoothOut,
-                    ),
-                  );
-                }
-              },
+    // Tool rows pin expanded outputs against the session byte budget and can
+    // ask for a history re-read after an old output was released.
+    return ChatToolOutputScope(
+      reload: chat.reloadToolOutput,
+      setPinned: chat.pinToolOutput,
+      child: Stack(
+        children: [
+          ListView.builder(
+            // Explicit anchor: ScrollPosition only persists when a
+            // PageStorageKey exists between the scrollable and the pane bucket,
+            // so the timeline survives tab-body unmounts with its offset.
+            key: const PageStorageKey('chat-timeline'),
+            controller: _scroll,
+            reverse: true,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xxl,
+              AppSpacing.lg,
+              AppSpacing.xxl,
+              AppSpacing.sm,
             ),
+            itemCount: chat.timeline.messages.length,
+            itemBuilder: (context, reverseIndex) {
+              final index = chat.timeline.messages.length - 1 - reverseIndex;
+              final message = chat.timeline.messages[index];
+              return Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 820),
+                  child: ChatMessageView(
+                    key: ValueKey('${message.timestamp}-$index'),
+                    message: message,
+                    assistantNumber: assistantNumbers[index],
+                    thinkingIndex: chat.timeline.thinkingIndexFor(index),
+                    tools: chat.timeline.tools,
+                    registry: widget.registry,
+                    onShowChanges: (path) => widget.browser.showFiles(path),
+                  ),
+                ),
+              );
+            },
           ),
-      ],
+          if (!_following)
+            Positioned(
+              bottom: AppSpacing.sm,
+              right: AppSpacing.xxl,
+              child: AppActionButton.pill(
+                label: context.l10n.chatLatest,
+                leading: const Icon(Icons.arrow_downward),
+                onPressed: () {
+                  setState(() => _following = true);
+                  if (!_scroll.hasClients) return;
+                  if (MediaQuery.disableAnimationsOf(context)) {
+                    _scroll.jumpTo(0);
+                  } else {
+                    unawaited(
+                      _scroll.animateTo(
+                        0,
+                        duration: AppDurations.fast,
+                        curve: AppCurves.smoothOut,
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -243,7 +281,9 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
       ChatFailure.invalidEvent => l10n.chatInvalidEvent,
       null => null,
     };
-    final activityText = chat.isLoading
+    final activityText = widget.hibernating
+        ? l10n.chatWaking
+        : chat.isLoading
         ? l10n.chatLoading
         : chat.isSending
         ? l10n.modelUpdating
@@ -289,7 +329,31 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
                 ],
               ),
             ),
-          if (failureText != null)
+          if (widget.hibernating)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: AppCard(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                borderColor: context.colors.primary.withValues(alpha: 0.4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.chatHibernated,
+                        style: context.textTheme.bodySmall,
+                      ),
+                    ),
+                    if (widget.onWake != null)
+                      AppActionButton.subtle(
+                        label: l10n.chatWake,
+                        leading: const Icon(Icons.power_settings_new),
+                        onPressed: widget.waking ? null : widget.onWake,
+                      ),
+                  ],
+                ),
+              ),
+            )
+          else if (failureText != null)
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: AppCard(
@@ -421,15 +485,21 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
       // first prompt enters the bottom-docked conversation layout.
       final started =
           chat.timeline.messages.isNotEmpty || chat.isSending || chat.isRunning;
-      final conversation = AppComposerLayout(
-        started: started,
-        content: Column(
-          children: [
-            _header(context),
-            Expanded(child: _timeline(context)),
-          ],
+      // One shared backdrop pass for every glass card in this conversation
+      // (timeline bubbles, tool cards, starter panel, composer). Cards never
+      // overlap here; popups and dialogs render in the global overlay outside
+      // this subtree, so they never share the group key.
+      final conversation = BackdropGroup(
+        child: AppComposerLayout(
+          started: started,
+          content: Column(
+            children: [
+              _header(context),
+              Expanded(child: _timeline(context)),
+            ],
+          ),
+          editor: _editor(context, started),
         ),
-        editor: _editor(context, started),
       );
       if (widget.conversationOnly) return conversation;
       return AppSplitPanel(

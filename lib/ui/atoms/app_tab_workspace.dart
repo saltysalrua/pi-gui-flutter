@@ -15,6 +15,8 @@ enum _TabAction { split, merge, closeOthers }
 
 /// Reusable document host. ALL document bodies remain siblings in one Stack:
 /// reorder/split/merge never reparents or duplicates an editor's Element.
+/// Hidden panes drop their heavy body (bounded retention) and rebuild it from
+/// the owning controller on activation; scroll anchors survive in PageStorage.
 /// Background is deliberately transparent; the surrounding scaffold paints it.
 class AppTabWorkspace<T extends Object> extends StatefulWidget {
   const AppTabWorkspace({
@@ -273,6 +275,10 @@ class _DocumentPane extends StatefulWidget {
   State<_DocumentPane> createState() => _DocumentPaneState();
 }
 
+/// Bounded retention: only on-screen panes keep their heavy body (markdown,
+/// code blocks, diffs, images). Hidden panes keep this thin state, their
+/// PageStorage bucket and therefore their scroll anchors, while session
+/// controllers, drafts and attachments live outside and are never dropped.
 class _DocumentPaneState extends State<_DocumentPane>
     with SingleTickerProviderStateMixin {
   final _storage = PageStorageBucket();
@@ -315,7 +321,14 @@ class _DocumentPaneState extends State<_DocumentPane>
                 onFocusChange: (focused) {
                   if (focused) widget.onActivate();
                 },
-                child: PageStorage(bucket: _storage, child: widget.child),
+                // The bucket survives body swaps, so a remounted scrollable
+                // restores its offset on attach instead of starting at zero.
+                child: PageStorage(
+                  bucket: _storage,
+                  child: widget.visible
+                      ? widget.child
+                      : const SizedBox.expand(),
+                ),
               ),
             ),
           ),
