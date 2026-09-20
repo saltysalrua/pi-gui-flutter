@@ -50,11 +50,11 @@ tags: [github-actions, windows, linux, flutter, release]
 - Flutter：固定 **3.47.4 / stable**（Dart **3.13.3**），Windows 默认使用 Impeller。升级时显式更新 `.github/workflows/release.yml`，连同 SDK 约束和 `pubspec.lock` 一起验证；不要使用会自动漂移的最新 stable/beta。迁移结果与回退方式见 [Flutter 版本与渲染器](flutter_renderer.md)。
 - 依赖：提交 `pubspec.lock`，使用 `flutter pub get --enforce-lockfile`；Windows 随后执行已有 Cargokit 隐藏目录修复，Linux 不需要该修复。
 - 构建：`flutter build windows --release -t lib/main.dart` 与 `flutter build linux --release -t lib/main.dart`。CI 在全新目录构建，不接触开发机活动 GUI。
-- 包装：Windows 打包完整 `build/windows/x64/runner/Release`；Linux 打包完整 `build/linux/x64/release/bundle`，用 tar.gz 保留可执行位。两者都包含用户说明和第三方声明；缺少 AOT/资源、执行位丢失或发现额外 QA 可执行文件时拒绝包装。
+- 包装：Windows 打包完整 `build/windows/x64/runner/Release`；Linux 打包完整 `build/linux/x64/release/bundle`，用 tar.gz 保留可执行位。两者都包含用户说明、项目 MIT `LICENSE`、第三方声明、MiSans PDF、Material Icons 原文，以及本平台 `NOTICES.Z` 的可读副本 `licenses/Flutter-Pub-NOTICES.txt`；缺少 AOT/资源、许可汇总缺失或损坏、执行位丢失或发现额外 QA 可执行文件时拒绝包装。
 - 产物：`pi-gui-flutter-1.0.0+1-windows-x64.zip` 与 `pi-gui-flutter-1.0.0+1-linux-x64.tar.gz`，各带同名 `.sha256`；发布前再次校验哈希。
 - 不提供安装器、代码签名、macOS / ARM64 构建；不打包 Node.js、Pi、模型密钥或个人会话。
 
-用户运行方式及 VC++ 运行库要求见 [便携版使用说明](release_usage.md)，原生构建问题见 [Windows 构建说明](windows_build.md)，字体许可见 [第三方声明](../THIRD_PARTY_NOTICES.md)。公开仓库本身不等于授予开源许可；本次未擅自为项目代码选择 MIT/Apache 等许可证。
+用户运行方式及 VC++ 运行库要求见 [便携版使用说明](release_usage.md)，原生构建问题见 [Windows 构建说明](windows_build.md)，字体许可见 [第三方声明](../THIRD_PARTY_NOTICES.md)。项目原创代码采用根目录 [MIT 许可证](../LICENSE)，并随两平台压缩包分发；第三方组件、资源及未确认授权来源的品牌图稿不由项目 MIT 许可证重新授权。
 
 ## Agent 接手路径
 
@@ -67,7 +67,8 @@ tags: [github-actions, windows, linux, flutter, release]
 | `pubspec.yaml` / `pubspec.lock` | 应用版本与确定的依赖解析 |
 | `tool/fix_cargokit_windows.ps1` | 按实际 Pub 包路径修复上游已知问题 |
 | `docs/release_usage.md` | Release 正文与 ZIP 内 README 的共同来源；源码保留 YAML Frontmatter，发布时只输出 Markdown 正文 |
-| `THIRD_PARTY_NOTICES.md` / `assets/fonts/MiSans/LICENSE.pdf` | 随包分发的资源声明与字体原始许可 |
+| `LICENSE` / `THIRD_PARTY_NOTICES.md` / `assets/fonts/MiSans/LICENSE.pdf` / `licenses/MaterialIcons-LICENSE.txt` | 随包分发的组件声明与字体/图标原始许可；Flutter/Pub 可读原文从各平台构建产物生成 |
+| `docs/third_party_audit.md` | 许可核对方法、依赖升级维护步骤，以及原生依赖、品牌图稿和高亮语法来源的未完成项 |
 
 发布 Job 用 `python3 tool/ci_release.py notes` 生成临时说明文件，再交给 `gh release create --notes-file`。不把源码文档的 `title` / `type` / `status` 元信息展示给用户；ZIP 的 README 使用同样处理，正文中的 Markdown 分隔线保留。该变更只影响新发布，不自动覆盖既有 Release 正文或附件。
 

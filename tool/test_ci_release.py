@@ -1,5 +1,6 @@
 """Focused regression checks for the version gate and release archive boundary."""
 
+import gzip
 import hashlib
 import subprocess
 import tarfile
@@ -10,7 +11,15 @@ from contextlib import ExitStack
 from pathlib import Path
 from unittest import mock
 
-from ci_release import detect, git, package, package_linux, parse_version, release_notes
+from ci_release import (
+    detect,
+    flutter_notices,
+    git,
+    package,
+    package_linux,
+    parse_version,
+    release_notes,
+)
 
 
 class ReleaseTest(unittest.TestCase):
@@ -90,6 +99,19 @@ class ReleaseTest(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             detect(self.root, "push", {"before": "f" * 40})
 
+    def test_flutter_notices_reject_missing_corrupt_and_empty_text(self):
+        path = self.root / "data/flutter_assets/NOTICES.Z"
+        with self.assertRaises(ValueError):
+            flutter_notices(self.root)
+        path.parent.mkdir(parents=True)
+        for data in (b"not gzip", gzip.compress(b"\xff"), gzip.compress(b" \n")):
+            path.write_bytes(data)
+            with self.assertRaises(ValueError):
+                flutter_notices(self.root)
+        original = "Copyright 原始声明\r\nLicense text\n".encode()
+        path.write_bytes(gzip.compress(original))
+        self.assertEqual(flutter_notices(self.root), original)
+
     def test_complete_zip_checksum_and_qa_rejection(self):
         self.commit("1.0.0+1")
         source = self.root / "Release"
@@ -112,6 +134,11 @@ class ReleaseTest(unittest.TestCase):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"notice")
+        (self.root / "licenses").mkdir()
+        (self.root / "licenses/MaterialIcons-LICENSE.txt").write_bytes(b"icons notice")
+        notices = b"Original Flutter and Pub license texts\n"
+        (source / "data/flutter_assets/NOTICES.Z").write_bytes(gzip.compress(notices))
+        (self.root / "LICENSE").write_bytes(b"project MIT license")
         guide = self.root / "docs/release_usage.md"
         body = "# Windows 便携版使用说明\n\n正文。\n\n---\n\n保留正文分隔线。\n"
         guide.write_text(body, encoding="utf-8")
@@ -124,9 +151,13 @@ class ReleaseTest(unittest.TestCase):
         with zipfile.ZipFile(archive) as bundle:
             self.assertIsNone(bundle.testzip())
             self.assertIn("pi_gui.exe", bundle.namelist())
+            self.assertEqual(bundle.read("LICENSE"), b"project MIT license")
             self.assertIn("plugin.dll", bundle.namelist())
             self.assertIn("data/flutter_assets/font.ttf", bundle.namelist())
             self.assertIn("licenses/MiSans-LICENSE.pdf", bundle.namelist())
+            self.assertEqual(bundle.read("licenses/MaterialIcons-LICENSE.txt"), b"icons notice")
+            self.assertEqual(bundle.read("licenses/Flutter-Pub-NOTICES.txt"), notices)
+            self.assertEqual(gzip.decompress(bundle.read("data/flutter_assets/NOTICES.Z")), notices)
             self.assertEqual(bundle.read("README.md").decode("utf-8"), body)
         checksum = archive.with_suffix(".zip.sha256").read_text(encoding="utf-8")
         self.assertEqual(
@@ -162,6 +193,11 @@ class ReleaseTest(unittest.TestCase):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"notice")
+        (self.root / "licenses").mkdir()
+        (self.root / "licenses/MaterialIcons-LICENSE.txt").write_bytes(b"icons notice")
+        notices = b"Original Flutter and Pub license texts\n"
+        (source / "data/flutter_assets/NOTICES.Z").write_bytes(gzip.compress(notices))
+        (self.root / "LICENSE").write_bytes(b"project MIT license")
         body = "---\ntitle: 使用说明\n---\n\n# 使用说明\n\n正文。\n"
         (self.root / "docs/release_usage.md").write_text(body, encoding="utf-8-sig")
         # Windows stat cannot express the POSIX executable bit, so the
@@ -183,8 +219,20 @@ class ReleaseTest(unittest.TestCase):
                 "licenses/MiSans-LICENSE.pdf",
             ):
                 self.assertIn(expected, names)
+            for name, expected in (
+                ("LICENSE", b"project MIT license"),
+                ("licenses/MaterialIcons-LICENSE.txt", b"icons notice"),
+                ("licenses/Flutter-Pub-NOTICES.txt", notices),
+                ("data/flutter_assets/NOTICES.Z", notices),
+            ):
+                handle = bundle.extractfile(name)
+                assert handle is not None
+                actual = handle.read()
+                if name.endswith(".Z"):
+                    actual = gzip.decompress(actual)
+                self.assertEqual(actual, expected)
             readme_handle = bundle.extractfile("README.md")
-            self.assertIsNotNone(readme_handle)
+            assert readme_handle is not None
             self.assertEqual(
                 readme_handle.read().decode("utf-8"), release_notes(self.root)
             )

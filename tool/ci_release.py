@@ -4,6 +4,7 @@ Actions (stdlib only)."""
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import io
 import json
@@ -14,6 +15,7 @@ import subprocess
 import sys
 import tarfile
 import zipfile
+import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -108,9 +110,23 @@ def release_notes(root: Path) -> str:
 # Files from the repository that ship inside every release archive next to the
 # application itself.
 SHARED_FILES = (
+    ("LICENSE", "LICENSE"),
     ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
     ("assets/fonts/MiSans/LICENSE.pdf", "licenses/MiSans-LICENSE.pdf"),
+    ("licenses/MaterialIcons-LICENSE.txt", "licenses/MaterialIcons-LICENSE.txt"),
 )
+
+
+def flutter_notices(source: Path) -> bytes:
+    """Require Flutter's license bundle and preserve its original text bytes."""
+    path = source / "data/flutter_assets/NOTICES.Z"
+    try:
+        text = gzip.decompress(path.read_bytes())
+        if not text.decode("utf-8").strip():
+            raise ValueError("Flutter license bundle is empty")
+    except (OSError, EOFError, UnicodeError, zlib.error) as error:
+        raise ValueError("Missing or invalid Flutter license bundle: NOTICES.Z") from error
+    return text
 
 
 def write_checksum(archive: Path) -> None:
@@ -133,6 +149,7 @@ def package(root: Path, source: Path, output: Path) -> Path:
         raise ValueError(f"Unexpected EXE in release directory: {sorted(executables)}")
     if not (source / "data/flutter_assets").is_dir():
         raise ValueError("Incomplete Windows release: missing Flutter assets")
+    notices = flutter_notices(source)
     output.mkdir(parents=True, exist_ok=True)
     archive = output / f"pi-gui-flutter-{version}-windows-x64.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as bundle:
@@ -140,6 +157,7 @@ def package(root: Path, source: Path, output: Path) -> Path:
             if path.is_file():
                 bundle.write(path, path.relative_to(source).as_posix())
         bundle.writestr("README.md", release_notes(root).encode("utf-8"))
+        bundle.writestr("licenses/Flutter-Pub-NOTICES.txt", notices)
         for original, destination in SHARED_FILES:
             bundle.write(root / original, destination)
     write_checksum(archive)
@@ -174,6 +192,7 @@ def package_linux(root: Path, source: Path, output: Path) -> Path:
         raise ValueError(
             f"Unexpected executable in release directory: {sorted(executables)}"
         )
+    notices = flutter_notices(source)
     output.mkdir(parents=True, exist_ok=True)
     archive = output / f"pi-gui-flutter-{version}-linux-x64.tar.gz"
     with tarfile.open(archive, "w:gz") as bundle:
@@ -188,6 +207,9 @@ def package_linux(root: Path, source: Path, output: Path) -> Path:
         info = tarfile.TarInfo("README.md")
         info.size = len(readme)
         bundle.addfile(info, io.BytesIO(readme))
+        info = tarfile.TarInfo("licenses/Flutter-Pub-NOTICES.txt")
+        info.size = len(notices)
+        bundle.addfile(info, io.BytesIO(notices))
         for original, destination in SHARED_FILES:
             bundle.add(root / original, arcname=destination, recursive=False)
     write_checksum(archive)

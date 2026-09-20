@@ -61,4 +61,6 @@ sha256sum --check pi-gui-flutter-<版本>-linux-x64.tar.gz.sha256
 
 关闭旧版后，将新包解压到新的目录再运行，不要覆盖正在运行的程序。应用外观配置与附件缓存使用 GUI 自有的系统应用数据目录，Pi 会话与模型配置由 Pi 管理；“便携版”仅表示无需安装器，并不表示用户数据全部写在解压目录。
 
-本软件使用 MiSans 字体，随包附有 `THIRD_PARTY_NOTICES.md` 和 `licenses/MiSans-LICENSE.pdf`；Flutter / Pub 依赖许可保留在 `data/flutter_assets/NOTICES.Z` 中。
+项目原创代码采用 MIT 许可证，原文随包保存在 `LICENSE`；第三方代码、字体和图标仍适用各自许可，未确认授权来源的品牌图稿不在项目 MIT 授权范围内。
+
+随包附有 `THIRD_PARTY_NOTICES.md`、`licenses/MiSans-LICENSE.pdf` 和 `licenses/MaterialIcons-LICENSE.txt`。Flutter / Pub 依赖许可保留在 `data/flutter_assets/NOTICES.Z` 中，并提供可直接阅读的 `licenses/Flutter-Pub-NOTICES.txt`。
