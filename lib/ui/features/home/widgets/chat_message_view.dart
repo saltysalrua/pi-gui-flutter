@@ -84,6 +84,7 @@ class ChatMessageView extends StatelessWidget {
   Widget _render(BuildContext context, ValueChanged<String> showChanges) {
     final l10n = context.l10n;
     final user = message.role == 'user';
+    final errorMessage = stripTerminalControls(message.errorMessage ?? '');
     final children = <Widget>[];
     final steps = <Widget>[];
     var groupStart = 0;
@@ -199,14 +200,18 @@ class ChatMessageView extends StatelessWidget {
             message.stopReason == 'length' ||
             message.stopReason == 'error') ...[
           const SizedBox(height: AppSpacing.sm),
-          Text(
-            message.stopReason == 'aborted'
-                ? l10n.chatAborted
-                : message.stopReason == 'length'
-                ? l10n.chatLengthLimit
-                : l10n.chatReplyFailed,
-            style: context.textTheme.bodySmall?.copyWith(
-              color: context.colors.warning,
+          SelectionArea(
+            child: Text(
+              message.stopReason == 'aborted'
+                  ? l10n.chatAborted
+                  : message.stopReason == 'length'
+                  ? l10n.chatLengthLimit
+                  : errorMessage.trim().isNotEmpty
+                  ? errorMessage
+                  : l10n.chatReplyFailed,
+              style: context.textTheme.bodySmall?.copyWith(
+                color: context.colors.warning,
+              ),
             ),
           ),
         ],

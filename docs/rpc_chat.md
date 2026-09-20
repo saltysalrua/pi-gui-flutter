@@ -1,6 +1,6 @@
 ---
 title: "RPC 对话、Markdown 与文件改动"
-version: "1.9.0"
+version: "1.9.1"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, chat, markdown, diff]
@@ -28,6 +28,7 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 4. 点击停止：先通过 `clear_queue` 清掉待执行消息，再 `abort` 等 Pi 停止；清掉的消息追加回草稿，不覆盖用户新输入。
 5. 发送明确被拒时保留草稿。确认超时或确认帧损坏时，暂停再次发送，避免重复执行；不会把超时当成进程断线，也不会自动重放 Prompt。
 6. 从较早的消息向上查看时不强制跳回底部，可点击“回到最新消息”。
+7. 模型请求失败时，在对应 AI 消息下方直接显示 Pi 返回的错误详情，可选择复制；不再同时在输入框上方弹出相同警告，自动重试最终失败也一样。只有错误详情缺失或为空时才使用通用提示。断线、消息未被接受、压缩失败等没有对应消息内提示的操作错误仍保留原来的提醒。
 
 ### Markdown 与工具卡片
 
@@ -79,7 +80,7 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 | 主工作区 | `lib/ui/features/home/widgets/home_chat_panel.dart` | 两态布局、时间线、草稿、回到最新、响应式文件 / Git 右栏 |
 | 输入组件 | `lib/ui/features/home/widgets/home_starter_panel.dart` | 共用输入卡片、键盘/IME、紧凑模型入口 |
 | 消息 | `lib/ui/features/home/widgets/chat_message_view.dart` | 角色/发言编号、Markdown、思考和工具块的有序渲染，连续步骤分组 |
-| 显示文本 | `lib/core/utils/terminal_text.dart` | `stripTerminalControls` 线性扫描 CSI/OSC/控制字符串，兼容流式半截序列，仅在思考显示入口使用 |
+| 显示文本 | `lib/core/utils/terminal_text.dart` | `stripTerminalControls` 线性扫描 CSI/OSC/控制字符串，兼容流式半截序列，用于思考与模型错误的显示入口 |
 | 工具注册表 | `lib/ui/features/home/widgets/tool_card_registry.dart` | `ToolCardRegistry.register` / `unregister`，默认回退与共享 `ToolChangeDetails` |
 | 工作区右栏 | `lib/ui/features/home/widgets/workspace_browser_panel.dart` | 文件树、Git graph、只读预览；详见独立文档 |
 
@@ -134,6 +135,17 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 - `auto_retry_start/end`、`compaction_start/end` 及摘要重试有独立状态。手动压缩结束后可通过状态查询回到空闲。
 - `get_messages` 与实时事件竞态时，不能覆盖更晚的流式内容；运行中保留本地投影，需要校正时在 settled 后重新同步历史。普通完整回复只回读 `get_state`，不再每轮搬运全部历史；具体校正条件见下方“内存与重复处理”。
 - 历史工具结果按 toolCallId 合并，不额外制造重复消息。没有前置工具调用的历史结果仍有可见的回退卡片。
+
+### 模型错误的原文与单处提示
+
+```json
+{"type":"message_end","message":{"role":"assistant","content":[],"timestamp":1,"stopReason":"error","errorMessage":"400 Model request rejected: request_id=example"}}
+```
+
+- `PiChatMessage.errorMessage` 从 RPC 原样解析，`copyWith` 与历史重建均保留；不从正文猜错误，也不读取 Pi 私有日志。已有历史通过 `get_messages` 重新读取后同样显示详情。
+- `ChatMessageView` 复用原有消息底部状态位置、主题警告色与 `SelectionArea`，以纯文本显示错误，不当作 Markdown/HTML 执行或解析。只去除终端控制码；状态码、服务商文字、JSON、换行和请求标识保留。没有可见详情才回退到 `chatReplyFailed`；主动停止与长度上限提示不变。
+- `ChatController` 不再因 `message_end.stopReason == error` 或 `auto_retry_end.success == false` 设置输入框警告；模型错误由对应消息负责显示。重试状态、历史校正及 `agent_settled` 运行锁不变。`compaction_end` 等独立操作失败仍走原提醒，不能为了去重吞掉没有消息承载的错误。
+- 不增加 RPC、通用原子组件或后端异常重写。该详情是 **Pi 实际返回的错误**，不是绕过 Pi 抓取服务商完整 HTTP 报文。
 
 ### 思考动画的启停
 
@@ -201,7 +213,7 @@ assistantNumbers: null,       null, 1,         2,         null, 3
 - `prompt/new_session/switch_session` 超时保留未确认屏障；损坏的聊天写确认同样按结果未知处理。新聊天写不能越过它，读取和停止仍可用。
 - 迟到确认派发 `PiRpcConversationSettled`，只回读，不重新发送。会话切换确认派发 `PiRpcSessionChanged`，模型选择器重新读取模型/等级。
 - `clear_queue/abort` 不等待模型选择写入屏障，停止路径不会被未确认的模型选择卡住。
-- 顶层错误提示使用本地化的人话，不直接输出原始异常堆栈。原始工具返回仍可在明确展开的输出区域查看。
+- 连接、发送确认等顶层操作提示仍使用本地化的人话，不直接输出 GUI 内部异常堆栈。模型错误在消息内显示 Pi 的 `errorMessage`，不再被通用文案覆盖，也不重复触发输入框警告；原始工具返回仍可在展开的输出区域查看。
 
 ## 加载性能与验证方式
 
@@ -289,6 +301,8 @@ flutter analyze
 flutter test
 # 真实 RPC，无模型请求：新建隔离空会话、读状态/消息、清队列与停止
 dart run tool/check_chat_rpc.dart
+# 真实 Pi RPC + 本地 HTTP 错误响应：实时错误与历史恢复，无外部模型请求
+node tool/check_model_error.mjs
 # 原生 Pi write + 扩展事件回归：临时文件、无模型请求
 node tool/check_tool_diff.mjs
 # 可选端到端：真实 Pi RPC + 本地固定 SSE 响应，不访问外部模型
@@ -300,6 +314,8 @@ dart run tool/check_chat_rpc.dart --with-model
 ```
 
 `--with-model` 会消耗少量模型额度。探针使用独立的无持久化会话、关闭扩展/技能，临时目录在 finally 中清理；不编辑项目文件，也不改变 GUI 进程的模型选择。无参数运行不调用模型。
+
+模型错误回归在 `test/chat_rpc_test.dart`：RPC 实时/历史 errorMessage 映射、流式副本保留、空详情兼容，以及普通失败/重试失败/重试恢复不生成输入框警告且仍等待 settled 解锁；断线和压缩失败提醒不受影响。`tool/check_model_error.mjs` 使用临时隔离配置与仅绑定 127.0.0.1 的 HTTP 400 响应，验证真实 Pi 的 `message_end`、`get_messages` 和重新打开历史均保留错误，不读取用户配置、不访问外部模型。
 
 核心测试在 `test/chat_rpc_test.dart`：内容块拼接、最终替换、工具累计输出、Diff 行号/统计、write patch/元数据的实时和历史映射、无基线行号（含空文本/CRLF）、坏事件隔离、写确认未知、停止优先级、重试状态、历史竞态、恢复与取消切换。`tool/check_tool_diff.mjs` 使用真实原生 write 验证新建/覆盖写、patch 往返、空文件/BOM/CRLF、保留扩展 details、并发 write/edit/shell、失败/参数改动/写后不符/会话清理、大小和二进制降级。加 `--rpc` 使用仅绑定 127.0.0.1 的固定 SSE 响应驱动真实 Pi：并行新建/覆盖写、CLI 扩展装载、实时 patch、切换会话后持久历史恢复；Pi 配置与会话完全隔离在临时目录，不访问外部模型、不消耗模型额度。无纯展示 Widget 测试。
 

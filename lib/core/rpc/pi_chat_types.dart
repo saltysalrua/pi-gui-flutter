@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'pi_rpc_types.dart';
 
 /// Provider content is kept in order; no model-specific reasoning assumptions.
@@ -110,6 +111,7 @@ class PiChatMessage {
     this.timestamp = 0,
     this.model,
     this.stopReason,
+    this.errorMessage,
     this.toolCallId,
     this.toolName,
     this.result,
@@ -131,6 +133,7 @@ class PiChatMessage {
       timestamp: (json['timestamp'] as num?)?.toInt() ?? 0,
       model: json['model'] as String?,
       stopReason: json['stopReason'] as String?,
+      errorMessage: json['errorMessage'] as String?,
       toolCallId: json['toolCallId'] as String?,
       toolName: json['toolName'] as String?,
       result: role == 'toolResult' ? PiToolResult.fromJson(json) : null,
@@ -140,6 +143,9 @@ class PiChatMessage {
   final List<PiContent> content;
   final int timestamp;
   final String? model, stopReason, toolCallId, toolName;
+
+  /// Pi's model/provider error, preserved for both live messages and history.
+  final String? errorMessage;
   final PiToolResult? result;
   final bool isStreaming;
   String get text => content
@@ -153,6 +159,7 @@ class PiChatMessage {
         timestamp: timestamp,
         model: model,
         stopReason: stopReason,
+        errorMessage: errorMessage,
         toolCallId: toolCallId,
         toolName: toolName,
         result: result,

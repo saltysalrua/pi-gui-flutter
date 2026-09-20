@@ -87,6 +87,137 @@ class FakeChatGateway implements PiChatGateway {
 }
 
 void main() {
+  test(
+    'model errors survive RPC live projection, copies and history reads',
+    () async {
+      const detail =
+          '429 {"error":{"message":"额度不足 / quota exceeded"}}\n'
+          'request_id: local-fixture';
+      final failed = {
+        ...message('assistant', [text('partial reply')]),
+        'stopReason': 'error',
+        'errorMessage': detail,
+      };
+      final transport = TestTransport();
+      final pi = PiRpcClient(transportFactory: () async => transport);
+      addTearDown(pi.close);
+      final timeline = ChatTimeline();
+      final sub = pi.events
+          .where((e) => e is PiChatEvent)
+          .listen((e) => timeline.apply(e as PiChatEvent));
+      addTearDown(sub.cancel);
+      transport.onSend = (request) => transport.reply(request, {
+        'messages': [failed],
+      });
+      await pi.connect();
+      transport.emit({'type': 'message_start', 'message': failed});
+      await tick();
+      expect(timeline.messages.single.errorMessage, detail);
+      expect(timeline.messages.single.isStreaming, true);
+      transport.emit({'type': 'message_end', 'message': failed});
+      transport.emit({'type': 'agent_settled'});
+      await tick();
+      expect(timeline.messages.single.errorMessage, detail);
+      expect(timeline.messages.single.text, 'partial reply');
+      expect(timeline.messages.single.isStreaming, false);
+      expect(
+        timeline.messages.single.copyWith(content: []).errorMessage,
+        detail,
+      );
+      timeline.load(await pi.getMessages());
+      expect(timeline.messages.single.errorMessage, detail);
+      expect(timeline.messages.single.stopReason, 'error');
+      // Older histories and provider errors without details remain valid.
+      for (final fields in [
+        <String, dynamic>{},
+        {'errorMessage': null},
+        {'errorMessage': ''},
+      ]) {
+        expect(
+          PiChatMessage.fromJson({
+            ...message('assistant', []),
+            'stopReason': 'error',
+            ...fields,
+          }).errorMessage,
+          fields['errorMessage'],
+        );
+      }
+    },
+  );
+
+  test('model failures stay in the timeline, never the composer, including retries', () async {
+    for (final retry in ['none', 'failed', 'succeeded']) {
+      final pi = FakeChatGateway();
+      final chat = ChatController(pi);
+      try {
+        await chat.refresh();
+        final failed = {
+          ...message('assistant', [], 2),
+          'stopReason': 'error',
+          'errorMessage': '503 upstream unavailable',
+        };
+        void finish(Map<String, dynamic> value) {
+          pi.stream.add(
+            event('message_start', {
+              'message': message('assistant', [], value['timestamp'] as int),
+            }),
+          );
+          pi.stream.add(event('message_end', {'message': value}));
+        }
+
+        pi.stream.add(event('agent_start'));
+        finish(failed);
+        expect(chat.failure, isNull);
+        expect(
+          chat.timeline.messages.single.errorMessage,
+          failed['errorMessage'],
+        );
+        pi.stream.add(event('agent_end', {'willRetry': retry != 'none'}));
+        expect(chat.canSend, false);
+        if (retry != 'none') {
+          pi.stream.add(event('auto_retry_start'));
+          expect(chat.activity, ChatActivity.retrying);
+          pi.stream.add(event('agent_start'));
+          final last = retry == 'failed'
+              ? {...failed, 'timestamp': 3}
+              : {
+                  ...message('assistant', [text('recovered')], 3),
+                  'stopReason': 'stop',
+                };
+          finish(last);
+          pi.stream.add(
+            event('auto_retry_end', {
+              'success': retry == 'succeeded',
+              if (retry == 'failed') 'finalError': failed['errorMessage'],
+            }),
+          );
+          expect(chat.failure, isNull);
+          expect(chat.canSend, false);
+          pi.history = [PiChatMessage.fromJson(last)];
+        }
+        pi.stream.add(event('agent_settled'));
+        await tick();
+        expect(chat.canSend, true);
+        expect(chat.failure, isNull);
+        expect(
+          chat.timeline.messages.last.errorMessage,
+          retry == 'succeeded' ? null : failed['errorMessage'],
+        );
+        // Failures without an assistant message must still be reported.
+        pi.stream.add(
+          event('compaction_end', {'errorMessage': 'failed to compact'}),
+        );
+        await tick();
+        expect(chat.failure, ChatFailure.reply);
+        pi.stream.add(const PiRpcDisconnected());
+        expect(chat.failure, ChatFailure.disconnected);
+      } finally {
+        chat.dispose();
+        await pi.stream.close();
+      }
+    }
+  });
+
   test('stream batches only notify content; final state flushes without a stale batch', () async {
     final gateway = FakeChatGateway();
     final chat = ChatController(gateway);

@@ -384,8 +384,9 @@ class ChatController extends ChangeNotifier {
       case 'summarization_retry_attempt_start':
         activity = ChatActivity.compacting;
       case 'auto_retry_end':
+        // The failed assistant message already carries the model error.
+        // Retry completion must not duplicate it above the composer.
         activity = ChatActivity.working;
-        if (event.failed) failure = ChatFailure.reply;
       case 'compaction_end':
         _needsHistory = true;
         activity = _awaitingSettled ? ChatActivity.working : ChatActivity.idle;
@@ -396,8 +397,6 @@ class ChatController extends ChangeNotifier {
         _applyOutputBudget();
       case 'queue_update':
         queue = event.queued ?? const PiPromptQueue();
-      case 'message_end':
-        if (event.message?.stopReason == 'error') failure = ChatFailure.reply;
     }
     if ((event.type == 'message_update' ||
             event.type == 'tool_execution_update') &&

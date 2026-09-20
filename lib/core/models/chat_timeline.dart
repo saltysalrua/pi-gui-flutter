@@ -167,6 +167,7 @@ class ChatTimeline {
           timestamp: current.timestamp,
           model: current.model,
           stopReason: current.stopReason,
+          errorMessage: current.errorMessage,
           toolCallId: current.toolCallId,
           toolName: current.toolName,
           result: replacement,
