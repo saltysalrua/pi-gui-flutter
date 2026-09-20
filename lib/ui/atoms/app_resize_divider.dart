@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
@@ -69,6 +70,9 @@ class _AppResizeDividerState extends State<AppResizeDivider> {
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        // Resizing starts at pointer-down, not after the recognition slop.
+        // Keep that first movement instead of making the edge trail the mouse.
+        dragStartBehavior: DragStartBehavior.down,
         onDoubleTap: widget.onReset,
         onHorizontalDragStart: (_) {
           widget.onDragStart?.call();

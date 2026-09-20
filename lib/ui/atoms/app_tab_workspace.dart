@@ -136,7 +136,11 @@ class _AppTabWorkspaceState<T extends Object>
                         if (spare <= 0) return;
                         final a = visible[i].id, b = visible[i + 1].id;
                         final pair = widths[a]! + widths[b]!;
-                        final next = (widths[a]! + dx).clamp(
+                        // Several pointer updates can arrive before a build.
+                        // Accumulate from live state, not the last frame's width.
+                        final current =
+                            _minimumPane + spare * _weights[a]! / total;
+                        final next = (current + dx).clamp(
                           _minimumPane,
                           pair - _minimumPane,
                         );

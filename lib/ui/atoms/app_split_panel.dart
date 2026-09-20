@@ -126,10 +126,11 @@ class _AppSplitPanelState extends State<AppSplitPanel> {
                                     onDragEnd: () =>
                                         setState(() => _dragging = false),
                                     onDelta: (dx) => setState(
-                                      () => _width = (width - dx).clamp(
-                                        minimum,
-                                        maximum,
-                                      ),
+                                      // Keep every update between frames; start
+                                      // from the visible edge if window-clamped.
+                                      () => _width =
+                                          (_width.clamp(minimum, maximum) - dx)
+                                              .clamp(minimum, maximum),
                                     ),
                                     onReset: () => setState(() => _width = 300),
                                   ),

@@ -1,6 +1,6 @@
 ---
 title: "右侧文件树、Git graph 与毛玻璃"
-version: "2.0.1"
+version: "2.0.2"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, workspace, git, graph, diff, acrylic, rpc]
@@ -55,6 +55,7 @@ tags: [flutter, workspace, git, graph, diff, acrylic, rpc]
 - 右栏和 10px 拖拽条本身透明，没有纯色 `ColoredBox` 或卡片叠在主背景上。覆盖式窄栏还会裁掉右栏后方的聊天内容，防止输入框或消息透到栏内。
 - `WindowMaterialScope.tint` 只在原生材质 `active` 且非高对比度时允许透明；否则各区立即回退纯色。沿用已有 Windows Acrylic，不修改原生 C++、系统透明设置或用户外观偏好。
 - 普通停靠栏展开 / 收起使用 slow 400ms / medium 350ms；窄窗阻断浮层使用 fast 250ms / quick 150ms。拖拽即时更新，切页 quick 150ms；减弱动态时立即完成。尺寸动画驱动同一份布局与背景边界，不产生重叠 tint。
+- 调宽从当前 `_width` 累加每次鼠标位移，不能从 build 捕获的旧 `width` 开始；保留起拖位移、窗口约束与双击复位。这样高频鼠标事件不会互相覆盖，边界反向拖动也即时生效。代码与回归见 [分隔条拖拽](document_tabs.md#分隔条拖拽)。
 - 每个 `HomeChatPanel` 的空态 / 会话态始终使用同一个 `AppComposerLayout`。`HomeView` 的 `AppTabWorkspace` 把所有会话与文档正文放在同一扁平 Stack 下，切页、排序与跨组移动不会重新挂载编辑器；右栏入口位于当前活动组的标签栏。
 
 材质原理、系统回退与独立卡片毛玻璃见 [外观设置](appearance_settings.md)。

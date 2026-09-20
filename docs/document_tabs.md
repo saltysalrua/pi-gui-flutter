@@ -1,6 +1,6 @@
 ---
 title: "文档标签页与并排分组"
-version: "2.0.0"
+version: "2.0.1"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, tabs, workspace, diff, layout]
@@ -28,6 +28,15 @@ tags: [flutter, tabs, workspace, diff, layout]
 5. **标签页操作 → 合并所有标签页** 将所有分组合并，保留当前选中文档；**关闭其他标签页** 按同样的关闭确认规则逐项处理，保留当前文档。
 
 同一组只有一个文档时，不提供无意义的继续拆分。可建立多个横向分组；每组至少留 300 逻辑像素。可用宽度不够时只显示当前活动组，其余文档仍可从“所有标签页”访问；放大后恢复原分组和宽度比例，不自动关闭文档。不实现上下分组或窗口外拖出。
+
+### 分隔条拖拽
+
+中间分组、首页 / 设置左侧栏、文件 / Git 右侧栏复用 `lib/ui/atoms/app_resize_divider.dart`。拖动直接更新尺寸，不加追赶鼠标的补间动画；悬停手柄、开关面板与双击复位仍保留原有动效。
+
+- 公共 `GestureDetector` 使用 `DragStartBehavior.down`，识别拖拽时保留从按下位置开始的位移，不丢掉起拖的第一段移动。`details.delta.dx` 已经过 `AppScale` 的坐标转换，不能再按 UI 比例重复缩放。
+- `AppTabWorkspace` 从当前 `_weights` 计算相邻分组的新宽度；`AppSplitPanel` 从当前 `_width` 累加位移；左栏 `SidebarLayoutController.resizeBy` 同样使用当前状态。**不要用 build 捕获的上一帧宽度累加**：一帧内多次鼠标移动会互相覆盖，造成鼠标走 60px、分隔条只走最后 3px 的滞后。
+- 每次更新都限制在可见宽度范围内，不累计越界距离，碰到最小 / 最大宽度后反向拖动立即生效。每组最小宽度、窄窗单组、双击等分与侧栏默认宽度不变。不读写文件、不发送 RPC。
+- `test/app_tab_workspace_test.dart` 与 `test/app_resize_drag_test.dart` 覆盖真实 Flutter 鼠标事件：起拖位移、帧间突发 20 次移动、逐帧反向、边界反向、2 / 3 组只调整相邻宽度、100% / 125% 缩放、取消与双击复位。这些是输入 / 几何状态回归，不做截图或样式断言。
 
 ### 键盘
 
@@ -103,6 +112,14 @@ tags: [flutter, tabs, workspace, diff, layout]
 沿用浏览 Controller 的 generation 和工作区返回值检查。关闭页面后的 FutureBuilder 会丢弃迟到快照；切换工作区的旧请求不会落进新文档。只读限制、256 KiB 预览上限、符号链接 / 路径防护、首次 / 合并提交 Diff 语义均见 [工作区浏览](workspace_browser.md)。
 
 ## 验证
+
+拖拽跟手修复定向验证：
+
+```bash
+flutter test --no-pub test/app_resize_drag_test.dart test/app_tab_workspace_test.dart test/app_tabs_controller_test.dart
+```
+
+共 11 项通过；新用例先在旧实现复现丢位移，再验证修复。以下为原标签页功能的历史验证记录。
 
 ```bash
 flutter analyze --no-pub

@@ -1,7 +1,10 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_gui/l10n/app_localizations.dart';
 import 'package:pi_gui/ui/atoms/app_document_tabs.dart';
+import 'package:pi_gui/ui/atoms/app_resize_divider.dart';
+import 'package:pi_gui/ui/atoms/app_scale.dart';
 import 'package:pi_gui/ui/atoms/app_tab_workspace.dart';
 import 'package:pi_gui/ui/core/app_tabs_controller.dart';
 import 'package:pi_gui/ui/core/theme/app_theme.dart';
@@ -51,12 +54,14 @@ Future<void> _pump(
   WidgetTester tester,
   AppTabsController<int> controller,
   Map<int, ScrollController> bodies,
-  List<int> unloaded,
-) => tester.pumpWidget(
+  List<int> unloaded, {
+  double scale = 1,
+}) => tester.pumpWidget(
   MaterialApp(
     theme: AppTheme.lightTheme,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
+    builder: (context, child) => AppScale(scale: scale, child: child!),
     home: Scaffold(
       body: AppTabWorkspace<int>(
         controller: controller,
@@ -73,6 +78,74 @@ Future<void> _pump(
 );
 
 void main() {
+  for (final (groups, scale) in [(2, 1.0), (3, 1.25)]) {
+    testWidgets(
+      '$groups panes accumulate mouse moves between frames at scale $scale',
+      (tester) async {
+        tester.view
+          ..devicePixelRatio = 1
+          ..physicalSize = const Size(1600, 900);
+        addTearDown(tester.view.reset);
+        final controller = AppTabsController<int>(home: 0);
+        addTearDown(controller.dispose);
+        for (var tab = 1; tab < groups; tab++) {
+          controller.open(tab);
+          controller.split(tab);
+        }
+        final bodies = <int, ScrollController>{};
+        final unloaded = <int>[];
+        await _pump(tester, controller, bodies, unloaded, scale: scale);
+        final divider = find.byType(AppResizeDivider).first;
+        final lastPane = find.byWidgetPredicate(
+          (widget) => widget is _ProbeBody && widget.id == groups - 1,
+        );
+        final lastWidth = tester.getSize(lastPane).width;
+        final gesture = await tester.startGesture(
+          tester.getCenter(divider),
+          kind: PointerDeviceKind.mouse,
+        );
+        // Cross the drag recognizer's slop before measuring tracking.
+        await gesture.moveBy(Offset(30 * scale, 0));
+        await tester.pump();
+        final start = tester.getTopLeft(divider).dx;
+
+        // High-polling mice can deliver many updates before the next frame.
+        for (var i = 0; i < 20; i++) {
+          await gesture.moveBy(Offset(3 * scale, 0));
+        }
+        await tester.pump();
+        expect(
+          tester.getTopLeft(divider).dx,
+          closeTo(start + 60 * scale, 0.01),
+        );
+        if (groups == 3) {
+          expect(tester.getSize(lastPane).width, closeTo(lastWidth, 0.01));
+        }
+
+        // Moving the divider itself must not change the pointer's delta.
+        for (var i = 0; i < 10; i++) {
+          await gesture.moveBy(Offset(-6 * scale, 0));
+          await tester.pump();
+          expect(
+            tester.getTopLeft(divider).dx,
+            closeTo(start + (60 - 6 * (i + 1)) * scale, 0.01),
+          );
+        }
+
+        // Clamp without banking overshoot; reversing responds immediately,
+        // even when the reversal arrives before the next build.
+        await gesture.moveBy(Offset(-2000 * scale, 0));
+        await gesture.moveBy(Offset(-20 * scale, 0));
+        await gesture.moveBy(Offset(15 * scale, 0));
+        await tester.pump();
+        expect(tester.getTopLeft(divider).dx, closeTo(315 * scale, 0.01));
+        expect(unloaded, isEmpty);
+        await gesture.up();
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
   testWidgets(
     'hidden tab bodies unload while their scroll anchors survive in PageStorage',
     (tester) async {

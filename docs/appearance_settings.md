@@ -1,6 +1,6 @@
 ---
 title: "外观设置：动态配色、分区毛玻璃与缩放"
-version: "1.9.0"
+version: "1.9.1"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, settings, material3, windows, theme]
@@ -105,6 +105,7 @@ tags: [flutter, settings, material3, windows, theme]
 - 共享状态位于 `lib/ui/core/sidebar_layout_controller.dart` 的 `SidebarLayoutController.instance`，由应用进程持有，两页通过 `ListenableBuilder` 订阅。页面不各存一份宽度，也不相互调用 `setState`。
 - 默认 260px，最小 180px，最大为 480px 与当前逻辑视口宽度一半中的较小值（沿用首页限制）。`widthFor(viewportWidth)` 统一计算显示宽度，`resizeBy(delta, viewportWidth: ...)` 从实际显示边缘开始拖动，避免窗口变窄后反向拖动出现空行程；`reset()` 恢复默认。
 - 窗口缩小只临时限制显示宽度，未继续拖动时放大可恢复之前的宽度。UI 比例变化仍使用缩放后的逻辑视口计算，两页上限一致。
+- 公共 `AppResizeDivider` 保留按下后的起拖位移；宽度从 Controller 当前状态累加，帧内多次鼠标事件不丢失，边界反向也没有空行程。输入与缩放回归见 [分隔条拖拽](document_tabs.md#分隔条拖拽)。
 - 设置页逻辑视口不足 760px 时继续隐藏侧栏及拖拽区，将返回和搜索移到顶部；不重置共享宽度，恢复宽窗口后继续使用原值。
 - 宽度仅保存在本次 GUI 运行期间，重新启动恢复默认；不写入 `appearance.json`，不触发配色保存或 Pi RPC，也不改聊天会话。
 
