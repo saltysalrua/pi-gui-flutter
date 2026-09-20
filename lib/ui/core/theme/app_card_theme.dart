@@ -12,6 +12,16 @@ class AppCardTheme extends ThemeExtension<AppCardTheme> {
   final double blurSigma;
 
   @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppCardTheme &&
+          opacity == other.opacity &&
+          blurSigma == other.blurSigma;
+
+  @override
+  int get hashCode => Object.hash(opacity, blurSigma);
+
+  @override
   AppCardTheme copyWith({double? opacity, double? blurSigma}) => AppCardTheme(
     opacity: opacity ?? this.opacity,
     blurSigma: blurSigma ?? this.blurSigma,

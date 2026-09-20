@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/models/appearance_preferences.dart';
@@ -195,4 +196,76 @@ class AppTheme {
       ),
     );
   }
+}
+
+/// Bounded, owner-scoped theme cache. Preference saving, slot visibility and
+/// glass tint changes must not regenerate M3 palettes or restart AnimatedTheme.
+/// PiGuiApp creates this outside its listener builder (and renews on reload).
+class AppThemeCache {
+  final _entries = <Brightness, _ThemeEntry>{};
+
+  ThemeData resolve(
+    Brightness brightness, {
+    required AppearancePreferences preferences,
+    Color? systemAccent,
+  }) {
+    final p = preferences;
+    final seed = switch (p.source) {
+      PaletteSource.original => null,
+      PaletteSource.system =>
+        systemAccent?.toARGB32() ?? AppearancePreferences.defaultSeed,
+      PaletteSource.custom => p.seed,
+    };
+    final overrides = brightness == Brightness.dark
+        ? p.darkColors
+        : p.lightColors;
+    var entry = _entries[brightness];
+    if (entry == null ||
+        entry.seed != seed ||
+        entry.fontSize != p.baseFontSize ||
+        !mapEquals(entry.overrides, overrides)) {
+      entry = _ThemeEntry(
+        seed: seed,
+        fontSize: p.baseFontSize,
+        overrides: overrides,
+        base: AppTheme.build(
+          brightness,
+          preferences: p.copyWith(
+            cardGlass: AppearancePreferences.defaultCardGlass,
+          ),
+          systemAccent: systemAccent,
+        ),
+      );
+      _entries[brightness] = entry;
+    }
+    final opacity = p.cardGlass.enabled ? p.cardGlass.opacity : 1.0;
+    if (entry.opacity != opacity) {
+      entry.opacity = opacity;
+      entry.theme = entry.base.copyWith(
+        extensions: [
+          ...entry.base.extensions.values.where((e) => e is! AppCardTheme),
+          AppCardTheme(
+            opacity: opacity,
+            blurSigma: opacity < 1 ? AppGlass.cardBlurSigma : 0,
+          ),
+        ],
+      );
+    }
+    return entry.theme;
+  }
+}
+
+class _ThemeEntry {
+  _ThemeEntry({
+    required this.seed,
+    required this.fontSize,
+    required this.overrides,
+    required this.base,
+  }) : theme = base;
+  final int? seed;
+  final double fontSize;
+  final Map<AppearanceColor, int> overrides;
+  final ThemeData base;
+  double opacity = 1;
+  ThemeData theme;
 }

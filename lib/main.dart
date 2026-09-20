@@ -53,10 +53,13 @@ class PiGuiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = appearance ?? AppearanceController.instance;
+    // The listener below rebuilds on preference/accent changes, not this
+    // widget. Keep two theme snapshots here; hot reload naturally clears them.
+    final themes = AppThemeCache();
     return AppearanceScope(
       controller: controller,
       child: ListenableBuilder(
-        listenable: controller,
+        listenable: controller.appearanceChanges,
         builder: (context, _) {
           AppFramePolicy.instance.configure(
             frameRate: controller.preferences.frameRate,
@@ -65,12 +68,12 @@ class PiGuiApp extends StatelessWidget {
           return MaterialApp(
             title: 'Pi',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.build(
+            theme: themes.resolve(
               Brightness.light,
               preferences: controller.preferences,
               systemAccent: controller.systemAccent,
             ),
-            darkTheme: AppTheme.build(
+            darkTheme: themes.resolve(
               Brightness.dark,
               preferences: controller.preferences,
               systemAccent: controller.systemAccent,

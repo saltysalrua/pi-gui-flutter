@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_gui/core/models/appearance_preferences.dart';
 import 'package:pi_gui/core/services/appearance_store.dart';
 import 'package:pi_gui/ui/core/theme/app_colors_extension.dart';
+import 'package:pi_gui/ui/core/theme/app_card_theme.dart';
 import 'package:pi_gui/ui/core/theme/app_theme.dart';
 import 'package:pi_gui/ui/core/theme/appearance_palette.dart';
 import 'package:pi_gui/ui/features/settings/controllers/appearance_controller.dart';
@@ -33,6 +34,143 @@ class _Store implements AppearanceStore {
 }
 
 void main() {
+  test('theme snapshots invalidate only their actual inputs', () {
+    final cache = AppThemeCache();
+    final p = AppearancePreferences(source: PaletteSource.system);
+    const accent = Color(0xff126789);
+    ThemeData resolve(
+      AppearancePreferences value, [
+      Brightness b = Brightness.light,
+    ]) => cache.resolve(b, preferences: value, systemAccent: accent);
+    final light = resolve(p);
+    final dark = resolve(p, Brightness.dark);
+    final nonTheme = p.copyWith(
+      mode: AppearanceMode.dark,
+      uiScale: 1.25,
+      frameRate: 60,
+      animationFrameRate: 60,
+      sessionIdleMinutes: 15,
+      toolDisplay: ToolDisplayMode.expanded,
+      slotVisibility: {'aboveEditor': false},
+      sidebarGlass: const GlassPreferences(enabled: true, opacity: .3),
+      canvasGlass: const GlassPreferences(enabled: true, opacity: .4),
+    );
+    expect(identical(resolve(nonTheme), light), isTrue);
+    expect(identical(resolve(nonTheme, Brightness.dark), dark), isTrue);
+    // Serialization copies maps; equal values must still hit the cache.
+    expect(
+      identical(resolve(AppearancePreferences.fromJson(p.toJson())), light),
+      isTrue,
+    );
+    final glass = p.copyWith(
+      cardGlass: const GlassPreferences(enabled: true, opacity: .4),
+    );
+    final material = resolve(glass);
+    expect(material.extension<AppCardTheme>()!.opacity, .4);
+    expect(material.colorScheme, light.colorScheme);
+    expect(material.textTheme, light.textTheme);
+    expect(
+      identical(
+        material.extension<AppColorsExtension>(),
+        light.extension<AppColorsExtension>(),
+      ),
+      isTrue,
+    );
+    expect(identical(resolve(glass), material), isTrue);
+    expect(
+      material,
+      AppTheme.build(
+        Brightness.light,
+        preferences: glass,
+        systemAccent: accent,
+      ),
+    );
+    final overridden = glass.withColor(
+      AppearanceColor.canvas,
+      0xff123456,
+      dark: true,
+    );
+    expect(identical(resolve(overridden), material), isTrue);
+    expect(
+      resolve(overridden, Brightness.dark).scaffoldBackgroundColor,
+      const Color(0xff123456),
+    );
+    expect(
+      resolve(p.copyWith(baseFontSize: 16)).textTheme.bodyMedium!.fontSize,
+      16,
+    );
+    final custom = p.copyWith(source: PaletteSource.custom, seed: 0xff873312);
+    expect(
+      resolve(custom),
+      AppTheme.build(Brightness.light, preferences: custom),
+    );
+    final changedAccent = cache.resolve(
+      Brightness.light,
+      preferences: p,
+      systemAccent: const Color(0xff00aa22),
+    );
+    expect(changedAccent, isNot(light));
+    final fallback = cache.resolve(Brightness.light, preferences: p);
+    expect(fallback, AppTheme.build(Brightness.light, preferences: p));
+    final original = p.copyWith(source: PaletteSource.original);
+    final originalTheme = resolve(original);
+    expect(
+      identical(
+        cache.resolve(
+          Brightness.light,
+          preferences: original,
+          systemAccent: null,
+        ),
+        originalTheme,
+      ),
+      isTrue,
+    );
+    expect(AppColorsExtension.light.copyWith(), AppColorsExtension.light);
+    expect(
+      AppColorsExtension.light.copyWith().hashCode,
+      AppColorsExtension.light.hashCode,
+    );
+    expect(const AppCardTheme(opacity: .4), const AppCardTheme(opacity: .4));
+  });
+
+  test(
+    'save status and unchanged accent do not broadcast global appearance',
+    () async {
+      final store = _Store();
+      Color? accent = const Color(0xff123456);
+      final c = AppearanceController(
+        store: store,
+        readAccent: () async => accent,
+      );
+      addTearDown(c.dispose);
+      await c.initialize(observeSystem: false);
+      var globalChanges = 0, statusChanges = 0;
+      c.appearanceChanges.addListener(() => globalChanges++);
+      Listenable.merge([c, c.statusChanges]).addListener(() => statusChanges++);
+      c.update(c.preferences.copyWith(slotVisibility: {'aboveEditor': false}));
+      expect(globalChanges, 1);
+      await c.settled;
+      expect(globalChanges, 1);
+      expect(statusChanges, 2);
+      await c.refreshSystemColor();
+      expect(globalChanges, 1);
+      expect(statusChanges, 4);
+      accent = const Color(0xff987654);
+      await c.refreshSystemColor();
+      expect(globalChanges, 2);
+      store.failSave = true;
+      c.update(c.preferences.copyWith(uiScale: 1.25));
+      await c.settled;
+      expect(globalChanges, 3);
+      expect(c.saveFailed, isTrue);
+      store.failSave = false;
+      c.retrySave();
+      await c.settled;
+      expect(c.saveFailed, isFalse);
+      expect(globalChanges, 4);
+    },
+  );
+
   test(
     'independent frame caps default, round trip and reject invalid values',
     () {

@@ -1,6 +1,6 @@
 ---
 title: "外观设置：动态配色、分区毛玻璃与缩放"
-version: "1.8.0"
+version: "1.9.0"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, settings, material3, windows, theme]
@@ -48,6 +48,12 @@ tags: [flutter, settings, material3, windows, theme]
 - 仅删除 `FadeTransition` 不够：普通 opaque 路由在入场完成前仍会绘制前一页，两个半透明外壳会叠色。新路由在返回的最后一帧也停止绘制自身，确保首页恢复绘制时不会再叠一层设置背景。不要改回整页 Fade / Slide，也不要用不透明遮罩来掩盖问题。
 - `AppDesktopScaffold.contentAnimation` 只变换子内容，侧栏和正文分别裁切到各自区域。该参数默认空，不给首页插入新的动画包装，不改变现有首页布局或子树路径。设置页弹出的菜单、取色器和确认框仍保留下面的设置页面，沿用自身公共动效。
 - 设置分组 `AppSettingsGroup` 在减弱动态时直接显示内容，与 `AppDisclosure` 一致；不再运行零时长 `AnimatedSize`，避免 Flutter beta 在布局过程中同步重新标脏的断言。
+
+### 设置更新与首屏性能
+
+外观页按可见分组挂载，不在入场首帧布局屏幕外的全部选项。普通开关、保存完成、系统色读取忙碌状态不再触发等值主题的全局动画；真实配色和卡片材质变化仍使用原有过渡。两套主题按实际输入缓存，`AppearanceScope` 只传播偏好/强调色变化，保存状态由页面额外订阅 `Controller.statusChanges`。设置子页淡切时独立持有滚动控制器与模糊组键。
+
+定位依据、代码路径、性能对照与测试边界见 [设置页性能审计](settings_performance.md)。不修改偏好格式、帧率、Pi RPC 或当前会话。
 
 ### 分区桌面毛玻璃
 
@@ -167,7 +173,7 @@ Windows 设置中开启“从背景自动选取强调色”后，应用可间接
 | `lib/ui/atoms/app_select.dart` | 复用操作按钮的带文字选择框，键盘与菜单动效 |
 | `lib/ui/atoms/app_color_picker.dart` | 色块、颜色按钮与局部草稿式 HEX/HSV 取色弹窗 |
 | `lib/ui/atoms/app_scale.dart` | 整个逻辑视口与 Overlay 的布局/绘制/命中缩放 |
-| `lib/main.dart` | 启动先读偏好，AppearanceScope + ListenableBuilder 绑定主题 |
+| `lib/main.dart` | 启动先读偏好，AppearanceScope + appearanceChanges 绑定主题；AppThemeCache 复用明暗主题，不随保存进度失效 |
 | `lib/ui/features/home/views/home_view.dart` | 设置入口；正常关闭窗口等待偏好保存完毕 |
 
 复用 `AppCard`、`AppActionButton`、`AppIconButton`、`AppNavTile`、`AppTextField`、`AppSteppedSlider`、`AppDisclosure`、`AppDialog`、`AppCodeBlock`；不在页面里另写私有装饰控件。文案位于 `lib/l10n/app_zh.arb` / `app_en.arb`。

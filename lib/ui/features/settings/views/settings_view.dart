@@ -59,7 +59,20 @@ class SettingsView extends StatefulWidget {
 
 class _SettingsViewState extends State<SettingsView> {
   final _search = TextEditingController();
-  final _scroll = ScrollController();
+  late ScrollController _scroll = _createScroll();
+  late final _outgoingScrolls = <ScrollController>{};
+
+  ScrollController _createScroll() {
+    late final ScrollController scroll;
+    scroll = ScrollController(
+      keepScrollOffset: false,
+      onDetach: (_) {
+        if (_outgoingScrolls.remove(scroll)) scroll.dispose();
+      },
+    );
+    return scroll;
+  }
+
   String _query = '';
   late _SettingsPage _page = widget.initialPage;
   PiUpdateController? _pi;
@@ -70,6 +83,10 @@ class _SettingsViewState extends State<SettingsView> {
   void dispose() {
     _search.dispose();
     _scroll.dispose();
+    for (final scroll in _outgoingScrolls) {
+      scroll.dispose();
+    }
+    _outgoingScrolls.clear();
     _pi?.dispose();
     _plugins?.dispose();
     _quota?.dispose();
@@ -110,8 +127,11 @@ class _SettingsViewState extends State<SettingsView> {
         _plugins ??= PackagesController(control)..load();
       }
     }
+    // Outgoing and incoming pages coexist during the cross-fade. They cannot
+    // share a ScrollPosition, including when quickly switching back again.
+    _outgoingScrolls.add(_scroll);
+    _scroll = _createScroll();
     setState(() => _page = page);
-    _scrollToTop();
   }
 
   @override
@@ -156,6 +176,11 @@ class _SettingsViewState extends State<SettingsView> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 760;
+            final scroll = _scroll;
+            final padding = EdgeInsets.symmetric(
+              horizontal: compact ? AppSpacing.lg : AppSpacing.xxxl,
+              vertical: compact ? AppSpacing.xxl : AppSpacing.xxxl * 2,
+            );
             final pageSwitcher = AppSelect<_SettingsPage>(
               value: _page,
               label: l.settings,
@@ -213,6 +238,8 @@ class _SettingsViewState extends State<SettingsView> {
             final content = switch (_page) {
               _SettingsPage.appearance => AppearanceSettingsContent(
                 controller: controller,
+                scrollController: scroll,
+                padding: padding,
                 query: _query,
               ),
               _SettingsPage.pi => PiSettingsContent(
@@ -254,43 +281,34 @@ class _SettingsViewState extends State<SettingsView> {
                     ),
                   ),
                 Expanded(
-                  child: Scrollbar(
-                    controller: _scroll,
-                    child: SingleChildScrollView(
-                      controller: _scroll,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: compact ? AppSpacing.lg : AppSpacing.xxxl,
-                        vertical: compact
-                            ? AppSpacing.xxl
-                            : AppSpacing.xxxl * 2,
-                      ),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 880),
-                          // One shared backdrop pass for the settings cards;
-                          // pickers and dropdowns render in the overlay and
-                          // never share this group key.
-                          child: BackdropGroup(
-                            child: AnimatedSwitcher(
-                              duration: reduceMotion
-                                  ? Duration.zero
-                                  : AppDurations.fast,
-                              switchInCurve: AppCurves.inOut,
-                              switchOutCurve: AppCurves.inOut,
-                              transitionBuilder: (child, animation) =>
-                                  FadeTransition(
-                                    opacity: animation,
-                                    child: child,
+                  child: AnimatedSwitcher(
+                    duration: reduceMotion ? Duration.zero : AppDurations.fast,
+                    switchInCurve: AppCurves.inOut,
+                    switchOutCurve: AppCurves.inOut,
+                    transitionBuilder: (child, animation) =>
+                        FadeTransition(opacity: animation, child: child),
+                    child: BackdropGroup(
+                      // Each page owns a group: fading pages can overlap and
+                      // must not share the same backdrop key.
+                      key: ValueKey(_page),
+                      child: _page == _SettingsPage.appearance
+                          ? content
+                          : Scrollbar(
+                              controller: scroll,
+                              child: SingleChildScrollView(
+                                controller: scroll,
+                                padding: padding,
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 880,
+                                    ),
+                                    child: content,
                                   ),
-                              child: KeyedSubtree(
-                                key: ValueKey(_page),
-                                child: content,
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      ),
                     ),
                   ),
                 ),

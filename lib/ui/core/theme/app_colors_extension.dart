@@ -79,6 +79,46 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
        codeBackground = codeBackground ?? mutedBackground,
        userMessageBackground = userMessageBackground ?? mutedBackground;
 
+  // ThemeData compares its extensions by value. Identity-only comparisons
+  // turn even an unchanged palette into a full-tree theme animation.
+  Object get _values => (
+    canvasBackground,
+    sidebarBackground,
+    cardBackground,
+    elevatedBackground,
+    mutedBackground,
+    hoverBackground,
+    composerBackground,
+    codeBackground,
+    userMessageBackground,
+    borderSubtle,
+    borderDefault,
+    borderHover,
+    borderFocus,
+    textPrimary,
+    textSecondary,
+    textMuted,
+    primary,
+    primaryLight,
+    primaryDark,
+    primaryTint,
+    accent,
+    success,
+    warning,
+    error,
+    info,
+    lightboxForeground,
+    controlThumb,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppColorsExtension && _values == other._values;
+
+  @override
+  int get hashCode => _values.hashCode;
+
   /// 亮色调色板 (Notion 暖纸本工作台)
   static const AppColorsExtension light = AppColorsExtension(
     canvasBackground: Color(0xFFF9F9F8), // 亮色右侧主工作区暖白底色

@@ -28,6 +28,13 @@ class AppearanceController extends ChangeNotifier
   Future<void> _writes = Future.value();
   Future<void> get settled => _writes;
 
+  // Preserve AppearanceScope's notifier type and the running Navigator tree.
+  // Global listeners receive appearance changes; only the settings page also
+  // subscribes to save/busy bookkeeping. Lazy for already-running controllers.
+  Listenable get appearanceChanges => this;
+  ChangeNotifier? _statusChanges;
+  Listenable get statusChanges => _statusChanges ??= ChangeNotifier();
+
   Future<void> initialize({bool observeSystem = true}) async {
     try {
       _preferences = await _store.load();
@@ -35,6 +42,7 @@ class AppearanceController extends ChangeNotifier
       loadFailed = true;
     }
     if (_disposed) return;
+    notifyListeners();
     if (observeSystem && !_observing) {
       _observing = true;
       WidgetsBinding.instance.addObserver(this);
@@ -64,7 +72,7 @@ class AppearanceController extends ChangeNotifier
       }
       if (revision == _revision) {
         isSaving = false;
-        if (!_disposed) notifyListeners();
+        if (!_disposed) _statusChanges?.notifyListeners();
       }
     });
   }
@@ -75,14 +83,18 @@ class AppearanceController extends ChangeNotifier
   Future<void> refreshSystemColor() async {
     if (_disposed || systemColorBusy) return;
     systemColorBusy = true;
-    notifyListeners();
+    _statusChanges?.notifyListeners();
+    final previousAccent = systemAccent;
     try {
       systemAccent = (await _readAccent())?.withValues(alpha: 1);
     } catch (_) {
       systemAccent = null;
     }
     systemColorBusy = false;
-    if (!_disposed) notifyListeners();
+    if (!_disposed) {
+      if (systemAccent != previousAccent) notifyListeners();
+      _statusChanges?.notifyListeners();
+    }
   }
 
   @override
@@ -96,6 +108,7 @@ class AppearanceController extends ChangeNotifier
       WidgetsBinding.instance.removeObserver(this);
       windowManager.removeListener(this);
     }
+    _statusChanges?.dispose();
     super.dispose();
   }
 }

@@ -26,9 +26,13 @@ class AppearanceSettingsContent extends StatefulWidget {
   const AppearanceSettingsContent({
     super.key,
     required this.controller,
+    required this.scrollController,
+    this.padding = EdgeInsets.zero,
     this.query = '',
   });
   final AppearanceController controller;
+  final ScrollController scrollController;
+  final EdgeInsetsGeometry padding;
   final String query;
   @override
   State<AppearanceSettingsContent> createState() =>
@@ -99,7 +103,10 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: widget.controller,
+    listenable: Listenable.merge([
+      widget.controller,
+      widget.controller.statusChanges,
+    ]),
     builder: (context, _) {
       final controller = widget.controller;
       final p = controller.preferences;
@@ -119,6 +126,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
         if (visible.isNotEmpty) {
           groups.add(
             AppSettingsGroup(
+              key: ValueKey(title),
               title: title,
               description: description,
               children: visible,
@@ -603,7 +611,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
           ),
         );
       }
-      return Column(
+      final header = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Wrap(
@@ -648,14 +656,32 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
               ),
             ),
           ],
-          const SizedBox(height: AppSpacing.xxxl),
-          if (groups.isEmpty)
+          if (groups.isEmpty) ...[
+            const SizedBox(height: AppSpacing.xxxl),
             Text(l.settingsNoResults, style: context.textTheme.bodyMedium),
-          for (var i = 0; i < groups.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.xxxl),
-            groups[i],
           ],
         ],
+      );
+      final sections = [header, ...groups];
+      // Mount/layout only visible sections, not every row and the code preview
+      // below the fold on the very first route-animation frame.
+      return Scrollbar(
+        controller: widget.scrollController,
+        child: ListView.builder(
+          controller: widget.scrollController,
+          padding: widget.padding,
+          itemCount: sections.length,
+          itemBuilder: (context, index) => Padding(
+            padding: EdgeInsets.only(top: index == 0 ? 0 : AppSpacing.xxxl),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 880),
+                child: sections[index],
+              ),
+            ),
+          ),
+        ),
       );
     },
   );
