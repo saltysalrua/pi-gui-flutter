@@ -28,7 +28,17 @@ class _PendingRequest {
   }.contains(command);
   bool get isConversationMutation =>
       isWorkspaceMutation ||
-      const {'prompt', 'new_session', 'switch_session'}.contains(command);
+      const {
+        'prompt',
+        'new_session',
+        'switch_session',
+        'fork',
+        'clone',
+        'gui_history_navigate',
+        'gui_history_fork',
+        'gui_history_clone',
+        'gui_history_label',
+      }.contains(command);
 }
 
 /// 单个长期存活的 Pi 子进程；Widget 不接触进程或协议 JSON。
@@ -144,6 +154,23 @@ class PiRpcClient
           throw const FormatException('Invalid RPC response');
         }
         if (decoded['success'] == true) {
+          if (pending.isConversationMutation &&
+              pending.command.startsWith('gui_history_')) {
+            final data = decoded['data'];
+            if (data is! Map ||
+                data['cancelled'] is! bool ||
+                data['editorText'] != null && data['editorText'] is! String ||
+                data['images'] != null &&
+                    (data['images'] is! List ||
+                        !(data['images'] as List).every(
+                          (v) =>
+                              v is Map &&
+                              v['data'] is String &&
+                              v['mimeType'] is String,
+                        ))) {
+              throw const FormatException('Invalid history acknowledgement');
+            }
+          }
           if (!pending.result.isCompleted) {
             pending.result.complete(decoded['data']);
           }
@@ -183,6 +210,11 @@ class PiRpcClient
         _events.add(const PiRpcSelectionSettled());
       }
       if (acknowledged && lateConversation) {
+        if (pending.command.startsWith('gui_history_')) {
+          _events.add(
+            PiAgentEvent('gui_history_settled', Map.unmodifiable(decoded)),
+          );
+        }
         _events.add(const PiRpcConversationSettled());
       }
       final data = decoded['data'];
@@ -195,7 +227,7 @@ class PiRpcClient
       }
       return;
     }
-    if (type == 'gui_workspace_reset') {
+    if (type == 'gui_workspace_reset' || type == 'gui_history_session_reset') {
       _events.add(const PiRpcWorkspaceReset());
       return;
     }
@@ -288,6 +320,12 @@ class PiRpcClient
                       'prompt',
                       'new_session',
                       'switch_session',
+                      'fork',
+                      'clone',
+                      'gui_history_navigate',
+                      'gui_history_fork',
+                      'gui_history_clone',
+                      'gui_history_label',
                       'gui_open_workspace',
                       'gui_create_workspace',
                       'gui_create_worktree',
@@ -378,6 +416,9 @@ class PiRpcClient
   Future<void> setThinkingLevel(PiThinkingLevel level) async {
     await _request('set_thinking_level', {'level': level.name});
   }
+
+  /// Official append-only history, including pre-compaction and abandoned paths.
+  Future<Object?> getHistoryEntries() => _request('get_entries');
 
   @override
   Future<List<PiChatMessage>> getMessages() async {

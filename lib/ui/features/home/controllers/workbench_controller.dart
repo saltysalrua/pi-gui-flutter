@@ -1,5 +1,11 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart' show listEquals;
+import 'package:pi_gui/core/rpc/pi_history_types.dart';
+import 'package:pi_gui/core/services/chat_resources.dart';
+import 'package:pi_gui/core/services/file_attachments.dart';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -14,6 +20,7 @@ import 'package:pi_gui/core/slots/slot_manager.dart';
 import 'package:pi_gui/ui/core/app_tabs_controller.dart';
 
 import 'chat_controller.dart';
+import 'history_controller.dart';
 import 'image_attachment_controller.dart';
 import 'model_picker_controller.dart';
 import 'pi_extension_ui_bridge.dart';
@@ -22,7 +29,13 @@ import 'workspace_tabs_controller.dart';
 import '../../settings/controllers/appearance_controller.dart';
 
 class WorkbenchSession {
-  WorkbenchSession(this.id, this.workspace, this.client, VoidCallback changed) {
+  WorkbenchSession(
+    this.id,
+    this.workspace,
+    this.client,
+    VoidCallback changed, {
+    Future<void> Function(WorkbenchSession, PiHistorySnapshot)? onForked,
+  }) {
     chat = ChatController(client);
     models = ModelPickerController(client);
     extensions = PiExtensionUiBridge(
@@ -32,6 +45,52 @@ class WorkbenchSession {
       foreground: false,
       onAttentionChanged: () {
         if (extensions.hasNotifications) unread = true;
+        history.availabilityChanged();
+        changed();
+      },
+    );
+    history = HistoryController(
+      PiHistoryService(client),
+      events: client.events,
+      canMutate: () =>
+          !disposed &&
+          !hibernating &&
+          !waking &&
+          chat.canSwitch &&
+          chat.isReady &&
+          !models.isBusy &&
+          !extensions.needsAttention &&
+          !attachments.isPicking,
+      onLock: (locked) {
+        if (locked) {
+          _historyInput = input.value;
+          _historyImages = attachments.items;
+          _historyFiles = attachments.files;
+        }
+        chat.setWorkspaceLocked(locked);
+        models.setWorkspaceLocked(locked);
+        changed();
+      },
+      onCommitted: (result, action, source) async {
+        if (disposed) return;
+        if (action != PiHistoryAction.clone && !result.unchanged) {
+          pendingHistoryDraft = result;
+          if (input.value == _historyInput &&
+              listEquals(attachments.items, _historyImages) &&
+              listEquals(attachments.files, _historyFiles)) {
+            restoreHistoryDraft();
+          }
+        }
+        chat.setWorkspaceLocked(false);
+        models.setWorkspaceLocked(false);
+        await hydrate();
+        if (disposed) return;
+        if (!chat.isReady) throw const PiRpcException('HISTORY_REFRESH_FAILED');
+        historyPath = chat.sessionFile;
+        historyRevision++;
+        if (action != PiHistoryAction.navigate && onForked != null) {
+          await onForked(this, source);
+        }
         changed();
       },
     );
@@ -48,11 +107,13 @@ class WorkbenchSession {
       );
       if (summary == lastSummary) return;
       lastSummary = summary;
+      history.availabilityChanged();
       changed();
     }
 
     chat.addListener(summaryChanged);
     models.addListener(summaryChanged);
+    attachments.addListener(history.availabilityChanged);
     attachments.setWorkspace(workspace);
   }
   final String id, workspace;
@@ -63,6 +124,46 @@ class WorkbenchSession {
   late final ChatController chat;
   late final ModelPickerController models;
   late final PiExtensionUiBridge extensions;
+  late final HistoryController history;
+  PiHistoryResult? pendingHistoryDraft;
+  TextEditingValue? _historyInput;
+  List<ImageAttachment> _historyImages = [];
+  List<FileAttachment> _historyFiles = [];
+  int historyRevision = 0;
+
+  /// Prepare the entire draft first; malformed attachments must not erase typing.
+  void restoreHistoryDraft() {
+    final draft = pendingHistoryDraft;
+    if (draft == null) return;
+    try {
+      final images = <ImageAttachment>[];
+      var bytes = 0;
+      for (final image in draft.images) {
+        final decoded = base64Decode(image.data);
+        bytes += decoded.length;
+        if (bytes > ImageResources.maxTotalBytes ||
+            images.length >= ImageResources.maxAttachments) {
+          return;
+        }
+        images.add(
+          ImageAttachment(
+            name: '${images.length + 1}.${image.mimeType.split('/').last}',
+            bytes: decoded,
+            mimeType: image.mimeType,
+          ),
+        );
+      }
+      final parsed = FileAttachmentPrompt.parse(draft.text);
+      attachments.clear();
+      attachments.restore(images, parsed?.files ?? []);
+      input.text = parsed?.text ?? draft.text;
+      input.selection = TextSelection.collapsed(offset: input.text.length);
+      pendingHistoryDraft = null;
+    } on FormatException {
+      /* Keep the complete returned draft available. */
+    }
+  }
+
   bool unread = false,
       hydrating = false,
       disposed = false,
@@ -77,6 +178,7 @@ class WorkbenchSession {
   DateTime lastActivity = DateTime.now();
   String? historyPath;
   bool get busy =>
+      history.busy ||
       chat.isRunning ||
       chat.isSending ||
       chat.isLoading ||
@@ -102,6 +204,7 @@ class WorkbenchSession {
 
   Future<void> dispose() async {
     disposed = true;
+    history.dispose();
     extensions.dispose();
     chat.dispose();
     models.dispose();
@@ -272,7 +375,25 @@ class WorkbenchController extends ChangeNotifier {
 
   WorkbenchSession _makeSession(String id, String workspace) {
     final client = PiRpcClient(transportFactory: hub.transportFor(id));
-    final session = WorkbenchSession(id, workspace, client, _notify);
+    final session = WorkbenchSession(
+      id,
+      workspace,
+      client,
+      _notify,
+      onForked: (forked, source) async {
+        // Pi's native fork replaces its runtime. Keep that authoritative channel
+        // as the fork and reopen the untouched source in a separate tab.
+        forked.historyPath = forked.chat.sessionFile;
+        await loadHistory(workspace, force: true);
+        if (source.sessionFile != null &&
+            source.sessionFile != forked.chat.sessionFile) {
+          await openSession(workspace, sessionPath: source.sessionFile);
+        }
+        if (!_disposed && sessions[id] == forked) {
+          tabs.activate(forked.document);
+        }
+      },
+    );
     _sessionEvents[id] = client.events.listen((event) {
       if (_disposed || session.disposed) return;
       if (event is PiChatEvent) {

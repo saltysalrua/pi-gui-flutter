@@ -534,13 +534,36 @@ export function routePiOutput(line, pendingRequests, emit) {
     emit(line);
     return;
   }
+  if (message.type === "extension_ui_request" && message.method === "setStatus" &&
+      typeof message.statusKey === "string" && message.statusKey.startsWith("pi-gui-history:")) {
+    const id = message.statusKey.slice("pi-gui-history:".length);
+    if (id === "reset") {
+      const reset = { type: "gui_history_session_reset" };
+      emit(JSON.stringify(reset), reset);
+      return;
+    }
+    const waiting = pendingRequests.get(id);
+    if (!waiting) return;
+    try {
+      const response = JSON.parse(message.statusText);
+      if (response.id !== id || response.command !== "gui_history_bridge" || typeof response.success !== "boolean") throw new Error("Invalid history response");
+      message = response;
+    } catch {
+      // A broken bridge acknowledgement is not proof that a mutation failed.
+      // Retain the waiter; the frontend timeout keeps its write barrier intact.
+      return;
+    }
+  }
   const pending =
     message.type === "response" && pendingRequests.get(message.id);
   if (pending) {
     pendingRequests.delete(message.id);
     clearTimeout(pending.timer);
     if (message.success) pending.resolve(message.data);
-    else pending.reject(new WorkspaceError("PI_REJECTED"));
+    else pending.reject(new WorkspaceError(
+      typeof message.error === "string" && message.error.startsWith("HISTORY_")
+        ? message.error : "PI_REJECTED",
+    ));
   } else {
     emit(line, message);
   }
@@ -573,6 +596,8 @@ export class PiChild {
           path.dirname(fileURLToPath(import.meta.url)),
           "gui_tool_diff.mjs",
         ),
+        "--extension",
+        path.join(path.dirname(fileURLToPath(import.meta.url)), "gui_history.mjs"),
         ...(sessionPath ? ["--session", sessionPath] : []),
       ],
       {
@@ -613,6 +638,30 @@ export class PiChild {
       this.pending.set(id, { resolve, reject, timer });
       this.send({ id, type, ...fields });
     });
+  }
+  async history(request, isCurrent = () => true) {
+    // Discover our command by provenance. Never risk sending an unknown slash
+    // command to the model (including when another extension uses the same name).
+    const { commands } = await this.request("get_commands", {}, 0);
+    const extensionPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "gui_history.mjs");
+    const command = commands.find((c) => {
+      const sourcePath = c.sourceInfo?.path ?? c.path;
+      return c.source === "extension" && sourcePath && key(sourcePath) === key(extensionPath);
+    });
+    if (!command) fail("HISTORY_UNAVAILABLE");
+    if (!isCurrent()) fail("HISTORY_CANCELLED");
+    const id = `adapter-history-${++this.nextId}`;
+    let resolve, reject;
+    const result = new Promise((yes, no) => { resolve = yes; reject = no; });
+    // Observe a rejection immediately; the prompt acknowledgement can arrive later.
+    result.catch(() => {});
+    this.pending.set(id, { resolve, reject });
+    try {
+      await this.request("prompt", { message: `/${command.name} ${JSON.stringify({ ...request, id })}` }, 0);
+      return await result;
+    } finally {
+      this.pending.delete(id);
+    }
   }
   async stop() {
     this.expectedExit = true;
@@ -660,6 +709,8 @@ export class WorkspaceAdapter {
     this.pi = null;
     this.mutating = false;
     this.agentBusy = false;
+    this.historyMutating = false;
+    this.historyEpoch = 0;
     this.forwarded = new Map();
   }
   async start(sessionPath) {
@@ -714,7 +765,7 @@ export class WorkspaceAdapter {
     );
   }
   async ensureIdle() {
-    if (this.agentBusy || this.forwarded.size || this.preparingImages)
+    if (this.agentBusy || this.forwarded.size || this.preparingImages || this.historyMutating)
       fail("WORKSPACE_BUSY");
     const state = await this.pi.request("get_state");
     if (
@@ -758,9 +809,58 @@ export class WorkspaceAdapter {
     this.emit(JSON.stringify({ type: "gui_workspace_changed", path: cwd }));
     return this.service.snapshot();
   }
+  async handleHistory(request) {
+    const mutation = request.type !== "gui_history_entry";
+    if (this.historyMutating || this.mutating) {
+      this.reply(request, null, new WorkspaceError("HISTORY_BUSY"));
+      return;
+    }
+    if (mutation) this.historyMutating = true;
+    const epoch = this.historyEpoch;
+    const isCurrent = () => !mutation || epoch === this.historyEpoch;
+    try {
+      if (mutation && (this.agentBusy || this.preparingImages || this.forwarded.size)) fail("HISTORY_BUSY");
+      const state = await this.pi.request("get_state", {}, 0);
+      if (!isCurrent()) fail("HISTORY_CANCELLED");
+      if (request.sessionId !== state.sessionId) fail("HISTORY_STALE");
+      if (mutation && (state.isStreaming || state.isCompacting || state.pendingMessageCount)) fail("HISTORY_BUSY");
+      let data;
+      if (["gui_history_fork", "gui_history_clone"].includes(request.type)) {
+        const snapshot = await this.pi.request("get_entries", {}, 0);
+        if (!isCurrent()) fail("HISTORY_CANCELLED");
+        if (snapshot.leafId !== request.leafId) fail("HISTORY_STALE");
+        const cloning = request.type === "gui_history_clone";
+        let images = [];
+        if (!cloning) {
+          // Native fork accepts a user entry on any path, not only the active
+          // branch (verified against 0.86 runtime, whose RPC prose is narrower).
+          const target = snapshot.entries.find((e) => e.id === request.entryId);
+          if (target?.type !== "message" || target.message.role !== "user") fail("HISTORY_ENTRY_MISSING");
+          if (Array.isArray(target.message.content)) images = target.message.content.filter((b) => b.type === "image");
+        }
+        const result = await this.pi.request(cloning ? "clone" : "fork", cloning ? {} : { entryId: request.entryId }, 0);
+        data = { cancelled: result.cancelled, editorText: result.text ?? "", images };
+      } else {
+        const operation = { gui_history_entry: "entry", gui_history_navigate: "navigate", gui_history_label: "label" }[request.type];
+        if (!operation) fail("HISTORY_INVALID");
+        data = await this.pi.history({ ...request, operation }, isCurrent);
+      }
+      if (mutation) this.service.invalidateSessions();
+      this.reply(request, data);
+    } catch (error) {
+      this.reply(request, null, error);
+    } finally {
+      if (mutation) this.historyMutating = false;
+    }
+  }
   async handle(request) {
     if (!request || typeof request.type !== "string") return;
+    if (request.type.startsWith("gui_history_")) return this.handleHistory(request);
     if (!request.type.startsWith("gui_")) {
+      if (this.historyMutating && !request.type.startsWith("get_") && !["abort", "extension_ui_response"].includes(request.type)) {
+        this.reply(request, null, new WorkspaceError("HISTORY_BUSY"));
+        return;
+      }
       const prompting = ["prompt", "steer", "follow_up"].includes(request.type);
       if (
         (this.mutating && request.type !== "extension_ui_response") ||
@@ -772,7 +872,10 @@ export class WorkspaceAdapter {
         return;
       }
       // Stop/read/UI responses must remain live while a worker prepares images.
-      if (request.type === "abort") this.uploadEpoch++;
+      if (request.type === "abort") {
+        this.uploadEpoch++;
+        if (this.historyMutating) this.historyEpoch++;
+      }
       if (
         typeof request.id === "string" &&
         request.type !== "extension_ui_response"

@@ -19,6 +19,7 @@ class PiWorkspaceTransport implements PiRpcTransport {
         'workspace_manager.mjs',
         'workspace_browser.mjs',
         'gui_tool_diff.mjs',
+        'gui_history.mjs',
         'gui_image_upload.mjs',
         'gui_packages.mjs',
       ]) {

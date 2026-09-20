@@ -556,7 +556,9 @@ export class WorkspaceManager {
         fail("PI_EXITED");
       if (request.type !== "extension_ui_response") await entry.ready;
       if (entry.closed || entry.status === "exited") fail("PI_EXITED");
-      // Channel cwd and historical identity are immutable. New chats get a channel.
+      // Channel cwd stays fixed. Ordinary session replacement is blocked;
+      // explicit history fork/clone is handled by the owning adapter and its
+      // new identity is reconciled through get_state before reopening the source.
       if (
         request.type.startsWith("gui_") &&
         ![
@@ -566,6 +568,11 @@ export class WorkspaceManager {
           "gui_get_git_graph",
           "gui_get_git_commit",
           "gui_get_file_preview",
+          "gui_history_entry",
+          "gui_history_navigate",
+          "gui_history_label",
+          "gui_history_fork",
+          "gui_history_clone",
         ].includes(request.type)
       )
         fail("UNKNOWN_COMMAND");

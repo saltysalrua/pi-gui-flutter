@@ -129,7 +129,7 @@ class PiChatMessage {
                 text: '${json['command'] ?? ''}\n${json['output'] ?? ''}',
               ),
             ]
-          : piContent(json['content']),
+          : piContent(json['content'] ?? json['summary']),
       timestamp: (json['timestamp'] as num?)?.toInt() ?? 0,
       model: json['model'] as String?,
       stopReason: json['stopReason'] as String?,

@@ -1,6 +1,6 @@
 ---
 title: "项目、Worktree 与并行会话"
-version: "2.3.0"
+version: "2.4.0"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, pi-rpc, session, workspace, git-worktree, parallel]
@@ -24,6 +24,10 @@ tags: [flutter, pi-rpc, session, workspace, git-worktree, parallel]
 聊天与文件共用原有标签栏，可以拖动、并排、合并。每个会话独立保留文本草稿、图片 / 文件附件、模型与思考档位、消息、滚动状态和扩展组件。切页不调用 `switch_session`，不改变已运行进程的 cwd，也不重新发送 Prompt。详见 [文档标签页](document_tabs.md)。
 
 **空会话输入居中，有消息后才移到底部**。紧凑模型浮层、主题、毛玻璃和共用侧栏宽度不变。正文流式更新仅重绘本会话；侧栏摘要发生变化才通知整页，不让逐 token 事件绕过原聊天合帧。
+
+## 会话历史回溯
+
+聊天工具栏和用户消息菜单提供 [历史回溯、分支与复制](history_rewind.md)。每个 WorkbenchSession 独立持有 HistoryController，历史窗口只读浏览，确认后才执行 Pi 原生树导航或 fork/clone。fork/clone 是用户明确要求的运行时替换：原通道成为新会话，先更新 `historyPath`，再另开标签恢复原文件，避免用旧书签误认新会话；其他会话继续运行。执行中和未确认的历史写操作计入 `busy`，禁止休眠和无确认关闭。
 
 ## 关闭与恢复
 
@@ -92,7 +96,7 @@ HomeView → WorkbenchController
   │
   ├─ WorkbenchTabs：会话 / 文件 / 提交身份与分组
   ├─ 每会话 WorkbenchSession
-  │    ├─ ChatController / ModelPickerController
+  │    ├─ ChatController / ModelPickerController / HistoryController
   │    ├─ 输入草稿 / ImageAttachmentController
   │    └─ PiExtensionUiBridge / 独立 SlotManager
   └─ 每目录 WorkspaceBrowserController
@@ -114,7 +118,7 @@ workspace_rpc.mjs --gui-multiplex
 
 注册项目、显示名称、起点保存在 **GUI 自有** `workspaces.json` 的 `catalog` 字段，旧 `recent` 仅用于首次迁移。位置仍为 Windows `%APPDATA%/pi-gui/workspaces.json`，其他系统 `$XDG_CONFIG_HOME/pi-gui/workspaces.json` 或 `~/.config/pi-gui/workspaces.json`；`PI_GUI_WORKSPACE_STORE` 可覆盖。只有管理器串行保存，各通道不争写配置；保存失败有提示。
 
-需要 PATH 中的 Node.js、npm 安装的 Pi；Git 功能需要 Git。`PiWorkspaceTransport` 携带六个脚本：`workspace_rpc.mjs`、`workspace_manager.mjs`、`workspace_browser.mjs`、`gui_tool_diff.mjs`、`gui_image_upload.mjs`、`gui_packages.mjs`，解包到同一临时目录。上传图片由适配层复用 Pi 公开缩放函数预处理，见 [图片与附件](images_and_links.md)；插件市场 / 插件管理见 [插件页文档](plugin_packages.md)。关闭应用只清理它自己的进程树和脚本。
+需要 PATH 中的 Node.js、npm 安装的 Pi；Git 功能需要 Git。`PiWorkspaceTransport` 携带七个脚本：`workspace_rpc.mjs`、`workspace_manager.mjs`、`workspace_browser.mjs`、`gui_tool_diff.mjs`、`gui_image_upload.mjs`、`gui_packages.mjs`、`gui_history.mjs`，解包到同一临时目录。上传图片由适配层复用 Pi 公开缩放函数预处理，见 [图片与附件](images_and_links.md)；插件市场 / 插件管理见 [插件页文档](plugin_packages.md)。关闭应用只清理它自己的进程树和脚本。
 
 不带 `--gui-multiplex` 的适配器继续提供原单会话协议，供兼容性回归 / 探针使用；旧 `WorkspaceController`、`WorkspaceDialog`、`HomeSidebar` 不再是生产首页入口。
 
@@ -177,10 +181,12 @@ node tool/check_parallel_rpc.mjs
 node tool/check_workspace_rpc.mjs
 ```
 
-- 最终 `flutter analyze --no-pub` 无问题；Flutter 全套 **81 项通过**，工作区 Node **20 项通过**，真实并行与旧单会话 RPC 探针均通过。Windows Release 构建成功，四个 backend assets 与源码 SHA-256 一致，发布目录只有正式 `pi_gui.exe`；活动 Debug GUI 未重启。
+- 并行工作区初版验证记录：`flutter analyze --no-pub` 无问题；当时 Flutter 全套 **81 项通过**，工作区 Node **20 项通过**，真实并行与旧单会话 RPC 探针均通过。Windows Release 构建成功，四个 backend assets 与源码 SHA-256 一致，发布目录只有正式 `pi_gui.exe`；活动 Debug GUI 未重启。
 - Node 使用真实隔离 Git 仓库覆盖分组、命名、并发历史去重、通道相同 ID、退出隔离、启动问答、仓库锁、忽略文件保护、保留分支和配置恢复。
 - Dart 核心回归覆盖单物理连接、逆序回复、单通道 EOF、超时不重放 / 不阻塞其他会话、独立扩展槽位 / 相同问答 ID，以及可关闭初始会话的标签状态机。
 - 真实 Pi 探针启动多个官方进程，通过双向文件就绪屏障证明两个 `bash` 同时执行；验证相同请求 ID、同目录多会话、历史去重、跨项目 cwd、只关闭指定会话。不访问外部模型，不使用用户历史 / 配置 / 当前仓库。
 - Windows 界面通过**临时项目副本中的独立离线应用**走查，截图只读取本应用 `RenderRepaintBoundary`。验证深浅色、并排会话、后台问答、空态居中、草稿保留、新开通道提前事件、Worktree 表单、660px + 150% UI 缩放、文件标签、运行中关闭确认及其他会话保留；11 张截图，最终无运行时错误。临时夹具不进入生产代码，不增加永久样式测试。
+
+历史回溯本轮的核心状态、真实 Pi 和独立桌面验证结果见 [历史回溯](history_rewind.md#验证与启动)。
 
 **新后端在下次正常启动更新后的 GUI 时装载。不要 hot restart、终止当前 Pi，或热重载重构后的 HomeView 来验证承载 Agent 的活动窗口。**

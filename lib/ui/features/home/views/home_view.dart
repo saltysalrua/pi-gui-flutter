@@ -271,6 +271,7 @@ class _HomeViewState extends State<HomeView> with WindowListener {
       child: ChatResourceScope(
         directory: session.workspace,
         child: HomeChatPanel(
+          session: session,
           chat: session.chat,
           modelPicker: session.models,
           input: session.input,

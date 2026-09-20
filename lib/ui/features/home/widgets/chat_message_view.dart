@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:pi_gui/core/rpc/pi_history_types.dart';
+import 'package:pi_gui/ui/atoms/app_menu_button.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pi_gui/core/services/file_attachments.dart';
@@ -30,12 +32,16 @@ class ChatMessageView extends StatelessWidget {
     required this.registry,
     required this.onShowChanges,
     this.thinkingIndex,
+    this.onHistory,
+    this.historyEnabled = true,
   });
   final PiChatMessage message;
   final int? assistantNumber, thinkingIndex;
   final Map<String, ChatToolCall> tools;
   final ToolCardRegistry registry;
   final ValueChanged<String> onShowChanges;
+  final void Function(PiChatMessage, PiHistoryAction)? onHistory;
+  final bool historyEnabled;
 
   Widget _userText(BuildContext context, String text) {
     final parsed = FileAttachmentPrompt.parse(text);
@@ -186,6 +192,26 @@ class ChatMessageView extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (user && onHistory != null)
+              AppMenuButton<PiHistoryAction>(
+                icon: Icons.history,
+                tooltip: l10n.historyTitle,
+                options: [
+                  AppMenuOption(
+                    value: PiHistoryAction.navigate,
+                    label: l10n.historyEdit,
+                    icon: Icons.edit_outlined,
+                  ),
+                  AppMenuOption(
+                    value: PiHistoryAction.fork,
+                    label: l10n.historyFork,
+                    icon: Icons.call_split,
+                  ),
+                ],
+                onSelected: historyEnabled
+                    ? (action) => onHistory!(message, action)
+                    : null,
+              ),
             if (message.text.isNotEmpty && !message.isStreaming)
               AppCopyButton(text: message.text),
           ],
@@ -258,6 +284,8 @@ class _MessageSnapshotState extends State<_MessageSnapshot> {
     if (!identical(old.message, next.message) ||
         old.assistantNumber != next.assistantNumber ||
         old.thinkingIndex != next.thinkingIndex ||
+        old.historyEnabled != next.historyEnabled ||
+        (old.onHistory == null) != (next.onHistory == null) ||
         !identical(old.registry, next.registry) ||
         !listEquals(_tools, _snapshot())) {
       _content = null;

@@ -1603,4 +1603,168 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get quotaOpenDetails => '点击查看详情';
+
+  @override
+  String get historyTitle => '历史回溯';
+
+  @override
+  String get historyHint => '浏览不会切换会话。回溯保留旧分支；GUI 不回滚代码文件，已安装扩展的回溯行为仍会执行。';
+
+  @override
+  String get historySearch => '搜索历史消息、标签或节点 ID…';
+
+  @override
+  String get historyFilter => '显示内容';
+
+  @override
+  String get historyDefault => '默认';
+
+  @override
+  String get historyNoTools => '隐藏工具结果';
+
+  @override
+  String get historyUserOnly => '仅我的消息';
+
+  @override
+  String get historyLabeledOnly => '仅有标签';
+
+  @override
+  String get historyAll => '全部';
+
+  @override
+  String get historyEmpty => '没有匹配的历史节点。试试更换过滤方式。';
+
+  @override
+  String get historySelect => '选择一个节点预览，再决定从哪里继续。';
+
+  @override
+  String get historyCurrent => '定位当前位置';
+
+  @override
+  String get historyActive => '当前位置';
+
+  @override
+  String get historyActivePath => '当前分支';
+
+  @override
+  String get historyExpand => '展开所有分支';
+
+  @override
+  String get historyCollapse => '折叠或展开此分支';
+
+  @override
+  String get historyTimestamps => '切换标签时间';
+
+  @override
+  String get historyLabel => '编辑标签';
+
+  @override
+  String get historyLabelHint => '输入标签，留空则清除';
+
+  @override
+  String get historyNavigate => '从这里继续';
+
+  @override
+  String get historyEdit => '回到这里修改';
+
+  @override
+  String get historyFork => '从这里新建会话';
+
+  @override
+  String get historyClone => '复制当前分支';
+
+  @override
+  String get historyForkHint => '从所选用户消息之前创建独立会话，原会话和其他分支保留。';
+
+  @override
+  String get historySummary => '离开分支时的摘要';
+
+  @override
+  String get historySummaryNone => '不生成摘要';
+
+  @override
+  String get historySummaryDefault => '生成默认摘要';
+
+  @override
+  String get historySummaryCustom => '自定义摘要说明';
+
+  @override
+  String get historyInstructions => '希望摘要保留哪些信息？会调用当前模型。';
+
+  @override
+  String get historyInstructionsMode => '摘要说明用法';
+
+  @override
+  String get historyAppendInstructions => '补充默认说明';
+
+  @override
+  String get historyReplaceInstructions => '替换默认说明';
+
+  @override
+  String get historySummaryCost => '生成摘要会调用当前模型并产生用量；失败或取消时不会主动重试回溯。';
+
+  @override
+  String get historyConfirm => '确认回溯';
+
+  @override
+  String get historyConfirmHint =>
+      '将切换模型接下来看到的历史。旧分支保留，不会自动发送提问，也不会由 GUI 回滚文件。';
+
+  @override
+  String get historyDraftWarning =>
+      '输入框已有未发送文字或附件。继续会替换这份草稿：回到用户消息会载入原提问，其他节点会清空输入。';
+
+  @override
+  String get historyBusy => '请等当前任务、模型切换或扩展问答结束后再回溯。';
+
+  @override
+  String get historyWorking => '正在等待 Pi 完成回溯…';
+
+  @override
+  String get historyStop => '取消回溯';
+
+  @override
+  String get historyFailed => '操作未完成。请刷新历史后重试；若选择了摘要，请检查模型是否可用。';
+
+  @override
+  String get historyStale => '历史位置已变化，请刷新后重新选择。';
+
+  @override
+  String get historyUnavailable => '历史桥接未加载。请正常重启更新后的 GUI，再试一次。';
+
+  @override
+  String get historyCancelled => 'Pi 或扩展已取消操作，未继续回溯。';
+
+  @override
+  String get historyUncertain => '还没收到最终确认。请等待或取消，不要重复回溯。';
+
+  @override
+  String get historyRefreshFailed => 'Pi 已确认操作，但界面刷新失败。请刷新会话，不要重复回溯。';
+
+  @override
+  String get historyPendingDraft => '历史提问已保留，尚未覆盖你正在编辑的草稿。';
+
+  @override
+  String get historyRestoreDraft => '载入历史提问';
+
+  @override
+  String get historyCompaction => '上下文压缩';
+
+  @override
+  String get historyBranchSummary => '分支摘要';
+
+  @override
+  String get historySystem => '系统消息';
+
+  @override
+  String get historySettingsEntry => '设置记录';
+
+  @override
+  String get historyExtensionEntry => '扩展记录';
+
+  @override
+  String get historyImageOnly => '图片消息';
+
+  @override
+  String get historyPreviewFailed => '无法加载此节点的预览，请重试。';
 }

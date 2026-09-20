@@ -1715,4 +1715,180 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quotaOpenDetails => 'Click to view details';
+
+  @override
+  String get historyTitle => 'History';
+
+  @override
+  String get historyHint =>
+      'Browsing does not switch context. Rewinding keeps old branches. The GUI does not roll back files; installed extension hooks still run.';
+
+  @override
+  String get historySearch => 'Search messages, labels or entry IDs…';
+
+  @override
+  String get historyFilter => 'Show entries';
+
+  @override
+  String get historyDefault => 'Default';
+
+  @override
+  String get historyNoTools => 'No tool results';
+
+  @override
+  String get historyUserOnly => 'User messages';
+
+  @override
+  String get historyLabeledOnly => 'Labeled entries';
+
+  @override
+  String get historyAll => 'All';
+
+  @override
+  String get historyEmpty => 'No matching entries. Try another filter.';
+
+  @override
+  String get historySelect =>
+      'Select an entry to preview before choosing where to continue.';
+
+  @override
+  String get historyCurrent => 'Show current position';
+
+  @override
+  String get historyActive => 'Current position';
+
+  @override
+  String get historyActivePath => 'Active branch';
+
+  @override
+  String get historyExpand => 'Expand all branches';
+
+  @override
+  String get historyCollapse => 'Fold or unfold this branch';
+
+  @override
+  String get historyTimestamps => 'Toggle label timestamps';
+
+  @override
+  String get historyLabel => 'Edit label';
+
+  @override
+  String get historyLabelHint => 'Label (leave empty to remove)';
+
+  @override
+  String get historyNavigate => 'Continue from here';
+
+  @override
+  String get historyEdit => 'Rewind and edit';
+
+  @override
+  String get historyFork => 'Fork from here';
+
+  @override
+  String get historyClone => 'Clone active branch';
+
+  @override
+  String get historyForkHint =>
+      'Create a separate conversation before the selected user message. The source and other branches remain.';
+
+  @override
+  String get historySummary => 'Summary of the branch being left';
+
+  @override
+  String get historySummaryNone => 'No summary';
+
+  @override
+  String get historySummaryDefault => 'Default summary';
+
+  @override
+  String get historySummaryCustom => 'Custom summary instructions';
+
+  @override
+  String get historyInstructions =>
+      'What should the summary retain? This uses the current model.';
+
+  @override
+  String get historyInstructionsMode => 'Summary instructions';
+
+  @override
+  String get historyAppendInstructions => 'Add to default instructions';
+
+  @override
+  String get historyReplaceInstructions => 'Replace default instructions';
+
+  @override
+  String get historySummaryCost =>
+      'Summarization uses the current model and incurs usage. Failed or cancelled navigation is not automatically replayed.';
+
+  @override
+  String get historyConfirm => 'Confirm navigation';
+
+  @override
+  String get historyConfirmHint =>
+      'This changes the history used for the next response. Old branches remain. No prompt is sent and the GUI does not roll back files.';
+
+  @override
+  String get historyDraftWarning =>
+      'There is an unsent draft or attachment. Continuing replaces it: a user message restores its prompt; other entries clear the input.';
+
+  @override
+  String get historyBusy =>
+      'Wait for the task, model change or extension question to finish before navigating.';
+
+  @override
+  String get historyWorking => 'Waiting for Pi to finish navigation…';
+
+  @override
+  String get historyStop => 'Cancel navigation';
+
+  @override
+  String get historyFailed =>
+      'The operation did not finish. Refresh history and retry. If summarizing, check model availability.';
+
+  @override
+  String get historyStale => 'History has moved. Refresh and select again.';
+
+  @override
+  String get historyUnavailable =>
+      'The history bridge is unavailable. Restart the updated GUI and try again.';
+
+  @override
+  String get historyCancelled => 'Pi or an extension cancelled the operation.';
+
+  @override
+  String get historyUncertain =>
+      'The final acknowledgement has not arrived. Wait or cancel; do not repeat the operation.';
+
+  @override
+  String get historyRefreshFailed =>
+      'Pi confirmed the operation, but the view could not refresh. Refresh the conversation rather than repeating navigation.';
+
+  @override
+  String get historyPendingDraft =>
+      'The historical prompt was kept without replacing your current draft.';
+
+  @override
+  String get historyRestoreDraft => 'Load historical prompt';
+
+  @override
+  String get historyCompaction => 'Context compaction';
+
+  @override
+  String get historyBranchSummary => 'Branch summary';
+
+  @override
+  String get historySystem => 'System message';
+
+  @override
+  String get historySettingsEntry => 'Setting entry';
+
+  @override
+  String get historyExtensionEntry => 'Extension entry';
+
+  @override
+  String get historyImageOnly => 'Image message';
+
+  @override
+  String get historyPreviewFailed =>
+      'Could not load this entry\'s preview. Try again.';
 }

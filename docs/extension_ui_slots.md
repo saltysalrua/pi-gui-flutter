@@ -1,6 +1,6 @@
 ---
 title: "扩展槽位与 Extension UI 动态挂载机制"
-version: "2.0.0"
+version: "2.1.0"
 status: "implemented"
 type: "architecture"
 tags: [flutter, pi-rpc, extension-ui, slots, pi-lens, todos]
@@ -94,6 +94,12 @@ pi-gui 在 `assets/backend/workspace_rpc.mjs` 中注入轻量发射拦截器：
 - 注入 `AgentSession.prototype.bindExtensions`，对外传递 `options.mode = "tui"`，通知插件当前宿主环境具备完整的可视化交互插槽能力。
 - 拦截 `uiContext.setWidget`：当传入函数时，自动构造 `mockTui` 实例并执行初始渲染与注册 `requestRender()` 监听。
 - 当插件调用 `tui.requestRender()` 时，重新调用 `render(160)`，并以标准单行 JSONL `extension_ui_request` (method: `setWidget`) 派发至 Flutter 前端。每次启动 Pi 前按本机 Pi 包路径重写 `pi_launcher.mjs`（不入库），同一套注入同时服务于并行会话的每个原生子进程。
+
+### 历史能力桥的保留通道
+
+[历史回溯](history_rewind.md)新增 `gui_history.mjs`，只调用 Pi 公开的 `ctx.navigateTree`、`pi.setLabel` 等能力。Pi 0.86 接管 stdout，因此该扩展用 `ctx.ui.setStatus` 的保留键 `pi-gui-history:adapter-history-N` 携带内部操作回应；Node `routePiOutput` 按待处理 ID 在进入 Flutter 前消费，不渲染成普通状态徽章。其他扩展的状态、通知和问答仍按原路径分发。
+
+原生 fork/new/resume 真正进入 `session_shutdown` 时发送保留 reset，转为 `gui_history_session_reset`，清掉旧运行时槽位，再接收 replacement 启动的组件。被扩展取消时没有 shutdown，也不清槽；同会话树导航仍由各扩展处理 `session_tree`，不重置仍存活的扩展状态。全局 `dialogOverlay` 在普通路由上方，回溯过程中权限扩展的提问不会被历史窗口挡住。
 
 ### 2. 前端事件路由与动态渲染
 

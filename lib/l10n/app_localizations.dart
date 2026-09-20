@@ -3121,6 +3121,330 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'点击查看详情'**
   String get quotaOpenDetails;
+
+  /// No description provided for @historyTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'历史回溯'**
+  String get historyTitle;
+
+  /// No description provided for @historyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'浏览不会切换会话。回溯保留旧分支；GUI 不回滚代码文件，已安装扩展的回溯行为仍会执行。'**
+  String get historyHint;
+
+  /// No description provided for @historySearch.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索历史消息、标签或节点 ID…'**
+  String get historySearch;
+
+  /// No description provided for @historyFilter.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示内容'**
+  String get historyFilter;
+
+  /// No description provided for @historyDefault.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认'**
+  String get historyDefault;
+
+  /// No description provided for @historyNoTools.
+  ///
+  /// In zh, this message translates to:
+  /// **'隐藏工具结果'**
+  String get historyNoTools;
+
+  /// No description provided for @historyUserOnly.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅我的消息'**
+  String get historyUserOnly;
+
+  /// No description provided for @historyLabeledOnly.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅有标签'**
+  String get historyLabeledOnly;
+
+  /// No description provided for @historyAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部'**
+  String get historyAll;
+
+  /// No description provided for @historyEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有匹配的历史节点。试试更换过滤方式。'**
+  String get historyEmpty;
+
+  /// No description provided for @historySelect.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择一个节点预览，再决定从哪里继续。'**
+  String get historySelect;
+
+  /// No description provided for @historyCurrent.
+  ///
+  /// In zh, this message translates to:
+  /// **'定位当前位置'**
+  String get historyCurrent;
+
+  /// No description provided for @historyActive.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前位置'**
+  String get historyActive;
+
+  /// No description provided for @historyActivePath.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前分支'**
+  String get historyActivePath;
+
+  /// No description provided for @historyExpand.
+  ///
+  /// In zh, this message translates to:
+  /// **'展开所有分支'**
+  String get historyExpand;
+
+  /// No description provided for @historyCollapse.
+  ///
+  /// In zh, this message translates to:
+  /// **'折叠或展开此分支'**
+  String get historyCollapse;
+
+  /// No description provided for @historyTimestamps.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换标签时间'**
+  String get historyTimestamps;
+
+  /// No description provided for @historyLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑标签'**
+  String get historyLabel;
+
+  /// No description provided for @historyLabelHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'输入标签，留空则清除'**
+  String get historyLabelHint;
+
+  /// No description provided for @historyNavigate.
+  ///
+  /// In zh, this message translates to:
+  /// **'从这里继续'**
+  String get historyNavigate;
+
+  /// No description provided for @historyEdit.
+  ///
+  /// In zh, this message translates to:
+  /// **'回到这里修改'**
+  String get historyEdit;
+
+  /// No description provided for @historyFork.
+  ///
+  /// In zh, this message translates to:
+  /// **'从这里新建会话'**
+  String get historyFork;
+
+  /// No description provided for @historyClone.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制当前分支'**
+  String get historyClone;
+
+  /// No description provided for @historyForkHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'从所选用户消息之前创建独立会话，原会话和其他分支保留。'**
+  String get historyForkHint;
+
+  /// No description provided for @historySummary.
+  ///
+  /// In zh, this message translates to:
+  /// **'离开分支时的摘要'**
+  String get historySummary;
+
+  /// No description provided for @historySummaryNone.
+  ///
+  /// In zh, this message translates to:
+  /// **'不生成摘要'**
+  String get historySummaryNone;
+
+  /// No description provided for @historySummaryDefault.
+  ///
+  /// In zh, this message translates to:
+  /// **'生成默认摘要'**
+  String get historySummaryDefault;
+
+  /// No description provided for @historySummaryCustom.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义摘要说明'**
+  String get historySummaryCustom;
+
+  /// No description provided for @historyInstructions.
+  ///
+  /// In zh, this message translates to:
+  /// **'希望摘要保留哪些信息？会调用当前模型。'**
+  String get historyInstructions;
+
+  /// No description provided for @historyInstructionsMode.
+  ///
+  /// In zh, this message translates to:
+  /// **'摘要说明用法'**
+  String get historyInstructionsMode;
+
+  /// No description provided for @historyAppendInstructions.
+  ///
+  /// In zh, this message translates to:
+  /// **'补充默认说明'**
+  String get historyAppendInstructions;
+
+  /// No description provided for @historyReplaceInstructions.
+  ///
+  /// In zh, this message translates to:
+  /// **'替换默认说明'**
+  String get historyReplaceInstructions;
+
+  /// No description provided for @historySummaryCost.
+  ///
+  /// In zh, this message translates to:
+  /// **'生成摘要会调用当前模型并产生用量；失败或取消时不会主动重试回溯。'**
+  String get historySummaryCost;
+
+  /// No description provided for @historyConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认回溯'**
+  String get historyConfirm;
+
+  /// No description provided for @historyConfirmHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'将切换模型接下来看到的历史。旧分支保留，不会自动发送提问，也不会由 GUI 回滚文件。'**
+  String get historyConfirmHint;
+
+  /// No description provided for @historyDraftWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'输入框已有未发送文字或附件。继续会替换这份草稿：回到用户消息会载入原提问，其他节点会清空输入。'**
+  String get historyDraftWarning;
+
+  /// No description provided for @historyBusy.
+  ///
+  /// In zh, this message translates to:
+  /// **'请等当前任务、模型切换或扩展问答结束后再回溯。'**
+  String get historyBusy;
+
+  /// No description provided for @historyWorking.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在等待 Pi 完成回溯…'**
+  String get historyWorking;
+
+  /// No description provided for @historyStop.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消回溯'**
+  String get historyStop;
+
+  /// No description provided for @historyFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'操作未完成。请刷新历史后重试；若选择了摘要，请检查模型是否可用。'**
+  String get historyFailed;
+
+  /// No description provided for @historyStale.
+  ///
+  /// In zh, this message translates to:
+  /// **'历史位置已变化，请刷新后重新选择。'**
+  String get historyStale;
+
+  /// No description provided for @historyUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'历史桥接未加载。请正常重启更新后的 GUI，再试一次。'**
+  String get historyUnavailable;
+
+  /// No description provided for @historyCancelled.
+  ///
+  /// In zh, this message translates to:
+  /// **'Pi 或扩展已取消操作，未继续回溯。'**
+  String get historyCancelled;
+
+  /// No description provided for @historyUncertain.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没收到最终确认。请等待或取消，不要重复回溯。'**
+  String get historyUncertain;
+
+  /// No description provided for @historyRefreshFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'Pi 已确认操作，但界面刷新失败。请刷新会话，不要重复回溯。'**
+  String get historyRefreshFailed;
+
+  /// No description provided for @historyPendingDraft.
+  ///
+  /// In zh, this message translates to:
+  /// **'历史提问已保留，尚未覆盖你正在编辑的草稿。'**
+  String get historyPendingDraft;
+
+  /// No description provided for @historyRestoreDraft.
+  ///
+  /// In zh, this message translates to:
+  /// **'载入历史提问'**
+  String get historyRestoreDraft;
+
+  /// No description provided for @historyCompaction.
+  ///
+  /// In zh, this message translates to:
+  /// **'上下文压缩'**
+  String get historyCompaction;
+
+  /// No description provided for @historyBranchSummary.
+  ///
+  /// In zh, this message translates to:
+  /// **'分支摘要'**
+  String get historyBranchSummary;
+
+  /// No description provided for @historySystem.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统消息'**
+  String get historySystem;
+
+  /// No description provided for @historySettingsEntry.
+  ///
+  /// In zh, this message translates to:
+  /// **'设置记录'**
+  String get historySettingsEntry;
+
+  /// No description provided for @historyExtensionEntry.
+  ///
+  /// In zh, this message translates to:
+  /// **'扩展记录'**
+  String get historyExtensionEntry;
+
+  /// No description provided for @historyImageOnly.
+  ///
+  /// In zh, this message translates to:
+  /// **'图片消息'**
+  String get historyImageOnly;
+
+  /// No description provided for @historyPreviewFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法加载此节点的预览，请重试。'**
+  String get historyPreviewFailed;
 }
 
 class _AppLocalizationsDelegate

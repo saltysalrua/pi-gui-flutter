@@ -1,6 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:pi_gui/core/rpc/pi_chat_types.dart';
+import 'package:pi_gui/core/rpc/pi_history_types.dart';
+import 'package:pi_gui/ui/atoms/app_dialog.dart';
+
+import '../controllers/workbench_controller.dart';
+import 'history_dialog.dart';
+
 import 'package:pi_gui/core/services/file_attachments.dart';
 import 'package:pi_gui/ui/atoms/app_action_button.dart';
 import 'package:pi_gui/ui/atoms/app_activity_label.dart';
@@ -46,8 +53,10 @@ class HomeChatPanel extends StatefulWidget {
     this.hibernating = false,
     this.waking = false,
     this.onWake,
+    this.session,
   });
   final ChatController chat;
+  final WorkbenchSession? session;
   final ModelPickerController modelPicker;
   final TextEditingController input;
   final ImageAttachmentController attachments;
@@ -72,6 +81,7 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
   bool _following = true;
   bool _restored = false;
   String? _session;
+  int _historyRevision = 0;
   @override
   void initState() {
     super.initState();
@@ -101,8 +111,10 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
   }
 
   void _updated() {
-    if (_session != widget.chat.sessionFile) {
+    if (_session != widget.chat.sessionFile ||
+        _historyRevision != (widget.session?.historyRevision ?? 0)) {
       _session = widget.chat.sessionFile;
+      _historyRevision = widget.session?.historyRevision ?? 0;
       _following = true;
     }
     if (!_restored) _scheduleRestore();
@@ -117,6 +129,63 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
       });
     }
   }
+
+  Future<void> _showHistory([
+    PiChatMessage? message,
+    PiHistoryAction action = PiHistoryAction.navigate,
+  ]) async {
+    final session = widget.session;
+    if (session == null || session.history.isOpen || session.hibernating) {
+      return;
+    }
+    await showAppDialog<void>(
+      context,
+      (_) => HistoryDialog(
+        controller: session.history,
+        hasDraft: () => session.hasDraft,
+        message: message,
+        initialAction: action,
+        onAbort: session.client.abort,
+      ),
+    );
+  }
+
+  Future<void> _restoreHistoryDraft() async {
+    final session = widget.session;
+    if (session == null) return;
+    final confirmed =
+        !session.hasDraft ||
+        await showAppDialog<bool>(
+              context,
+              (context) => AppDialog(
+                title: context.l10n.historyRestoreDraft,
+                actions: [
+                  AppActionButton.subtle(
+                    label: context.l10n.cancel,
+                    onPressed: () => Navigator.of(context).pop(false),
+                  ),
+                  AppActionButton(
+                    label: context.l10n.confirm,
+                    onPressed: () => Navigator.of(context).pop(true),
+                  ),
+                ],
+                child: Text(
+                  context.l10n.historyDraftWarning,
+                  style: context.textTheme.bodyMedium,
+                ),
+              ),
+            ) ==
+            true;
+    if (confirmed && mounted) setState(session.restoreHistoryDraft);
+  }
+
+  Widget _historyButton(BuildContext context) => AppIconButton.subtle(
+    icon: Icons.history,
+    tooltip: context.l10n.historyTitle,
+    onPressed: widget.session == null || widget.hibernating
+        ? null
+        : () => _showHistory(),
+  );
 
   Future<void> _send() async {
     final draft = widget.input.value;
@@ -180,6 +249,7 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
+          if (widget.session != null) _historyButton(context),
           AppIconButton.subtle(
             icon: Icons.refresh,
             tooltip: l10n.chatRefresh,
@@ -244,6 +314,10 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
                     tools: chat.timeline.tools,
                     registry: widget.registry,
                     onShowChanges: (path) => widget.browser.showFiles(path),
+                    onHistory: widget.session == null ? null : _showHistory,
+                    historyEnabled:
+                        !widget.hibernating &&
+                        widget.session?.history.busy != true,
                   ),
                 ),
               );
@@ -333,12 +407,15 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
                     color: context.colors.textSecondary,
                   ),
                   const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    widget.project,
-                    style: context.textTheme.labelMedium?.copyWith(
-                      color: context.colors.textPrimary,
+                  Expanded(
+                    child: Text(
+                      widget.project,
+                      style: context.textTheme.labelMedium?.copyWith(
+                        color: context.colors.textPrimary,
+                      ),
                     ),
                   ),
+                  if (widget.session != null) _historyButton(context),
                 ],
               ),
             ),
@@ -418,6 +495,24 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
                 active: chat.isRunning || chat.isLoading || chat.isSending,
               ),
             ),
+          if (widget.session?.pendingHistoryDraft != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: AppSpacing.sm,
+                children: [
+                  Text(
+                    l10n.historyPendingDraft,
+                    style: context.textTheme.bodySmall,
+                  ),
+                  AppActionButton.subtle(
+                    label: l10n.historyRestoreDraft,
+                    onPressed: _restoreHistoryDraft,
+                  ),
+                ],
+              ),
+            ),
           if (widget.sharedDirectoryWarning)
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -491,7 +586,11 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: Listenable.merge([widget.chat, widget.browser]),
+    listenable: Listenable.merge([
+      widget.chat,
+      widget.browser,
+      if (widget.session != null) widget.session!.history,
+    ]),
     builder: (context, _) {
       final chat = widget.chat;
       // Keep the original centered empty composer. Only an accepted/submitting

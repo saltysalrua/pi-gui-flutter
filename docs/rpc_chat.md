@@ -1,6 +1,6 @@
 ---
 title: "RPC 对话、Markdown 与文件改动"
-version: "1.9.1"
+version: "1.10.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, chat, markdown, diff]
@@ -58,6 +58,8 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 
 ### 会话与恢复
 
+聊天标题栏和用户消息菜单现支持 [历史回溯、分支与复制会话](history_rewind.md)：保留 Pi 全历史树、标签、分支摘要、fork/clone。成功后仍由 `get_messages` 回读活动上下文；`compactionSummary/branchSummary` 的 `summary` 作为正文显示。此功能只回溯会话，不新增文件回滚。
+
 生产侧栏通过管理通道的 `gui_workspace_history` 读取各目录的官方历史摘要，`gui_open_channel(sessionPath)` 在独立 Pi 进程中恢复历史；同一历史只允许一个运行实例。切换标签纯属 UI，不发送 `switch_session`。Flutter 不自行扫描 Pi 私有会话目录。
 
 每个通道有独立 ChatController / ModelPickerController 和写确认屏障。单会话断连不影响其他通道，不自动重放消息；已退出会话可关闭标签后从历史重开。单会话兼容传输的有界重连 / 恢复逻辑仍用于原有探针。完整生命周期见 [工作区与并行会话](workspaces_sessions.md)。
@@ -75,7 +77,7 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 | 时间线投影 | `lib/core/models/chat_timeline.dart` | 按内容索引拼接、最终消息替换、toolCallId 关联、历史重建；`assistantNumbers` 按正序生成与消息列表对齐的编号 |
 | Diff 解析 | `lib/core/models/diff_document.dart` | patch/带行号 Diff、中性写入后视图；隐藏重复文件头但保留真实内容，无文件 I/O、无补丁执行 |
 | write Diff 后端 | `assets/backend/gui_tool_diff.mjs` | 公共 `tool_call/tool_result` 中间件，有限快照、冲突降级、补充结果 details，不接管工具执行 |
-| 扩展装载 | `lib/core/rpc/pi_workspace_transport.dart`、`assets/backend/workspace_rpc.mjs` | 发布适配层、并行管理器、工作区浏览模块和 Diff 扩展四个 assets；`PiChild` 以 `--extension` 装载 Diff 观察扩展 |
+| 扩展装载 | `lib/core/rpc/pi_workspace_transport.dart`、`assets/backend/workspace_rpc.mjs` | 发布七个 backend assets（完整清单见工作区文档）；`PiChild` 以 `--extension` 装载 Diff 观察扩展与历史能力桥 |
 | 交互状态 | `lib/ui/features/home/controllers/chat_controller.dart` | 发送互斥、停止、恢复、会话书签与成功文件记录投影 |
 | 主工作区 | `lib/ui/features/home/widgets/home_chat_panel.dart` | 两态布局、时间线、草稿、回到最新、响应式文件 / Git 右栏 |
 | 输入组件 | `lib/ui/features/home/widgets/home_starter_panel.dart` | 共用输入卡片、键盘/IME、紧凑模型入口 |
@@ -105,7 +107,7 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 
 ### 命令
 
-下面是原生 Pi 命令格式。在并行 GUI 中由 PiChannelHub 封装 `gui_channel`；新建 / 选择会话用管理命令开通道，不在既有通道上替换另一个会话。
+下面是原生 Pi 命令格式。在并行 GUI 中由 PiChannelHub 封装 `gui_channel`；新建 / 选择会话用管理命令开通道。显式 fork/clone 沿用 Pi 的运行时替换语义，再另开标签恢复原历史，详见历史回溯文档；普通切标签不替换运行时。
 
 ```json
 {"id":"gui-1","type":"get_state"}
@@ -210,7 +212,7 @@ assistantNumbers: null,       null, 1,         2,         null, 3
 ### 故障边界
 
 - 旁路 stdout、单条坏事件与超时均不主动杀 Pi，遵循已有传输层约束。
-- `prompt/new_session/switch_session` 超时保留未确认屏障；损坏的聊天写确认同样按结果未知处理。新聊天写不能越过它，读取和停止仍可用。
+- `prompt/new_session/switch_session` 及 `gui_history_navigate/fork/clone/label` 超时保留未确认屏障；损坏的聊天写确认同样按结果未知处理。新聊天写不能越过它，读取和停止仍可用。
 - 迟到确认派发 `PiRpcConversationSettled`，只回读，不重新发送。会话切换确认派发 `PiRpcSessionChanged`，模型选择器重新读取模型/等级。
 - `clear_queue/abort` 不等待模型选择写入屏障，停止路径不会被未确认的模型选择卡住。
 - 连接、发送确认等顶层操作提示仍使用本地化的人话，不直接输出 GUI 内部异常堆栈。模型错误在消息内显示 Pi 的 `errorMessage`，不再被通用文案覆盖，也不重复触发输入框警告；原始工具返回仍可在展开的输出区域查看。
@@ -331,4 +333,4 @@ dart run tool/check_chat_rpc.dart --with-model
 
 ## 当前边界
 
-暂不包含 LaTeX/Mermaid、编辑审批/回滚及执行中的插队发送。Git 状态、Diff 和提交图已接入只读工作区右栏。图片上传/预览与文件链接已接入，见 [图片附件与文件链接](images_and_links.md)；历史会话列表由工作区后端提供。已有扩展弹窗仍由 Pi 的 extension_ui 机制处理，不由 Flutter 重写权限或 Agent 逻辑。
+暂不包含 LaTeX/Mermaid、文件编辑审批/回滚及执行中的插队发送。会话历史回溯已接入，见 [历史回溯](history_rewind.md)。Git 状态、Diff 和提交图已接入只读工作区右栏。图片上传/预览与文件链接已接入，见 [图片附件与文件链接](images_and_links.md)；历史会话列表由工作区后端提供。已有扩展弹窗仍由 Pi 的 extension_ui 机制处理，不由 Flutter 重写权限或 Agent 逻辑。
