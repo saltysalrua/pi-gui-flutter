@@ -181,9 +181,22 @@ class _HomeViewState extends State<HomeView> with WindowListener {
       _closing = false;
       return;
     }
-    await _workbench.shutdown();
-    await AppearanceController.instance.settled;
-    await windowManager.destroy();
+    // The close is now committed. Remove the window before waiting for the
+    // owned process tree (taskkill on Windows); keep Flutter alive until both
+    // backend cleanup and pending preference writes have finished.
+    try {
+      await windowManager.hide();
+    } catch (_) {
+      // A failed hide must not prevent the actual shutdown.
+    }
+    try {
+      await Future.wait([
+        _workbench.shutdown(),
+        AppearanceController.instance.settled,
+      ]);
+    } finally {
+      await windowManager.destroy();
+    }
   }
 
   @override

@@ -1,6 +1,6 @@
 ---
 title: "项目、Worktree 与并行会话"
-version: "2.4.0"
+version: "2.4.1"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, pi-rpc, session, workspace, git-worktree, parallel]
@@ -33,10 +33,23 @@ tags: [flutter, pi-rpc, session, workspace, git-worktree, parallel]
 
 - 关闭普通空闲会话只结束其所属 Pi 进程，已保存历史保留；从历史再次打开可恢复。
 - 有未发送草稿 / 附件时确认是否丢弃；仍在执行、加载、模型写入或等待问答时确认“停止并关闭”。关闭窗口会对运行任务和草稿进行整体确认。后台 Worktree 创建 / 移除或管理写请求尚未确认时，提示先等待操作完成，不直接杀掉 Git 留下半成品。
+- 确认关闭窗口后，窗口先隐藏，再等待本应用的 Pi 进程树清理和待保存的外观设置写完，最后销毁原生窗口。后台清理仍会短暂占用时间，但不再让一个已停止交互的窗口留在屏幕上；取消确认或仍有 Worktree 管理写操作时不会隐藏。
 - 关闭最后一个标签后显示新建会话入口，不关闭应用。
 - 同一份历史在本 GUI 内只允许一个运行实例；重复点击或并发打开会定位已经存在的会话。
 - 单个 Pi 退出只影响该通道，其余会话继续；不会自动重放 Prompt。关闭失败会保留会话条目，避免把未确认停止误报为已结束。
 - 打开的标签、草稿和扩展状态是本次运行的内存状态，不承诺跨重启保留。重启恢复注册项目、最后打开的目录，并自动重开该目录**最近一次有内容的会话**（见下“重启回到上一个对话”）；找不到已保存内容时才从空会话开始，其余历史仍从侧边栏显式打开。
+
+### 窗口退出时序
+
+`HomeView.onWindowClose()` 保留管理写操作守卫及运行任务 / 草稿确认，确认通过后按以下顺序退出：
+
+1. 调用 `windowManager.hide()`，先撤下窗口；隐藏失败仍继续退出，不把应用留在无法再关闭的状态。
+2. 并行等待 `WorkbenchController.shutdown()` 和 `AppearanceController.settled`，不因窗口已隐藏就跳过进程清理或设置保存。
+3. 在 `finally` 中调用 `windowManager.destroy()`，清理异常也不会留下不可操作的窗口。
+
+`WorkbenchController.shutdown()` 复用同一个 Future，重复调用必须等到同一次清理真正结束。先取消事件监听，再并行释放各会话客户端与 control 客户端；无论控制器释放是否成功，都在 `finally` 关闭唯一物理连接 `PiChannelHub`。Windows 仍由 `PiProcessTransport` 对**本次启动的适配器 PID** 执行 `taskkill /PID … /T /F`，等待其退出后删除解包脚本；没有改成按进程名终止，也没有省略 Pi / 工具子进程清理。不新增 RPC 命令，不改变单独关闭标签的逻辑。
+
+隔离验证使用临时目录、独立 Pi 配置与真实后端，不调用模型、不操作活动 GUI。修复前约 **536ms** 才发出 `destroy`；修复后 **0–3ms** 发出 `hide`，约 **482–605ms** 后完成后台清理并发出 `destroy`。这是窗口方法调用时序，**不是原生窗口消失延迟的测量**。临时验证也覆盖草稿关闭取消、重复点击关闭、隐藏方法异常；永久核心回归在 `test/parallel_session_test.dart` 覆盖等待进程树退出和会话释放失败后的兜底清理。
 
 ### 前端资源释放
 

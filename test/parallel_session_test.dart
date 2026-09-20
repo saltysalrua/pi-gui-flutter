@@ -37,8 +37,64 @@ void event(
   'message': message,
 });
 
+class _GatedCloseTransport extends TestTransport {
+  final closeStarted = Completer<void>();
+  final allowClose = Completer<void>();
+
+  @override
+  Future<void> close() async {
+    closeStarted.complete();
+    await allowClose.future;
+    await super.close();
+  }
+}
+
+class _ShutdownSession extends Fake implements WorkbenchSession {
+  _ShutdownSession(this.onDispose);
+  final Future<void> Function() onDispose;
+
+  @override
+  Future<void> dispose() => onDispose();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final failSession in [false, true]) {
+    test(
+      'shutdown waits for the owned process tree even with session failure=$failSession',
+      () async {
+        final transport = _GatedCloseTransport();
+        final workbench = WorkbenchController(
+          hub: PiChannelHub(() async => transport),
+        );
+        addTearDown(workbench.dispose);
+        await workbench.control.connect();
+        var disposedHealthy = false;
+        workbench.sessions['first'] = _ShutdownSession(() async {
+          if (failSession) throw StateError('cleanup failed');
+        });
+        workbench.sessions['second'] = _ShutdownSession(() async {
+          disposedHealthy = true;
+        });
+        var finished = false;
+        final shutdown = workbench.shutdown();
+        final checked = expectLater(
+          shutdown.whenComplete(() => finished = true),
+          failSession ? throwsStateError : completes,
+        );
+        expect(identical(shutdown, workbench.shutdown()), true);
+        await transport.closeStarted.future;
+        expect(disposedHealthy, true);
+        expect(finished, false);
+        transport.allowClose.complete();
+        await checked;
+        expect(transport.closed, true);
+        expect(workbench.hub.channelCount, 0);
+      },
+    );
+  }
+
   test('one physical transport routes identical request IDs and a child EOF only closes its channel', () async {
     final transport = TestTransport();
     var starts = 0;

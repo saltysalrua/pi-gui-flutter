@@ -271,6 +271,7 @@ class WorkbenchController extends ChangeNotifier {
   late final PiCatalogService api;
   late final StreamSubscription<PiRpcEvent> _events;
   Timer? _idleSweep;
+  Future<void>? _shutdownFuture;
   final tabs = WorkbenchTabs();
   final sessions = <String, WorkbenchSession>{};
   final history = <String, List<PiSessionSummary>>{};
@@ -849,19 +850,23 @@ class WorkbenchController extends ChangeNotifier {
     }
   }
 
-  Future<void> shutdown() async {
-    if (_disposed) return;
+  Future<void> shutdown() => _shutdownFuture ??= _shutdownResources();
+
+  Future<void> _shutdownResources() async {
     _disposed = true;
     _idleSweep?.cancel();
-    await _events.cancel();
-    for (final event in _sessionEvents.values) {
-      await event.cancel();
+    try {
+      await _events.cancel();
+      await Future.wait(_sessionEvents.values.map((event) => event.cancel()));
+      await Future.wait([
+        for (final session in sessions.values) session.dispose(),
+        control.close(),
+      ]);
+    } finally {
+      // A controller cleanup failure must not leave the adapter/Pi tree alive,
+      // especially once the window has already been hidden for shutdown.
+      await hub.close();
     }
-    for (final session in sessions.values) {
-      await session.dispose();
-    }
-    await control.close();
-    await hub.close();
   }
 
   @override
