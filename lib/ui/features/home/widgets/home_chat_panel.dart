@@ -535,6 +535,7 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
             ),
           HomeStarterPanel(
             modelPicker: widget.modelPicker,
+            contextGateway: widget.hibernating ? null : widget.session?.client,
             inputController: widget.input,
             attachments: widget.attachments,
             canSend: chat.canSubmit,

@@ -31,6 +31,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectModel => 'Select Model';
 
   @override
+  String contextUsageDetails(String percent, String used, String total) {
+    return 'Context $percent% used\n$used / $total tokens (estimated)';
+  }
+
+  @override
+  String contextUsagePending(String total) {
+    return 'Context usage not yet known\nModel limit: $total tokens; waiting for Pi';
+  }
+
+  @override
+  String get contextUsageUnavailable =>
+      'Context usage unavailable; waiting for Pi';
+
+  @override
   String get sendMessage => 'Send';
 
   @override

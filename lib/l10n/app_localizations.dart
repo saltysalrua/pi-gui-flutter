@@ -140,6 +140,24 @@ abstract class AppLocalizations {
   /// **'切换模型'**
   String get selectModel;
 
+  /// No description provided for @contextUsageDetails.
+  ///
+  /// In zh, this message translates to:
+  /// **'上下文已用 {percent}%\n{used} / {total} Token（估算）'**
+  String contextUsageDetails(String percent, String used, String total);
+
+  /// No description provided for @contextUsagePending.
+  ///
+  /// In zh, this message translates to:
+  /// **'上下文用量暂未确定\n模型上限 {total} Token，等待 Pi 更新'**
+  String contextUsagePending(String total);
+
+  /// No description provided for @contextUsageUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'上下文用量暂不可用，等待 Pi 返回数据'**
+  String get contextUsageUnavailable;
+
   /// No description provided for @sendMessage.
   ///
   /// In zh, this message translates to:

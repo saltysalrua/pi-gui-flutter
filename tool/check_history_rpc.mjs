@@ -16,12 +16,14 @@ let child;
 const pending = new Map();
 try {
   await mkdir(process.env.PI_CODING_AGENT_DIR);
+  // Enable model metadata without credentials or network/model calls.
+  await writeFile(path.join(process.env.PI_CODING_AGENT_DIR, 'auth.json'), JSON.stringify({ anthropic: { type: 'api_key', key: 'context-fixture-not-a-real-key' } }));
   await writeFile(path.join(process.env.PI_CODING_AGENT_DIR, "settings.json"), JSON.stringify({ defaultProvider: "anthropic", defaultModel: "claude-sonnet-4-5", compaction: { enabled: false } }));
   const packageRoot = await resolvePiPackage();
   const { SessionManager } = await import(pathToFileURL(path.join(packageRoot, "dist/index.js")).href);
   const sm = SessionManager.create(root);
   const user = (content, timestamp) => sm.appendMessage({ role: "user", content, timestamp });
-  const assistant = (text, timestamp) => sm.appendMessage({ role: "assistant", content: [{ type: "text", text }], timestamp, api: "anthropic-messages", provider: "anthropic", model: "claude-sonnet-4-5", stopReason: "stop", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } });
+  const assistant = (text, timestamp) => sm.appendMessage({ role: "assistant", content: [{ type: "text", text }], timestamp, api: "anthropic-messages", provider: "anthropic", model: "claude-sonnet-4-5", stopReason: "stop", usage: { input: 1000, output: 100, cacheRead: 2000, cacheWrite: 0, totalTokens: 3100, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } });
   const first = user("first prompt", 1);
   const answer = assistant("first answer", 2);
   const image = { type: "image", data: "aGVsbG8=", mimeType: "image/png" };
@@ -85,12 +87,18 @@ try {
   await requestAt("control", "gui_open_channel", { channelId: "history", workspace: root, sessionPath: sourceFile });
   await requestAt("control", "gui_open_channel", { channelId: "sibling", workspace: root });
   const siblingState = await requestAt("sibling", "get_state");
+  const siblingStats = await requestAt('sibling', 'get_session_stats');
+  assert.equal(siblingStats.sessionId, siblingState.sessionId);
+  assert.equal(siblingStats.contextUsage.contextWindow, siblingState.model.contextWindow);
   const request = (type, fields = {}) => requestAt("history", type, fields);
   const identity = async () => ({ sessionId: (await request("get_state")).sessionId, leafId: (await request("get_entries")).leafId });
   const full = await request("get_entries");
   assert(full.entries.some((e) => e.id === oldLeaf));
   assert(full.entries.some((e) => e.id === full.leafId));
   const initial = await identity();
+  const compactedStats = await request('get_session_stats');
+  assert.equal(compactedStats.sessionId, initial.sessionId);
+  assert.equal(compactedStats.contextUsage.tokens, null); // Pi intentionally marks post-compaction usage unknown.
   assert((await request('get_messages')).messages.some(m => m.role === 'compactionSummary'));
   assert.equal((await request("gui_history_entry", {...initial, entryId: second})).entry.id, second);
   await assert.rejects(requestAt("sibling", "gui_history_entry", {...initial, entryId: second}), {code:"HISTORY_STALE"});
@@ -103,6 +111,9 @@ try {
   assert.equal(rewound.editorText, "edit me");
   assert.deepEqual(rewound.images, [image]);
   assert.equal((await identity()).leafId, answer);
+  const restoredStats = await request('get_session_stats');
+  assert.equal(restoredStats.contextUsage.tokens, 3100); // Latest context, NOT sum of every assistant turn.
+  assert.equal(restoredStats.contextUsage.percent, 3100 / siblingState.model.contextWindow * 100);
   assert.equal((await request("get_entries")).entries.filter((e)=>e.type==='message').length, 6);
   await request("gui_history_navigate", {...await identity(), entryId:oldLeaf});
   const summarized = await request("gui_history_navigate", {...await identity(), entryId:answer, summarize:true, customInstructions:"focus", replaceInstructions:true});
@@ -137,7 +148,7 @@ try {
   assert.deepEqual((await requestAt("sibling", "get_messages")).messages, []);
   assert(!events.some((e) => e.type === "agent_start"));
   assert(!events.some((e) => e.type === "extension_error"));
-  console.log("PASS: packaged 7 assets + production multiplex + real Pi: preview, full branches, labels, stale guards, extension cancellation/custom summary, root reset, image draft, native fork/clone, source reopen, sibling isolation, bridge reload; no model calls.");
+  console.log("PASS: packaged 7 assets + production multiplex + real Pi: preview, full branches, labels, stale guards, extension cancellation/custom summary, root reset, image draft, native fork/clone, source reopen, sibling isolation, bridge reload, native context usage/compaction/rewind; no model calls.");
 } finally {
   for (const item of pending.values()) clearTimeout(item.timer);
   if (child && child.exitCode === null && child.signalCode === null) {

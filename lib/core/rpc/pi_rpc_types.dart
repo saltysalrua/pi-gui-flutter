@@ -56,6 +56,61 @@ class PiModel {
       other != null && provider == other.provider && id == other.id;
 }
 
+/// Pi's current context estimate, not cumulative session token consumption.
+class PiContextUsage {
+  const PiContextUsage({
+    required this.sessionId,
+    this.tokens,
+    this.contextWindow,
+    this.percent,
+  });
+
+  factory PiContextUsage.fromJson(Object? value) {
+    final json = rpcObject(value);
+    int? count(String key, {bool positive = false}) {
+      final value = json[key];
+      if (value == null) return null;
+      if (value is! num ||
+          !value.isFinite ||
+          value < (positive ? 1 : 0) ||
+          value != value.truncateToDouble()) {
+        throw FormatException('Invalid context usage $key');
+      }
+      return value.toInt();
+    }
+
+    final tokens = count('tokens');
+    final window = count('contextWindow', positive: true);
+    final percent = json['percent'];
+    if (percent != null &&
+        (percent is! num || !percent.isFinite || percent < 0)) {
+      throw const FormatException('Invalid context usage percent');
+    }
+    return PiContextUsage(
+      sessionId: json['sessionId'] as String,
+      tokens: tokens,
+      contextWindow: window,
+      percent: tokens == null || window == null
+          ? null
+          : (percent as num?)?.toDouble(),
+    );
+  }
+
+  final String sessionId;
+  final int? tokens, contextWindow;
+  final double? percent;
+
+  /// Older Pi versions omit contextUsage. Never substitute cumulative tokens.
+  static PiContextUsage? fromSessionStats(Object? value) {
+    final stats = rpcObject(value);
+    if (stats['contextUsage'] == null) return null;
+    return PiContextUsage.fromJson({
+      ...rpcObject(stats['contextUsage']),
+      'sessionId': stats['sessionId'],
+    });
+  }
+}
+
 class PiSessionState {
   const PiSessionState({
     required this.model,
@@ -104,6 +159,11 @@ class PiRpcException implements Exception {
 
 sealed class PiRpcEvent {
   const PiRpcEvent();
+}
+
+/// A confirmed model/history mutation invalidates the previous context meter.
+class PiContextUsageInvalidated extends PiRpcEvent {
+  const PiContextUsageInvalidated();
 }
 
 class PiRpcConnected extends PiRpcEvent {
@@ -190,6 +250,11 @@ class PiExtensionUiRequest extends PiRpcEvent {
   final String? statusKey, statusText, widgetKey, widgetPlacement;
   final List<String>? options, widgetLines;
   final int? timeout;
+}
+
+abstract interface class PiContextGateway {
+  Stream<PiRpcEvent> get events;
+  Future<PiContextUsage?> getContextUsage();
 }
 
 abstract interface class PiModelGateway {

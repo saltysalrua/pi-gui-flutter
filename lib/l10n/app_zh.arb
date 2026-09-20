@@ -7,6 +7,19 @@
   "noSessions": "暂无历史对话",
   "inputPlaceholder": "给 Pi 输入需求，或指派代码任务...",
   "selectModel": "切换模型",
+  "contextUsageDetails": "上下文已用 {percent}%\n{used} / {total} Token（估算）",
+  "@contextUsageDetails": {
+    "placeholders": {
+      "percent": { "type": "String" },
+      "used": { "type": "String" },
+      "total": { "type": "String" }
+    }
+  },
+  "contextUsagePending": "上下文用量暂未确定\n模型上限 {total} Token，等待 Pi 更新",
+  "@contextUsagePending": {
+    "placeholders": { "total": { "type": "String" } }
+  },
+  "contextUsageUnavailable": "上下文用量暂不可用，等待 Pi 返回数据",
   "sendMessage": "发送",
   "environmentLocal": "Local RPC (已连接)",
   "agentMain": "Main Agent",

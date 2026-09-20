@@ -7,6 +7,19 @@
   "noSessions": "No conversations yet",
   "inputPlaceholder": "Ask Pi anything, or assign a coding task...",
   "selectModel": "Select Model",
+  "contextUsageDetails": "Context {percent}% used\n{used} / {total} tokens (estimated)",
+  "@contextUsageDetails": {
+    "placeholders": {
+      "percent": { "type": "String" },
+      "used": { "type": "String" },
+      "total": { "type": "String" }
+    }
+  },
+  "contextUsagePending": "Context usage not yet known\nModel limit: {total} tokens; waiting for Pi",
+  "@contextUsagePending": {
+    "placeholders": { "total": { "type": "String" } }
+  },
+  "contextUsageUnavailable": "Context usage unavailable; waiting for Pi",
   "sendMessage": "Send",
   "environmentLocal": "Local RPC (Connected)",
   "agentMain": "Main Agent",

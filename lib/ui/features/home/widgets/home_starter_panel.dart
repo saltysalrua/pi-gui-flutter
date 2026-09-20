@@ -10,6 +10,10 @@ import 'package:pi_gui/ui/atoms/app_image.dart';
 
 import '../controllers/image_attachment_controller.dart';
 
+import 'package:pi_gui/core/rpc/pi_rpc_types.dart';
+
+import 'context_usage_indicator.dart';
+
 import 'package:pi_gui/core/slots/slot_manager.dart';
 import 'package:pi_gui/ui/atoms/app_icon_button.dart';
 import 'package:pi_gui/ui/atoms/app_action_button.dart';
@@ -38,7 +42,9 @@ class HomeStarterPanel extends StatefulWidget {
     this.onFollowUp,
     this.onRestoreQueue,
     this.minLines = 2,
+    this.contextGateway,
   });
+  final PiContextGateway? contextGateway;
   final ModelPickerController modelPicker;
   final TextEditingController inputController;
   final ImageAttachmentController attachments;
@@ -294,26 +300,37 @@ class _HomeStarterPanelState extends State<HomeStarterPanel> {
                                   model.name,
                                   thinkingLevelLabel(l10n, level),
                                 );
-                          return AppActionButton.subtle(
-                            key: _modelButtonKey,
-                            label: label,
-                            labelStyle: context.textTheme.labelMedium,
-                            height: 28,
-                            iconSize: 14,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm,
-                              vertical: AppSpacing.xs,
-                            ),
-                            trailing: const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                            ),
-                            onPressed: widget.isRunning
-                                ? null
-                                : () => showModelThinkingPopover(
-                                    context: context,
-                                    anchorKey: _modelButtonKey,
-                                    controller: picker,
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ContextUsageIndicator(
+                                gateway: widget.contextGateway,
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Flexible(
+                                child: AppActionButton.subtle(
+                                  key: _modelButtonKey,
+                                  label: label,
+                                  labelStyle: context.textTheme.labelMedium,
+                                  height: 28,
+                                  iconSize: 14,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.sm,
+                                    vertical: AppSpacing.xs,
                                   ),
+                                  trailing: const Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                  ),
+                                  onPressed: widget.isRunning
+                                      ? null
+                                      : () => showModelThinkingPopover(
+                                          context: context,
+                                          anchorKey: _modelButtonKey,
+                                          controller: picker,
+                                        ),
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),

@@ -46,6 +46,7 @@ class _PendingRequest {
 class PiRpcClient
     implements
         PiModelGateway,
+        PiContextGateway,
         PiChatGateway,
         PiWorkspaceGateway,
         PiBrowserGateway {
@@ -226,6 +227,21 @@ class PiRpcClient
       final data = decoded['data'];
       if (acknowledged &&
           decoded['success'] == true &&
+          !(data is Map && data['cancelled'] == true) &&
+          const {
+            'set_model',
+            'cycle_model',
+            'compact',
+            'fork',
+            'clone',
+            'gui_history_navigate',
+            'gui_history_fork',
+            'gui_history_clone',
+          }.contains(pending.command)) {
+        _events.add(const PiContextUsageInvalidated());
+      }
+      if (acknowledged &&
+          decoded['success'] == true &&
           data is Map &&
           data['cancelled'] == false &&
           const {'new_session', 'switch_session'}.contains(pending.command)) {
@@ -401,6 +417,10 @@ class PiRpcClient
   @override
   Future<PiSessionState> getState() async =>
       PiSessionState.fromJson(await _request('get_state'));
+
+  @override
+  Future<PiContextUsage?> getContextUsage() async =>
+      PiContextUsage.fromSessionStats(await _request('get_session_stats'));
 
   @override
   Future<List<PiThinkingLevel>> getAvailableThinkingLevels() async {

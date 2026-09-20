@@ -31,6 +31,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get selectModel => '切换模型';
 
   @override
+  String contextUsageDetails(String percent, String used, String total) {
+    return '上下文已用 $percent%\n$used / $total Token（估算）';
+  }
+
+  @override
+  String contextUsagePending(String total) {
+    return '上下文用量暂未确定\n模型上限 $total Token，等待 Pi 更新';
+  }
+
+  @override
+  String get contextUsageUnavailable => '上下文用量暂不可用，等待 Pi 返回数据';
+
+  @override
   String get sendMessage => '发送';
 
   @override
