@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_types.dart';
 import 'package:pi_gui/ui/features/home/controllers/model_picker_controller.dart';
@@ -112,30 +113,24 @@ void main() {
     await pi.close();
   });
 
-  test(
-    'reads exact backend levels and searches provider/name/id without conflating identities',
-    () async {
-      await picker.refresh();
-      expect(picker.thinkingLevels, [
-        PiThinkingLevel.off,
-        PiThinkingLevel.low,
-        PiThinkingLevel.high,
-        PiThinkingLevel.xhigh,
-      ]);
-      expect(picker.thinkingLevel, PiThinkingLevel.high);
-      expect(picker.search('  SAME   plain-PROVIDER  '), [plain]);
-      expect(picker.search('same-id'), [reasoning, plain]);
-      expect(picker.search('missing'), isEmpty);
-      expect(reasoning.sameIdentity(plain), isFalse);
-      expect(
-        await picker.selectThinkingLevel(PiThinkingLevel.minimal),
-        isFalse,
-      );
-      expect(pi.writes, 0);
-      expect(await picker.selectThinkingLevel(PiThinkingLevel.xhigh), isTrue);
-      expect(picker.thinkingLevel, PiThinkingLevel.xhigh);
-    },
-  );
+  test('reads exact backend levels and searches provider/name/id without conflating identities', () async {
+    await picker.refresh();
+    expect(picker.thinkingLevels, [
+      PiThinkingLevel.off,
+      PiThinkingLevel.low,
+      PiThinkingLevel.high,
+      PiThinkingLevel.xhigh,
+    ]);
+    expect(picker.thinkingLevel, PiThinkingLevel.high);
+    expect(picker.search('  SAME   plain-PROVIDER  '), [plain]);
+    expect(picker.search('same-id'), [reasoning, plain]);
+    expect(picker.search('missing'), isEmpty);
+    expect(reasoning.sameIdentity(plain), isFalse);
+    expect(await picker.selectThinkingLevel(PiThinkingLevel.minimal), isFalse);
+    expect(pi.writes, 0);
+    expect(await picker.selectThinkingLevel(PiThinkingLevel.xhigh), isTrue);
+    expect(picker.thinkingLevel, PiThinkingLevel.xhigh);
+  });
 
   test(
     'writes are serialized and model changes read back clamped thinking state',
@@ -294,6 +289,40 @@ void main() {
       expect(picker.selectedModel, plain);
       expect(picker.thinkingLevel, PiThinkingLevel.off);
       expect(pi.writes, 0);
+    },
+  );
+
+  test(
+    'late read repairs a catalog snapshot taken during the Pi startup window',
+    () async {
+      final windowed = ModelPickerController(pi, lateReadDelay: Duration.zero);
+      await windowed.refresh();
+      expect(windowed.models.length, 2);
+      // 模拟 Pi 后台目录刷新结束后补齐模型。
+      pi.models = [
+        reasoning,
+        plain,
+        const PiModel(
+          id: 'late-arrival',
+          name: 'Late Arrival',
+          provider: 'reasoning-provider',
+          reasoning: true,
+        ),
+      ];
+      var notifications = 0;
+      windowed.addListener(() => notifications++);
+      await pumpEventQueue();
+      expect(windowed.models.length, 3);
+      expect(notifications, 1);
+      expect(windowed.isBusy, isFalse);
+      expect(windowed.failure, isNull);
+      expect(windowed.isReady, isTrue);
+      // 每个进程周期只补读一次，后续读取不再触发额外通知。
+      pi.models = [reasoning];
+      await pumpEventQueue();
+      expect(windowed.models.length, 3);
+      expect(notifications, 1);
+      windowed.dispose();
     },
   );
 

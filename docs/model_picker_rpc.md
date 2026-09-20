@@ -81,6 +81,19 @@ tags: [flutter, pi-rpc, model-picker]
 
 普通打开只调用 `ModelPickerController.ensureLoaded()`：已就绪时不发请求、不触发 `isBusy`，因此不会经 `WorkspaceController.canSwitch` 让侧边栏变灰。显式刷新和真实写入仍保留原来的互斥锁，不能为消除视觉闪动放开并发写入。
 
+### 启动窗口补读（lateRead）
+
+Pi 0.85.1 RPC 进程在进入命令循环的同一刻才发起后台目录刷新（`main.js`，fire-and-forget，约 15 秒）：刷新开头的 `rebuildProviders()` 会先清空扩展 provider（如 yuukarin、猫饭）从 `models-store.json` 回放的动态目录，网络阶段逐 provider 补回。因此 RPC 就绪后头几秒 `get_available_models` 会返回残缺列表；GUI 首次读取（会话恢复事件触发）可能落在窗口内并缓存残缺快照。
+
+处理方式：`ModelPickerController` 在每个 Pi 进程周期（断线 `PiRpcDisconnected` 或换工作区 `PiRpcWorkspaceChanged` 重置）的首次成功读取后，安排一次 `lateReadDelay`（默认 18 秒，晚于后台刷新的 15 秒上限）后的**静默补读**：
+
+- 不置 `isBusy`、不弹 `failure`，侧边栏/滑块不闪；
+- 补读时若有写入在飞，最多间隔 3 秒重试 3 次，不与在途写入交错；
+- 仅当模型列表（身份/名称/推理标记）或选择快照（模型/档位/档位列表）可见变化时才 `notifyListeners`，列表内容不变则零通知；
+- 补读失败静默放弃，交给事件驱动的正常刷新重试。
+
+离线对照实验（`PI_OFFLINE=1`）确认无后台刷新时首次读取即全量，可区分窗口问题与连接问题。
+
 ### 错误与生命周期
 
 - `success:false` 变为带命令名的 `PiRpcException`；UI 展示本地化解决提示，不直接展示异常堆栈。
@@ -129,7 +142,7 @@ dart run tool/check_pi_rpc.dart --watch-seconds=120
 
 回归测试覆盖旁路 stdout、畸形扩展事件、读超时保活、超时写入延迟确认、旧连接 flush 错误隔离，以及自动重连次数上限。这些路径过去会被笼统地显示为断线，现在分别处理。
 
-闪动回归在 `test/model_picker_controller_test.dart` 中覆盖：反复打开不查询/不发忙碌通知、档位读取延迟或失败时保持完整旧快照、快速提交仍互斥到回读结束。视觉验证通过运行中 GUI 的独立预览 Controller 模拟等待态（不提交真实模型变更），检查 280×104 尺寸和滑块亮度保持不变；仅热重载，不重启承载当前会话的 Pi。
+闪动回归在 `test/model_picker_controller_test.dart` 中覆盖：反复打开不查询/不发忙碌通知、档位读取延迟或失败时保持完整旧快照、快速提交仍互斥到回读结束，以及启动窗口补读修复残缺列表且每个周期只补读一次（`lateReadDelay: Duration.zero` 注入）。视觉验证通过运行中 GUI 的独立预览 Controller 模拟等待态（不提交真实模型变更），检查 280×104 尺寸和滑块亮度保持不变；仅热重载，不重启承载当前会话的 Pi。
 
 窗口跟随通过运行中 Windows GUI 验证：保持浮层打开，依次缩小至 1200×760、放大至约 1750×980、最大化和还原，浮层右边缘始终与模型按钮对齐，上方间距保持 8；思考页维持 280×104。在模型列表输入 `gpt` 后还原窗口，仍停留在列表页并保留搜索内容。验证结束恢复原窗口位置和大小，不切换模型或会话；静态分析通过，纯布局修复不增加脆弱 Widget 测试。
 
