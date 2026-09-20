@@ -16,6 +16,7 @@ enum ChatFailure {
   disconnected,
   uncertain,
   stop,
+  queue,
   cancelled,
   invalidEvent,
 }
@@ -53,26 +54,52 @@ class ChatController extends ChangeNotifier {
       _needsHistory = true,
       _awaitingSettled = false;
   bool isLoading = false, isSending = false, isReady = false;
+  bool isTakingQueue = false, _stopping = false;
   bool workspaceLocked = false;
-  int _revision = 0, _runRevision = 0;
+  int _revision = 0, _runRevision = 0, _queueRevision = 0;
   ChatActivity activity = ChatActivity.idle;
   ChatFailure? failure;
   PiSessionState? state;
   PiPromptQueue queue = const PiPromptQueue();
 
-  bool get isRunning => activity != ChatActivity.idle;
-  bool get canSend =>
+  bool get isRunning => _stopping || activity != ChatActivity.idle;
+
+  /// Idle-only permission remains separate from submitting into a live run.
+  bool get canSend => canSubmit && !isRunning;
+  bool get canSubmit =>
+      !_disposed &&
       isReady &&
       !workspaceLocked &&
       !isLoading &&
       !isSending &&
-      !isRunning &&
+      !isTakingQueue &&
+      !_stopping &&
+      (activity == ChatActivity.idle || activity == ChatActivity.working) &&
       !_pi.hasUnsettledConversationMutation;
+  bool get canTakeQueue =>
+      !_disposed &&
+      isReady &&
+      !workspaceLocked &&
+      !isLoading &&
+      !isSending &&
+      !isTakingQueue &&
+      !_stopping &&
+      activity != ChatActivity.stopping &&
+      !queue.isEmpty &&
+      !_pi.hasUnsettledConversationMutation;
+  bool get canStop =>
+      !_disposed &&
+      isRunning &&
+      !isTakingQueue &&
+      !_stopping &&
+      activity != ChatActivity.stopping;
   // A fresh session is an explicit recovery option even if the previous read/restore failed.
   bool get canSwitch =>
       !workspaceLocked &&
       !isLoading &&
       !isSending &&
+      !isTakingQueue &&
+      queue.isEmpty &&
       !isRunning &&
       !_pi.hasUnsettledConversationMutation;
   String? get sessionFile => state?.sessionFile;
@@ -144,7 +171,7 @@ class ChatController extends ChangeNotifier {
 
   Future<void> _refresh() async {
     if (workspaceLocked) return;
-    if (_disposed || isLoading || isSending) {
+    if (_disposed || isLoading || isSending || isTakingQueue || _stopping) {
       _resync = true;
       return;
     }
@@ -162,6 +189,7 @@ class ChatController extends ChangeNotifier {
       }
       _lost = false;
       final version = _revision;
+      final queueVersion = _queueRevision;
       final next = await _pi.getState();
       if (state != null &&
           (state!.sessionId != next.sessionId ||
@@ -171,6 +199,9 @@ class ChatController extends ChangeNotifier {
       final history = _needsHistory ? await _pi.getMessages() : null;
       if (_disposed) return;
       state = next;
+      if (queueVersion == _queueRevision && next.pendingMessageCount == 0) {
+        queue = const PiPromptQueue();
+      }
       // A snapshot racing a live delta cannot overwrite newer content. Re-read at settled.
       if (version == _revision) {
         // get_messages excludes the in-flight assistant. Keep the active projection intact.
@@ -210,14 +241,24 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  Future<bool> send(String text, {List<PiImage> images = const []}) async {
-    if (!canSend || (text.trim().isEmpty && images.isEmpty)) return false;
+  Future<bool> send(
+    String text, {
+    List<PiImage> images = const [],
+    PiStreamingBehavior streamingBehavior = PiStreamingBehavior.steer,
+  }) async {
+    if (!canSubmit || (text.trim().isEmpty && images.isEmpty)) return false;
     isSending = true;
     failure = null;
     _notify();
     final runBeforePrompt = _runRevision;
     try {
-      await _pi.prompt(text.trim(), images: images);
+      // Always carry the policy: the backend may start/settle between the UI
+      // check and acceptance. prompt also preserves slash-command semantics.
+      await _pi.prompt(
+        text.trim(),
+        images: images,
+        streamingBehavior: streamingBehavior,
+      );
       if (_disposed) return true;
       // Extension slash commands can be handled without starting an agent run.
       if (!isRunning) {
@@ -245,14 +286,45 @@ class ChatController extends ChangeNotifier {
     }
   }
 
+  Future<List<String>> _clearQueue() async {
+    final version = _queueRevision;
+    final cleared = await _pi.clearQueue();
+    // Live queue_update wins over the command response (extensions may enqueue
+    // again before the acknowledgement arrives).
+    if (!_disposed && version == _queueRevision) queue = const PiPromptQueue();
+    return cleared.all;
+  }
+
+  /// Native dequeue: restore text without interrupting the current run.
+  Future<List<String>> takeQueue() async {
+    if (!canTakeQueue) return [];
+    isTakingQueue = true;
+    failure = null;
+    _notify();
+    try {
+      return await _clearQueue();
+    } catch (error) {
+      if (!_disposed) {
+        final uncertain = error is PiRpcException && error.outcomeUnknown;
+        if (uncertain) isReady = false;
+        failure = uncertain ? ChatFailure.uncertain : ChatFailure.queue;
+      }
+      return [];
+    } finally {
+      isTakingQueue = false;
+      _notify();
+      _flushResync();
+    }
+  }
+
   Future<List<String>> stop() async {
-    if (_disposed || !isRunning || activity == ChatActivity.stopping) return [];
+    if (!canStop) return [];
+    _stopping = true;
     activity = ChatActivity.stopping;
     _notify();
     var restored = <String>[];
     try {
-      restored = (await _pi.clearQueue()).all;
-      queue = const PiPromptQueue();
+      restored = await _clearQueue();
       await _pi.abort();
       if (!_disposed) {
         activity = ChatActivity.idle;
@@ -267,7 +339,9 @@ class ChatController extends ChangeNotifier {
         activity = _lost ? ChatActivity.idle : ChatActivity.working;
       }
     }
+    _stopping = false;
     _notify();
+    _flushResync();
     return restored;
   }
 
@@ -327,6 +401,10 @@ class ChatController extends ChangeNotifier {
       return;
     }
     if (event is PiRpcDisconnected) {
+      // Native queues are process-local, not persisted history. Never replay a
+      // stale snapshot after reconnecting; its delivery outcome is unknown.
+      queue = const PiPromptQueue();
+      _queueRevision++;
       _lost = true;
       _needsHistory = true;
       _awaitingSettled = false;
@@ -396,8 +474,12 @@ class ChatController extends ChangeNotifier {
         // A single long run can outgrow the budget before settling.
         _applyOutputBudget();
       case 'queue_update':
-        queue = event.queued ?? const PiPromptQueue();
+        _queueRevision++;
+        queue = event.queued!;
     }
+    // A queued continuation can start while clear_queue/abort is in flight.
+    // It must not reopen submission or permit a second stop operation.
+    if (_stopping) activity = ChatActivity.stopping;
     if ((event.type == 'message_update' ||
             event.type == 'tool_execution_update') &&
         !(wasEmpty && timeline.messages.isNotEmpty)) {
@@ -411,7 +493,12 @@ class ChatController extends ChangeNotifier {
   }
 
   void _flushResync() {
-    if (_resync && !_disposed && !isLoading && !isSending) {
+    if (_resync &&
+        !_disposed &&
+        !isLoading &&
+        !isSending &&
+        !isTakingQueue &&
+        !_stopping) {
       _resync = false;
       scheduleMicrotask(_refresh);
     }

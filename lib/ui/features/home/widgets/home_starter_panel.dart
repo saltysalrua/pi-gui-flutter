@@ -35,6 +35,8 @@ class HomeStarterPanel extends StatefulWidget {
     required this.onSendPrompt,
     required this.onStop,
     this.isStopping = false,
+    this.onFollowUp,
+    this.onRestoreQueue,
     this.minLines = 2,
   });
   final ModelPickerController modelPicker;
@@ -43,6 +45,7 @@ class HomeStarterPanel extends StatefulWidget {
   final bool canSend, isRunning, isStopping;
   final int minLines;
   final VoidCallback onSendPrompt, onStop;
+  final VoidCallback? onFollowUp, onRestoreQueue;
   @override
   State<HomeStarterPanel> createState() => _HomeStarterPanelState();
 }
@@ -55,20 +58,45 @@ class _HomeStarterPanelState extends State<HomeStarterPanel> {
     super.initState();
     _focusNode = FocusNode(
       onKeyEvent: (_, event) {
-        if (event is! KeyDownEvent ||
-            event.logicalKey != LogicalKeyboardKey.enter ||
-            HardwareKeyboard.instance.isShiftPressed ||
-            HardwareKeyboard.instance.isControlPressed ||
-            HardwareKeyboard.instance.isAltPressed ||
-            HardwareKeyboard.instance.isMetaPressed) {
-          return KeyEventResult.ignored;
-        }
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
         final composing = widget.inputController.value.composing;
         if (composing.isValid && !composing.isCollapsed) {
           return KeyEventResult.ignored;
         }
-        if (_canSend) widget.onSendPrompt();
-        return KeyEventResult.handled;
+        final keyboard = HardwareKeyboard.instance;
+        if (keyboard.isShiftPressed || keyboard.isMetaPressed) {
+          return KeyEventResult.ignored;
+        }
+        final alt = keyboard.isAltPressed;
+        final ctrl = keyboard.isControlPressed;
+        final key = event.logicalKey;
+        if (!alt &&
+            !ctrl &&
+            key == LogicalKeyboardKey.escape &&
+            widget.isRunning &&
+            !widget.isStopping) {
+          widget.onStop();
+          return KeyEventResult.handled;
+        }
+        if (alt &&
+            !ctrl &&
+            (key == LogicalKeyboardKey.arrowUp ||
+                key == LogicalKeyboardKey.keyQ)) {
+          widget.onRestoreQueue?.call();
+          return KeyEventResult.handled;
+        }
+        final followUp =
+            alt && !ctrl && key == LogicalKeyboardKey.enter ||
+            ctrl && !alt && key == LogicalKeyboardKey.keyQ;
+        if (followUp && widget.onFollowUp != null) {
+          if (_canSend) widget.onFollowUp!();
+          return KeyEventResult.handled;
+        }
+        if (!alt && !ctrl && key == LogicalKeyboardKey.enter) {
+          if (_canSend) widget.onSendPrompt();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
       },
     );
     _focusNode.addListener(_changed);
@@ -206,7 +234,9 @@ class _HomeStarterPanelState extends State<HomeStarterPanel> {
               AppTextField(
                 controller: widget.inputController,
                 focusNode: _focusNode,
-                hintText: l10n.inputPlaceholder,
+                hintText: widget.isRunning
+                    ? l10n.chatQueuePlaceholder
+                    : l10n.inputPlaceholder,
                 minLines: widget.minLines,
                 maxLines: 7,
                 borderless: true,
@@ -294,20 +324,68 @@ class _HomeStarterPanelState extends State<HomeStarterPanel> {
                     duration: MediaQuery.disableAnimationsOf(context)
                         ? Duration.zero
                         : AppDurations.fast,
-                    child: AppIconButton.primaryCircle(
-                      key: ValueKey(widget.isRunning),
-                      icon: widget.isRunning
-                          ? Icons.stop_rounded
-                          : Icons.arrow_upward_rounded,
-                      tooltip: widget.isRunning
-                          ? l10n.chatStop
-                          : l10n.sendMessage,
-                      onPressed: widget.isRunning
-                          ? (widget.isStopping ? null : widget.onStop)
-                          : _canSend
-                          ? widget.onSendPrompt
-                          : null,
+                    reverseDuration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : AppDurations.quick,
+                    switchInCurve: AppCurves.smoothOut,
+                    transitionBuilder: (child, animation) => SizeTransition(
+                      sizeFactor: animation,
+                      axis: Axis.horizontal,
+                      alignment: Alignment.centerRight,
+                      child: FadeTransition(opacity: animation, child: child),
                     ),
+                    child: !widget.isRunning
+                        ? const SizedBox.shrink(key: ValueKey(false))
+                        : Row(
+                            key: const ValueKey(true),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppIconButton.subtle(
+                                icon: Icons.stop_rounded,
+                                tooltip: l10n.chatQueueStop,
+                                onPressed: widget.isStopping
+                                    ? null
+                                    : widget.onStop,
+                              ),
+                              if (widget.onFollowUp != null)
+                                AppMenuButton<bool>(
+                                  icon: Icons.keyboard_arrow_down_rounded,
+                                  tooltip: l10n.chatQueueSendOptions,
+                                  options: [
+                                    AppMenuOption(
+                                      value: false,
+                                      label: l10n.chatQueueSteerAction,
+                                      icon: Icons.subdirectory_arrow_right,
+                                    ),
+                                    AppMenuOption(
+                                      value: true,
+                                      label: l10n.chatQueueFollowUpAction,
+                                      icon: Icons.playlist_add,
+                                    ),
+                                  ],
+                                  onSelected: !_canSend
+                                      ? null
+                                      : (followUp) {
+                                          // Recheck after the menu closes; state may have
+                                          // changed while the popup route was open.
+                                          if (!_canSend) return;
+                                          if (followUp) {
+                                            widget.onFollowUp!();
+                                          } else {
+                                            widget.onSendPrompt();
+                                          }
+                                        },
+                                ),
+                              const SizedBox(width: AppSpacing.xs),
+                            ],
+                          ),
+                  ),
+                  AppIconButton.primaryCircle(
+                    icon: Icons.arrow_upward_rounded,
+                    tooltip: widget.isRunning
+                        ? l10n.chatQueueSteerAction
+                        : l10n.sendMessage,
+                    onPressed: _canSend ? widget.onSendPrompt : null,
                   ),
                 ],
               ),

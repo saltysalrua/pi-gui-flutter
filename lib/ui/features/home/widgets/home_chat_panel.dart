@@ -187,10 +187,15 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
         : () => _showHistory(),
   );
 
-  Future<void> _send() async {
-    final draft = widget.input.value;
-    final attachments = widget.attachments.items;
-    final files = widget.attachments.files;
+  Future<void> _send([
+    PiStreamingBehavior behavior = PiStreamingBehavior.steer,
+  ]) async {
+    final owner = widget.session;
+    final input = widget.input;
+    final attachmentController = widget.attachments;
+    final draft = input.value;
+    final attachments = attachmentController.items;
+    final files = attachmentController.files;
     if (widget.attachments.isPicking ||
         attachments.isNotEmpty &&
             widget.modelPicker.selectedModel?.supportsImages == false) {
@@ -199,22 +204,36 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
     final accepted = await widget.chat.send(
       FileAttachmentPrompt.compose(draft.text, files),
       images: attachments.map((a) => a.image).toList(),
+      streamingBehavior: behavior,
     );
-    if (!mounted) return;
-    // Preserve subsequent typing and set_editor_text extension updates.
+    if (owner?.disposed == true || owner == null && !mounted) return;
+    // The pane may have unmounted during a tab switch. Complete against the
+    // captured session draft, preserving new typing and extension updates.
     if (accepted) {
-      if (widget.input.value == draft) widget.input.clear();
-      widget.attachments.accept(attachments, files: files);
+      if (input.value == draft) input.clear();
+      attachmentController.accept(attachments, files: files);
     }
   }
 
-  Future<void> _stop() async {
-    final restored = await widget.chat.stop();
-    if (!mounted || restored.isEmpty) return;
-    widget.input.text = [
-      widget.input.text,
+  Future<void> _restoreQueue({bool stop = false}) async {
+    final owner = widget.session;
+    final input = widget.input;
+    final restored = await (stop
+        ? widget.chat.stop()
+        : widget.chat.takeQueue());
+    if (owner?.disposed == true ||
+        owner == null && !mounted ||
+        restored.isEmpty) {
+      return;
+    }
+    final text = [
       ...restored,
+      input.text,
     ].where((s) => s.isNotEmpty).join('\n\n');
+    input.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
   }
 
   @override
@@ -364,6 +383,7 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
       ChatFailure.disconnected => l10n.piDisconnected,
       ChatFailure.uncertain => l10n.chatUncertain,
       ChatFailure.stop => l10n.chatStopFailed,
+      ChatFailure.queue => l10n.chatQueueFailed,
       ChatFailure.cancelled => l10n.chatSessionCancelled,
       ChatFailure.invalidEvent => l10n.chatInvalidEvent,
       null => null,
@@ -473,17 +493,7 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
                 ),
               ),
             ),
-          if (chat.queue.all.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: AppDisclosure(
-                title: l10n.chatQueued,
-                builder: (_) => Text(
-                  chat.queue.all.join('\n\n'),
-                  style: context.textTheme.bodySmall,
-                ),
-              ),
-            ),
+          _queuePreview(context),
           if (((started && chat.activity != ChatActivity.idle) ||
                   chat.isLoading ||
                   !chat.isReady) &&
@@ -527,15 +537,91 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
             modelPicker: widget.modelPicker,
             inputController: widget.input,
             attachments: widget.attachments,
-            canSend: chat.canSend,
+            canSend: chat.canSubmit,
             isRunning: chat.isRunning,
-            isStopping: chat.activity == ChatActivity.stopping,
+            isStopping: !chat.canStop,
             onSendPrompt: _send,
-            onStop: _stop,
+            onFollowUp: () => _send(PiStreamingBehavior.followUp),
+            onRestoreQueue: chat.canTakeQueue ? () => _restoreQueue() : null,
+            onStop: () => _restoreQueue(stop: true),
             minLines: started ? 2 : 4,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _queuePreview(BuildContext context) {
+    final chat = widget.chat;
+    final l10n = context.l10n;
+    final queue = chat.queue;
+    final entries = [
+      for (final text in queue.steering) (l10n.chatQueueSteering, text),
+      for (final text in queue.followUp) (l10n.chatQueueFollowUp, text),
+    ];
+    final previewEntries = [
+      if (queue.steering.isNotEmpty)
+        (l10n.chatQueueSteering, queue.steering.first),
+      if (queue.followUp.isNotEmpty)
+        (l10n.chatQueueFollowUp, queue.followUp.first),
+    ];
+    Widget contents(BuildContext context, {bool preview = false}) =>
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 144),
+          child: SingleChildScrollView(
+            primary: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (label, text) in preview ? previewEntries : entries)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Text(
+                      l10n.chatQueueEntry(
+                        label,
+                        text.isEmpty ? l10n.chatImage : text,
+                      ),
+                      maxLines: preview ? 1 : null,
+                      overflow: preview ? TextOverflow.ellipsis : null,
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+    final body = queue.isEmpty
+        ? const SizedBox(width: double.infinity)
+        : Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: AppDisclosure(
+                    framed: false,
+                    title: l10n.chatQueuedCount(queue.length),
+                    previewBuilder: (context) =>
+                        contents(context, preview: true),
+                    builder: contents,
+                  ),
+                ),
+                AppIconButton.subtle(
+                  icon: Icons.edit_outlined,
+                  tooltip: l10n.chatQueueRestore,
+                  onPressed: chat.canTakeQueue ? () => _restoreQueue() : null,
+                ),
+              ],
+            ),
+          );
+    if (MediaQuery.disableAnimationsOf(context)) return body;
+    return AnimatedSize(
+      duration: AppDurations.fast,
+      curve: AppCurves.smoothOut,
+      alignment: Alignment.bottomCenter,
+      child: body,
     );
   }
 

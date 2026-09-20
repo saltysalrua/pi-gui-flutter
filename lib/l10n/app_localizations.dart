@@ -788,6 +788,72 @@ abstract class AppLocalizations {
   /// **'等待中的消息'**
   String get chatQueued;
 
+  /// No description provided for @chatQueuedCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'等待中的消息（{count}）'**
+  String chatQueuedCount(int count);
+
+  /// No description provided for @chatQueueSteering.
+  ///
+  /// In zh, this message translates to:
+  /// **'本轮补充'**
+  String get chatQueueSteering;
+
+  /// No description provided for @chatQueueFollowUp.
+  ///
+  /// In zh, this message translates to:
+  /// **'完成后处理'**
+  String get chatQueueFollowUp;
+
+  /// No description provided for @chatQueueEntry.
+  ///
+  /// In zh, this message translates to:
+  /// **'{kind}：{message}'**
+  String chatQueueEntry(String kind, String message);
+
+  /// No description provided for @chatQueueSteerAction.
+  ///
+  /// In zh, this message translates to:
+  /// **'本轮补充 · Enter'**
+  String get chatQueueSteerAction;
+
+  /// No description provided for @chatQueueFollowUpAction.
+  ///
+  /// In zh, this message translates to:
+  /// **'完成后处理 · Alt+Enter'**
+  String get chatQueueFollowUpAction;
+
+  /// No description provided for @chatQueueSendOptions.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择消息处理时机'**
+  String get chatQueueSendOptions;
+
+  /// No description provided for @chatQueuePlaceholder.
+  ///
+  /// In zh, this message translates to:
+  /// **'继续补充… Enter 本轮处理，Alt+Enter 完成后处理'**
+  String get chatQueuePlaceholder;
+
+  /// No description provided for @chatQueueRestore.
+  ///
+  /// In zh, this message translates to:
+  /// **'取回排队文字 · Alt+↑\n不停止当前任务。图片需重新添加。'**
+  String get chatQueueRestore;
+
+  /// No description provided for @chatQueueStop.
+  ///
+  /// In zh, this message translates to:
+  /// **'停止并取回排队文字 · Esc\n图片需重新添加。'**
+  String get chatQueueStop;
+
+  /// No description provided for @chatQueueFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'未能取回排队文字，请稍后重试。'**
+  String get chatQueueFailed;
+
   /// No description provided for @chatRefresh.
   ///
   /// In zh, this message translates to:

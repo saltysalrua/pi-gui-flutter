@@ -391,6 +391,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatQueued => 'Queued messages';
 
   @override
+  String chatQueuedCount(int count) {
+    return 'Queued messages ($count)';
+  }
+
+  @override
+  String get chatQueueSteering => 'Steering';
+
+  @override
+  String get chatQueueFollowUp => 'Follow-up';
+
+  @override
+  String chatQueueEntry(String kind, String message) {
+    return '$kind: $message';
+  }
+
+  @override
+  String get chatQueueSteerAction => 'Steer · Enter';
+
+  @override
+  String get chatQueueFollowUpAction => 'Follow up · Alt+Enter';
+
+  @override
+  String get chatQueueSendOptions => 'Choose when to deliver';
+
+  @override
+  String get chatQueuePlaceholder =>
+      'Add instructions… Enter to steer, Alt+Enter to follow up';
+
+  @override
+  String get chatQueueRestore =>
+      'Retrieve queued text · Alt+↑\nKeep the current task running. Reattach images if needed.';
+
+  @override
+  String get chatQueueStop =>
+      'Stop and retrieve queued text · Esc\nReattach images if needed.';
+
+  @override
+  String get chatQueueFailed =>
+      'Could not retrieve queued text. Please try again.';
+
+  @override
   String get chatRefresh => 'Sync conversation';
 
   @override

@@ -101,6 +101,8 @@ class WorkbenchSession {
         chat.activity,
         chat.isSending,
         chat.isLoading,
+        chat.isTakingQueue,
+        chat.queue.length,
         chat.sessionFile,
         chat.failure,
         models.isBusy,
@@ -182,6 +184,8 @@ class WorkbenchSession {
       chat.isRunning ||
       chat.isSending ||
       chat.isLoading ||
+      chat.isTakingQueue ||
+      !chat.queue.isEmpty ||
       models.isBusy ||
       extensions.needsAttention ||
       client.hasUnsettledConversationMutation;

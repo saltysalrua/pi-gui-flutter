@@ -368,6 +368,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatQueued => '等待中的消息';
 
   @override
+  String chatQueuedCount(int count) {
+    return '等待中的消息（$count）';
+  }
+
+  @override
+  String get chatQueueSteering => '本轮补充';
+
+  @override
+  String get chatQueueFollowUp => '完成后处理';
+
+  @override
+  String chatQueueEntry(String kind, String message) {
+    return '$kind：$message';
+  }
+
+  @override
+  String get chatQueueSteerAction => '本轮补充 · Enter';
+
+  @override
+  String get chatQueueFollowUpAction => '完成后处理 · Alt+Enter';
+
+  @override
+  String get chatQueueSendOptions => '选择消息处理时机';
+
+  @override
+  String get chatQueuePlaceholder => '继续补充… Enter 本轮处理，Alt+Enter 完成后处理';
+
+  @override
+  String get chatQueueRestore => '取回排队文字 · Alt+↑\n不停止当前任务。图片需重新添加。';
+
+  @override
+  String get chatQueueStop => '停止并取回排队文字 · Esc\n图片需重新添加。';
+
+  @override
+  String get chatQueueFailed => '未能取回排队文字，请稍后重试。';
+
+  @override
   String get chatRefresh => '同步对话';
 
   @override

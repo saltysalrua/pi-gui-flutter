@@ -30,6 +30,7 @@ class _PendingRequest {
       isWorkspaceMutation ||
       const {
         'prompt',
+        'clear_queue',
         'new_session',
         'switch_session',
         'fork',
@@ -154,6 +155,11 @@ class PiRpcClient
           throw const FormatException('Invalid RPC response');
         }
         if (decoded['success'] == true) {
+          // Clearing is destructive: a malformed reply must not claim that
+          // nothing was removed or allow an automatic replay.
+          if (pending.command == 'clear_queue') {
+            PiPromptQueue.fromJson(decoded['data']);
+          }
           if (pending.isConversationMutation &&
               pending.command.startsWith('gui_history_')) {
             final data = decoded['data'];
@@ -429,9 +435,15 @@ class PiRpcClient
   }
 
   @override
-  Future<void> prompt(String text, {List<PiImage> images = const []}) async {
+  Future<void> prompt(
+    String text, {
+    List<PiImage> images = const [],
+    PiStreamingBehavior? streamingBehavior,
+  }) async {
     await _request('prompt', {
       'message': text,
+      if (streamingBehavior != null)
+        'streamingBehavior': streamingBehavior.name,
       if (images.isNotEmpty)
         'images': images.map((image) => image.toJson()).toList(),
     });

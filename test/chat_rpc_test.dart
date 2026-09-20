@@ -31,6 +31,9 @@ class FakeChatGateway implements PiChatGateway {
   );
   bool cancelled = false;
   Completer<void>? pendingPrompt;
+  PiStreamingBehavior? sentBehavior;
+  Completer<PiPromptQueue>? pendingQueue;
+  PiPromptQueue queued = const PiPromptQueue(followUp: ['next']);
   List<PiImage> sentImages = const [];
   Completer<List<PiChatMessage>>? pendingHistory;
   Completer<PiSessionState>? pendingState;
@@ -56,8 +59,13 @@ class FakeChatGateway implements PiChatGateway {
   }
 
   @override
-  Future<void> prompt(String value, {List<PiImage> images = const []}) async {
+  Future<void> prompt(
+    String value, {
+    List<PiImage> images = const [],
+    PiStreamingBehavior? streamingBehavior,
+  }) async {
     sentImages = images;
+    sentBehavior = streamingBehavior;
     commands.add('prompt:$value');
     await pendingPrompt?.future;
   }
@@ -70,7 +78,7 @@ class FakeChatGateway implements PiChatGateway {
   @override
   Future<PiPromptQueue> clearQueue() async {
     commands.add('clear_queue');
-    return const PiPromptQueue(followUp: ['next']);
+    return pendingQueue?.future ?? queued;
   }
 
   @override

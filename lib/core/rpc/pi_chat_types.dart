@@ -244,17 +244,22 @@ class PiChatEvent extends PiAgentEvent {
   final bool failed;
 }
 
+/// Native prompt delivery policy; Pi decides whether to start or enqueue.
+enum PiStreamingBehavior { steer, followUp }
+
 class PiPromptQueue {
   const PiPromptQueue({this.steering = const [], this.followUp = const []});
   factory PiPromptQueue.fromJson(Object? value) {
     final json = rpcObject(value);
     return PiPromptQueue(
-      steering: List<String>.from(json['steering'] as List? ?? []),
-      followUp: List<String>.from(json['followUp'] as List? ?? []),
+      steering: List<String>.unmodifiable(json['steering'] as List),
+      followUp: List<String>.unmodifiable(json['followUp'] as List),
     );
   }
   final List<String> steering, followUp;
   List<String> get all => [...steering, ...followUp];
+  int get length => steering.length + followUp.length;
+  bool get isEmpty => steering.isEmpty && followUp.isEmpty;
 }
 
 abstract interface class PiChatGateway {
@@ -263,7 +268,11 @@ abstract interface class PiChatGateway {
   Future<void> connect();
   Future<PiSessionState> getState();
   Future<List<PiChatMessage>> getMessages();
-  Future<void> prompt(String text, {List<PiImage> images = const []});
+  Future<void> prompt(
+    String text, {
+    List<PiImage> images = const [],
+    PiStreamingBehavior? streamingBehavior,
+  });
   Future<void> abort();
   Future<PiPromptQueue> clearQueue();
   Future<bool> newSession();

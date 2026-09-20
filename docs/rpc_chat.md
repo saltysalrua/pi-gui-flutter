@@ -1,6 +1,6 @@
 ---
 title: "RPC 对话、Markdown 与文件改动"
-version: "1.10.0"
+version: "1.11.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, chat, markdown, diff]
@@ -24,8 +24,8 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 
 1. 在模型选择器选好 Pi 的模型和思考等级。
 2. 输入文字，按 **Enter** 或点击发送。**Shift+Enter** 换行。输入法正在组合文字时不抢走 Enter。
-3. 回复过程中可继续写下一条草稿，但不能重复发送。停止按钮代替发送按钮。
-4. 点击停止：先通过 `clear_queue` 清掉待执行消息，再 `abort` 等 Pi 停止；清掉的消息追加回草稿，不覆盖用户新输入。
+3. 回复过程中 **Enter** 发送本轮补充，**Alt+Enter** 排到全部工作完成后处理；输入框上方显示两类待发消息。停止与发送按钮同时保留，发送旁的菜单提供鼠标入口。详见 [原生消息队列](message_queue.md)。
+4. **Alt+↑** 取回排队文字但不停止。**Esc** 或停止按钮先通过 `clear_queue` 取回待执行文字，再 `abort` 等 Pi 停止；返回文字放在当前草稿之前，不覆盖新输入。Pi 只返回文字，图片需重新添加。
 5. 发送明确被拒时保留草稿。确认超时或确认帧损坏时，暂停再次发送，避免重复执行；不会把超时当成进程断线，也不会自动重放 Prompt。
 6. 从较早的消息向上查看时不强制跳回底部，可点击“回到最新消息”。
 7. 模型请求失败时，在对应 AI 消息下方直接显示 Pi 返回的错误详情，可选择复制；不再同时在输入框上方弹出相同警告，自动重试最终失败也一样。只有错误详情缺失或为空时才使用通用提示。断线、消息未被接受、压缩失败等没有对应消息内提示的操作错误仍保留原来的提醒。
@@ -212,7 +212,7 @@ assistantNumbers: null,       null, 1,         2,         null, 3
 ### 故障边界
 
 - 旁路 stdout、单条坏事件与超时均不主动杀 Pi，遵循已有传输层约束。
-- `prompt/new_session/switch_session` 及 `gui_history_navigate/fork/clone/label` 超时保留未确认屏障；损坏的聊天写确认同样按结果未知处理。新聊天写不能越过它，读取和停止仍可用。
+- `prompt/clear_queue/new_session/switch_session` 及 `gui_history_navigate/fork/clone/label` 超时保留未确认屏障；损坏的聊天写确认同样按结果未知处理。新聊天写不能越过它，读取和停止仍可用。
 - 迟到确认派发 `PiRpcConversationSettled`，只回读，不重新发送。会话切换确认派发 `PiRpcSessionChanged`，模型选择器重新读取模型/等级。
 - `clear_queue/abort` 不等待模型选择写入屏障，停止路径不会被未确认的模型选择卡住。
 - 连接、发送确认等顶层操作提示仍使用本地化的人话，不直接输出 GUI 内部异常堆栈。模型错误在消息内显示 Pi 的 `errorMessage`，不再被通用文案覆盖，也不重复触发输入框警告；原始工具返回仍可在展开的输出区域查看。
@@ -333,4 +333,4 @@ dart run tool/check_chat_rpc.dart --with-model
 
 ## 当前边界
 
-暂不包含 LaTeX/Mermaid、文件编辑审批/回滚及执行中的插队发送。会话历史回溯已接入，见 [历史回溯](history_rewind.md)。Git 状态、Diff 和提交图已接入只读工作区右栏。图片上传/预览与文件链接已接入，见 [图片附件与文件链接](images_and_links.md)；历史会话列表由工作区后端提供。已有扩展弹窗仍由 Pi 的 extension_ui 机制处理，不由 Flutter 重写权限或 Agent 逻辑。
+暂不包含 LaTeX/Mermaid、文件编辑审批/回滚。执行中的本轮补充、完成后处理和队列取回已接入，见 [原生消息队列](message_queue.md)。会话历史回溯已接入，见 [历史回溯](history_rewind.md)。Git 状态、Diff 和提交图已接入只读工作区右栏。图片上传/预览与文件链接已接入，见 [图片附件与文件链接](images_and_links.md)；历史会话列表由工作区后端提供。已有扩展弹窗仍由 Pi 的 extension_ui 机制处理，不由 Flutter 重写权限或 Agent 逻辑。
