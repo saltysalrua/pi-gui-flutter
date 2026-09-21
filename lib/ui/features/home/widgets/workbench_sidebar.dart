@@ -5,6 +5,7 @@ import 'package:pi_gui/ui/atoms/app_action_button.dart';
 import 'package:pi_gui/ui/atoms/app_icon_button.dart';
 import 'package:pi_gui/ui/atoms/app_menu_button.dart';
 import 'package:pi_gui/ui/atoms/app_nav_tile.dart';
+import 'package:pi_gui/ui/atoms/app_scroll_edge_fade.dart';
 import 'package:pi_gui/ui/atoms/app_text_field.dart';
 import 'package:pi_gui/ui/atoms/app_tree_tile.dart';
 import 'package:pi_gui/ui/core/context_l10n.dart';
@@ -381,21 +382,23 @@ class _WorkbenchSidebarState extends State<WorkbenchSidebar> {
             ),
           ),
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-            children: [
-              for (final project
-                  in controller.catalog?.projects ?? <PiCatalogProject>[])
-                _project(project),
-              if (controller.loading && controller.catalog == null)
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  child: Text(
-                    l10n.workspaceLoading,
-                    style: context.textTheme.bodySmall,
+          child: AppScrollEdgeFade(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              children: [
+                for (final project
+                    in controller.catalog?.projects ?? <PiCatalogProject>[])
+                  _project(project),
+                if (controller.loading && controller.catalog == null)
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    child: Text(
+                      l10n.workspaceLoading,
+                      style: context.textTheme.bodySmall,
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
         Padding(

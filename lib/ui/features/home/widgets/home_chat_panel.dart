@@ -15,6 +15,7 @@ import 'package:pi_gui/ui/atoms/app_card.dart';
 import 'package:pi_gui/ui/atoms/app_composer_layout.dart';
 import 'package:pi_gui/ui/atoms/app_disclosure.dart';
 import 'package:pi_gui/ui/atoms/app_icon_button.dart';
+import 'package:pi_gui/ui/atoms/app_scroll_edge_fade.dart';
 import 'package:pi_gui/ui/atoms/app_split_panel.dart';
 import 'package:pi_gui/ui/atoms/app_document_tabs.dart';
 import 'package:pi_gui/ui/atoms/app_tab_workspace.dart';
@@ -304,43 +305,46 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
       setPinned: chat.pinToolOutput,
       child: Stack(
         children: [
-          ListView.builder(
-            // Explicit anchor: ScrollPosition only persists when a
-            // PageStorageKey exists between the scrollable and the pane bucket,
-            // so the timeline survives tab-body unmounts with its offset.
-            key: const PageStorageKey('chat-timeline'),
-            controller: _scroll,
-            reverse: true,
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xxl,
-              AppSpacing.lg,
-              AppSpacing.xxl,
-              AppSpacing.sm,
-            ),
-            itemCount: chat.timeline.messages.length,
-            itemBuilder: (context, reverseIndex) {
-              final index = chat.timeline.messages.length - 1 - reverseIndex;
-              final message = chat.timeline.messages[index];
-              return Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 820),
-                  child: ChatMessageView(
-                    key: ValueKey('${message.timestamp}-$index'),
-                    message: message,
-                    assistantNumber: assistantNumbers[index],
-                    thinkingIndex: chat.timeline.thinkingIndexFor(index),
-                    tools: chat.timeline.tools,
-                    registry: widget.registry,
-                    onShowChanges: (path) => widget.browser.showFiles(path),
-                    onHistory: widget.session == null ? null : _showHistory,
-                    historyEnabled:
-                        !widget.hibernating &&
-                        widget.session?.history.busy != true,
+          AppScrollEdgeFade(
+            extent: AppSpacing.xxxl,
+            child: ListView.builder(
+              // Explicit anchor: ScrollPosition only persists when a
+              // PageStorageKey exists between the scrollable and the pane bucket,
+              // so the timeline survives tab-body unmounts with its offset.
+              key: const PageStorageKey('chat-timeline'),
+              controller: _scroll,
+              reverse: true,
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xxl,
+                AppSpacing.lg,
+                AppSpacing.xxl,
+                AppSpacing.sm,
+              ),
+              itemCount: chat.timeline.messages.length,
+              itemBuilder: (context, reverseIndex) {
+                final index = chat.timeline.messages.length - 1 - reverseIndex;
+                final message = chat.timeline.messages[index];
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 820),
+                    child: ChatMessageView(
+                      key: ValueKey('${message.timestamp}-$index'),
+                      message: message,
+                      assistantNumber: assistantNumbers[index],
+                      thinkingIndex: chat.timeline.thinkingIndexFor(index),
+                      tools: chat.timeline.tools,
+                      registry: widget.registry,
+                      onShowChanges: (path) => widget.browser.showFiles(path),
+                      onHistory: widget.session == null ? null : _showHistory,
+                      historyEnabled:
+                          !widget.hibernating &&
+                          widget.session?.history.busy != true,
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
           if (!_following)
             Positioned(
@@ -403,9 +407,11 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
             ChatActivity.stopping => l10n.chatStopping,
           };
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      // In the docked layout, removing the top inset gives those pixels back
+      // to the timeline. The card stays put; its fade now meets the editor.
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.xl,
-        AppSpacing.sm,
+        started ? 0 : AppSpacing.sm,
         AppSpacing.xl,
         AppSpacing.md,
       ),
