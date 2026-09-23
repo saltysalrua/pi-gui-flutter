@@ -3529,6 +3529,396 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'无法加载此节点的预览，请重试。'**
   String get historyPreviewFailed;
+
+  /// No description provided for @providerTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'Provider 配置'**
+  String get providerTitle;
+
+  /// No description provided for @providerDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加 API 地址和 Key，获取模型后交给 Pi 使用。配置可以先保存，启用插件后再切换。'**
+  String get providerDescription;
+
+  /// No description provided for @providerNotInstalled.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未安装 Provider 插件。你可以先管理配置；使用配置前需要确认安装。'**
+  String get providerNotInstalled;
+
+  /// No description provided for @providerDisabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件已安装，但目前是停用状态。启用后，新会话会加载它。'**
+  String get providerDisabled;
+
+  /// No description provided for @providerInstallTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'安装 Provider 插件'**
+  String get providerInstallTitle;
+
+  /// No description provided for @providerInstallWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'此操作会把随应用提供的 pi-provider-switch 安装到 Pi 的全局配置。扩展拥有与 Pi 相同的系统权限；之后的新会话会加载它，已启用的配置会从服务商刷新模型列表。配置可能包含 API Key，请优先使用环境变量。首次选中未知模型的图片能力探测默认关闭。确定安装吗？'**
+  String get providerInstallWarning;
+
+  /// No description provided for @providerAdd.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加配置'**
+  String get providerAdd;
+
+  /// No description provided for @providerEdit.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑配置'**
+  String get providerEdit;
+
+  /// No description provided for @providerSave.
+  ///
+  /// In zh, this message translates to:
+  /// **'保存配置'**
+  String get providerSave;
+
+  /// No description provided for @providerActivate.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用此配置'**
+  String get providerActivate;
+
+  /// No description provided for @providerSelected.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认'**
+  String get providerSelected;
+
+  /// No description provided for @providerActive.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前默认配置：{name}'**
+  String providerActive(String name);
+
+  /// No description provided for @providerNone.
+  ///
+  /// In zh, this message translates to:
+  /// **'无'**
+  String get providerNone;
+
+  /// No description provided for @providerNextSession.
+  ///
+  /// In zh, this message translates to:
+  /// **'已保存默认配置；当前会话未加载插件，新会话或下次启动后生效。'**
+  String get providerNextSession;
+
+  /// No description provided for @providerEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有 Provider 配置。添加一个后即可选择。'**
+  String get providerEmpty;
+
+  /// No description provided for @providerModelCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 个模型'**
+  String providerModelCount(int count);
+
+  /// No description provided for @providerRemoveWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除配置“{name}”？这不会卸载插件，且无法撤销。'**
+  String providerRemoveWarning(String name);
+
+  /// No description provided for @providerInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'请先填写配置名称和 API 地址。'**
+  String get providerInvalid;
+
+  /// No description provided for @providerName.
+  ///
+  /// In zh, this message translates to:
+  /// **'例如 my-api（字母、数字、点、横线、下划线）'**
+  String get providerName;
+
+  /// No description provided for @providerBaseUrl.
+  ///
+  /// In zh, this message translates to:
+  /// **'https://api.example.com/v1'**
+  String get providerBaseUrl;
+
+  /// No description provided for @providerApi.
+  ///
+  /// In zh, this message translates to:
+  /// **'接口类型'**
+  String get providerApi;
+
+  /// No description provided for @providerKey.
+  ///
+  /// In zh, this message translates to:
+  /// **'sk-… 或 \$ENV_VAR'**
+  String get providerKey;
+
+  /// No description provided for @providerKeepKey.
+  ///
+  /// In zh, this message translates to:
+  /// **'已保存 Key，留空则不修改'**
+  String get providerKeepKey;
+
+  /// No description provided for @providerKeyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'Key 会写进插件的 provider-profiles.json。更推荐填 \$环境变量名，别把这个文件提交到仓库。'**
+  String get providerKeyHint;
+
+  /// No description provided for @providerModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'留空保存时会自动获取模型；也可先点「获取模型列表」再选默认模型。刷新不会移除已有 ID，不支持列表接口时可手填。'**
+  String get providerModels;
+
+  /// No description provided for @providerDefaultModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认模型'**
+  String get providerDefaultModel;
+
+  /// No description provided for @providerThinking.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认支持思考'**
+  String get providerThinking;
+
+  /// No description provided for @providerEnable.
+  ///
+  /// In zh, this message translates to:
+  /// **'启用插件'**
+  String get providerEnable;
+
+  /// No description provided for @providerNameLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'配置名称'**
+  String get providerNameLabel;
+
+  /// No description provided for @providerBaseUrlLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'API 地址'**
+  String get providerBaseUrlLabel;
+
+  /// No description provided for @providerKeyLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'API Key'**
+  String get providerKeyLabel;
+
+  /// No description provided for @providerModelsLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'模型'**
+  String get providerModelsLabel;
+
+  /// No description provided for @providerFetchModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'获取模型列表'**
+  String get providerFetchModels;
+
+  /// No description provided for @providerFetchedModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'已获取 {count} 个模型'**
+  String providerFetchedModels(int count);
+
+  /// No description provided for @providerFetchingOnSave.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在从 API 获取模型…'**
+  String get providerFetchingOnSave;
+
+  /// No description provided for @providerDefaultModelValue.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认模型：{model}'**
+  String providerDefaultModelValue(String model);
+
+  /// No description provided for @providerHasKey.
+  ///
+  /// In zh, this message translates to:
+  /// **'已保存 Key'**
+  String get providerHasKey;
+
+  /// No description provided for @providerThinkingBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认思考'**
+  String get providerThinkingBadge;
+
+  /// No description provided for @providerSwitched.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前会话已切换到“{name}”。'**
+  String providerSwitched(String name);
+
+  /// No description provided for @providerErrorInvalid.
+  ///
+  /// In zh, this message translates to:
+  /// **'有内容没填对，请检查 API 地址（需以 http:// 或 https:// 开头）和模型。'**
+  String get providerErrorInvalid;
+
+  /// No description provided for @providerErrorName.
+  ///
+  /// In zh, this message translates to:
+  /// **'名称需为 1–64 个字母、数字、点、横线或下划线，以字母或数字开头，且不能使用保留名称。'**
+  String get providerErrorName;
+
+  /// No description provided for @providerErrorFile.
+  ///
+  /// In zh, this message translates to:
+  /// **'provider-profiles.json 内容损坏，读取不了。请先手动修好这个文件。'**
+  String get providerErrorFile;
+
+  /// No description provided for @providerErrorNotFound.
+  ///
+  /// In zh, this message translates to:
+  /// **'这个配置已经不存在了，可能在别处被删了。请刷新后再试。'**
+  String get providerErrorNotFound;
+
+  /// No description provided for @providerErrorActivate.
+  ///
+  /// In zh, this message translates to:
+  /// **'未能确认切换成功，请刷新并检查当前模型后再试。'**
+  String get providerErrorActivate;
+
+  /// No description provided for @providerErrorUnreachable.
+  ///
+  /// In zh, this message translates to:
+  /// **'连不上这个 API 地址，请检查地址和网络。'**
+  String get providerErrorUnreachable;
+
+  /// No description provided for @providerErrorUnauthorized.
+  ///
+  /// In zh, this message translates to:
+  /// **'API Key 不对，或者没有权限获取模型列表。'**
+  String get providerErrorUnauthorized;
+
+  /// No description provided for @providerErrorHttp.
+  ///
+  /// In zh, this message translates to:
+  /// **'服务器拒绝了获取模型列表的请求，请确认地址是否正确。'**
+  String get providerErrorHttp;
+
+  /// No description provided for @providerErrorNotJson.
+  ///
+  /// In zh, this message translates to:
+  /// **'这个地址没有返回模型列表，请确认地址是否正确（通常以 /v1 结尾）。'**
+  String get providerErrorNotJson;
+
+  /// No description provided for @providerErrorEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'服务器没有返回任何模型，请手动填写模型 ID。'**
+  String get providerErrorEmpty;
+
+  /// No description provided for @providerErrorKeyEnv.
+  ///
+  /// In zh, this message translates to:
+  /// **'找不到 Key 里引用的环境变量。请确认它已设置，或者直接填 Key。'**
+  String get providerErrorKeyEnv;
+
+  /// No description provided for @providerErrorKeyCommand.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行 Key 命令失败，请检查 ! 后面的命令。'**
+  String get providerErrorKeyCommand;
+
+  /// No description provided for @providerErrorGeneric.
+  ///
+  /// In zh, this message translates to:
+  /// **'操作没有完成：{detail}'**
+  String providerErrorGeneric(String detail);
+
+  /// No description provided for @providerManualModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'每行一个模型 ID，也可用逗号分隔'**
+  String get providerManualModels;
+
+  /// No description provided for @providerErrorExists.
+  ///
+  /// In zh, this message translates to:
+  /// **'这个名称已经有配置了，请换个名称，或返回列表编辑原配置。'**
+  String get providerErrorExists;
+
+  /// No description provided for @providerErrorBusy.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前会话正在处理消息，请等它结束后再切换配置。'**
+  String get providerErrorBusy;
+
+  /// No description provided for @providerErrorKeyEndpoint.
+  ///
+  /// In zh, this message translates to:
+  /// **'API 地址或接口类型已更改。为避免把旧 Key 发给其他服务，请重新填写 Key，或选择「移除已存 Key」。'**
+  String get providerErrorKeyEndpoint;
+
+  /// No description provided for @providerErrorUnknownOutcome.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂未确认操作结果，请先刷新配置确认，不要重复提交。'**
+  String get providerErrorUnknownOutcome;
+
+  /// No description provided for @providerErrorBackend.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前运行的后端还不支持此功能。请结束任务后重新启动应用，再试一次。'**
+  String get providerErrorBackend;
+
+  /// No description provided for @providerErrorFallback.
+  ///
+  /// In zh, this message translates to:
+  /// **'操作未完成，请检查连接后重试；仍失败时请查看 Pi 日志。'**
+  String get providerErrorFallback;
+
+  /// No description provided for @providerNoMatches.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有匹配的配置，试试其他关键词。'**
+  String get providerNoMatches;
+
+  /// No description provided for @providerShowKey.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示本次输入的 Key'**
+  String get providerShowKey;
+
+  /// No description provided for @providerHideKey.
+  ///
+  /// In zh, this message translates to:
+  /// **'隐藏 Key'**
+  String get providerHideKey;
+
+  /// No description provided for @providerSavedKey.
+  ///
+  /// In zh, this message translates to:
+  /// **'已存 Key'**
+  String get providerSavedKey;
+
+  /// No description provided for @providerRetainKey.
+  ///
+  /// In zh, this message translates to:
+  /// **'保留（输入新 Key 可替换）'**
+  String get providerRetainKey;
+
+  /// No description provided for @providerClearKey.
+  ///
+  /// In zh, this message translates to:
+  /// **'移除已存 Key'**
+  String get providerClearKey;
 }
 
 class _AppLocalizationsDelegate

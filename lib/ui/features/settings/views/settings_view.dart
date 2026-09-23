@@ -18,6 +18,7 @@ import '../../../../core/rpc/pi_rpc_client.dart';
 import '../../../../core/services/window_material_service.dart';
 import '../controllers/appearance_controller.dart';
 import '../controllers/packages_controller.dart';
+import '../controllers/provider_profiles_controller.dart';
 import '../controllers/pi_update_controller.dart';
 import '../controllers/quota_controller.dart';
 import 'appearance_settings_view.dart';
@@ -34,11 +35,16 @@ typedef _SettingsPage = SettingsPage;
 Future<void> showSettings(
   BuildContext context, {
   PiRpcClient? control,
+  PiRpcClient? Function()? activeSessionClient,
   SettingsPage initialPage = SettingsPage.appearance,
 }) => Navigator.of(context).push<void>(
   AppDesktopPageRoute<void>(
     reduceMotion: MediaQuery.disableAnimationsOf(context),
-    builder: (_) => SettingsView(control: control, initialPage: initialPage),
+    builder: (_) => SettingsView(
+      control: control,
+      activeSessionClient: activeSessionClient,
+      initialPage: initialPage,
+    ),
   ),
 );
 
@@ -49,9 +55,11 @@ class SettingsView extends StatefulWidget {
   const SettingsView({
     super.key,
     this.control,
+    this.activeSessionClient,
     this.initialPage = SettingsPage.appearance,
   });
   final PiRpcClient? control;
+  final PiRpcClient? Function()? activeSessionClient;
   final SettingsPage initialPage;
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -77,6 +85,7 @@ class _SettingsViewState extends State<SettingsView> {
   late _SettingsPage _page = widget.initialPage;
   PiUpdateController? _pi;
   PackagesController? _plugins;
+  ProviderProfilesController? _profiles;
   QuotaController? _quota;
 
   @override
@@ -89,6 +98,7 @@ class _SettingsViewState extends State<SettingsView> {
     _outgoingScrolls.clear();
     _pi?.dispose();
     _plugins?.dispose();
+    _profiles?.dispose();
     _quota?.dispose();
     super.dispose();
   }
@@ -125,6 +135,10 @@ class _SettingsViewState extends State<SettingsView> {
       final control = widget.control;
       if (control != null) {
         _plugins ??= PackagesController(control)..load();
+        _profiles ??= ProviderProfilesController(
+          control,
+          widget.activeSessionClient ?? () => null,
+        )..load();
       }
     }
     // Outgoing and incoming pages coexist during the cross-fade. They cannot
@@ -253,6 +267,10 @@ class _SettingsViewState extends State<SettingsView> {
                 }
                 return PackagesSettingsContent(
                   controller: _plugins ??= PackagesController(control)..load(),
+                  profiles: _profiles ??= ProviderProfilesController(
+                    control,
+                    widget.activeSessionClient ?? () => null,
+                  )..load(),
                   query: _query,
                 );
               }(),

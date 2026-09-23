@@ -197,6 +197,13 @@ export class WorkspaceManager {
     }
     return this.packagesBridge.handle(request);
   }
+  async providerProfiles(request) {
+    if (!this.providerProfilesBridge) {
+      const { GuiProviderProfiles } = await import("./gui_provider_profiles.mjs");
+      this.providerProfilesBridge = new GuiProviderProfiles(this.packageRoot);
+    }
+    return this.providerProfilesBridge.handle(request);
+  }
   output(channel, message) {
     this.emit(JSON.stringify({ type: "gui_channel", channel, message }));
   }
@@ -516,6 +523,12 @@ export class WorkspaceManager {
       case "gui_packages_update":
       case "gui_packages_toggle":
         return this.packages(request);
+      case "gui_provider_profiles_state":
+      case "gui_provider_profiles_save":
+      case "gui_provider_profiles_remove":
+      case "gui_provider_profiles_activate":
+      case "gui_provider_profiles_models":
+        return this.providerProfiles(request);
       // Browse any registered worktree without creating an Agent.
       case "gui_list_files":
       case "gui_get_git_graph":

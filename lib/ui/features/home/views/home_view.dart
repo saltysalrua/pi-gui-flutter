@@ -339,11 +339,15 @@ class _HomeViewState extends State<HomeView> with WindowListener {
               onRemoveWorktree: _removeWorktree,
               onForgetProject: _forgetProject,
               onCloseSession: (s) => _workbench.tabs.close(s.document),
-              onSettings: () =>
-                  showSettings(context, control: _workbench.control),
+              onSettings: () => showSettings(
+                context,
+                control: _workbench.control,
+                activeSessionClient: () => _workbench.activeSession?.client,
+              ),
               onQuota: () => showSettings(
                 context,
                 control: _workbench.control,
+                activeSessionClient: () => _workbench.activeSession?.client,
                 initialPage: SettingsPage.quota,
               ),
             ),

@@ -25,17 +25,21 @@ class AppTextField extends StatelessWidget {
     this.focusNode,
     this.minLines,
     this.borderless = false,
+    this.obscureText = false,
+    this.labelText,
+    this.errorText,
     this.onPaste,
   });
 
   final TextEditingController controller;
   final String hintText;
+  final String? labelText, errorText;
   final ValueChanged<String>? onChanged, onSubmitted;
   final Widget? leading, trailing;
   final bool autofocus, enabled;
   final int? maxLines, minLines;
   final FocusNode? focusNode;
-  final bool isCompact, borderless;
+  final bool isCompact, borderless, obscureText;
 
   /// Return true when a non-text paste was handled; false preserves Flutter text editing.
   final Future<bool> Function()? onPaste;
@@ -76,6 +80,9 @@ class AppTextField extends StatelessWidget {
       autofocus: autofocus,
       enabled: enabled,
       maxLines: maxLines,
+      obscureText: obscureText,
+      autocorrect: !obscureText,
+      enableSuggestions: !obscureText,
       keyboardType: maxLines == 1
           ? TextInputType.text
           : TextInputType.multiline,
@@ -85,6 +92,9 @@ class AppTextField extends StatelessWidget {
                   : context.textTheme.bodyMedium)
               ?.copyWith(color: colors.textPrimary),
       decoration: InputDecoration(
+        labelText: labelText,
+        errorText: errorText,
+        errorMaxLines: 3,
         hintText: hintText,
         hintStyle: context.textTheme.bodyMedium?.copyWith(
           color: colors.textMuted,

@@ -1817,4 +1817,221 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get historyPreviewFailed => '无法加载此节点的预览，请重试。';
+
+  @override
+  String get providerTitle => 'Provider 配置';
+
+  @override
+  String get providerDescription =>
+      '添加 API 地址和 Key，获取模型后交给 Pi 使用。配置可以先保存，启用插件后再切换。';
+
+  @override
+  String get providerNotInstalled => '尚未安装 Provider 插件。你可以先管理配置；使用配置前需要确认安装。';
+
+  @override
+  String get providerDisabled => '插件已安装，但目前是停用状态。启用后，新会话会加载它。';
+
+  @override
+  String get providerInstallTitle => '安装 Provider 插件';
+
+  @override
+  String get providerInstallWarning =>
+      '此操作会把随应用提供的 pi-provider-switch 安装到 Pi 的全局配置。扩展拥有与 Pi 相同的系统权限；之后的新会话会加载它，已启用的配置会从服务商刷新模型列表。配置可能包含 API Key，请优先使用环境变量。首次选中未知模型的图片能力探测默认关闭。确定安装吗？';
+
+  @override
+  String get providerAdd => '添加配置';
+
+  @override
+  String get providerEdit => '编辑配置';
+
+  @override
+  String get providerSave => '保存配置';
+
+  @override
+  String get providerActivate => '使用此配置';
+
+  @override
+  String get providerSelected => '默认';
+
+  @override
+  String providerActive(String name) {
+    return '当前默认配置：$name';
+  }
+
+  @override
+  String get providerNone => '无';
+
+  @override
+  String get providerNextSession => '已保存默认配置；当前会话未加载插件，新会话或下次启动后生效。';
+
+  @override
+  String get providerEmpty => '还没有 Provider 配置。添加一个后即可选择。';
+
+  @override
+  String providerModelCount(int count) {
+    return '$count 个模型';
+  }
+
+  @override
+  String providerRemoveWarning(String name) {
+    return '删除配置“$name”？这不会卸载插件，且无法撤销。';
+  }
+
+  @override
+  String get providerInvalid => '请先填写配置名称和 API 地址。';
+
+  @override
+  String get providerName => '例如 my-api（字母、数字、点、横线、下划线）';
+
+  @override
+  String get providerBaseUrl => 'https://api.example.com/v1';
+
+  @override
+  String get providerApi => '接口类型';
+
+  @override
+  String get providerKey => 'sk-… 或 \$ENV_VAR';
+
+  @override
+  String get providerKeepKey => '已保存 Key，留空则不修改';
+
+  @override
+  String get providerKeyHint =>
+      'Key 会写进插件的 provider-profiles.json。更推荐填 \$环境变量名，别把这个文件提交到仓库。';
+
+  @override
+  String get providerModels =>
+      '留空保存时会自动获取模型；也可先点「获取模型列表」再选默认模型。刷新不会移除已有 ID，不支持列表接口时可手填。';
+
+  @override
+  String get providerDefaultModel => '默认模型';
+
+  @override
+  String get providerThinking => '默认支持思考';
+
+  @override
+  String get providerEnable => '启用插件';
+
+  @override
+  String get providerNameLabel => '配置名称';
+
+  @override
+  String get providerBaseUrlLabel => 'API 地址';
+
+  @override
+  String get providerKeyLabel => 'API Key';
+
+  @override
+  String get providerModelsLabel => '模型';
+
+  @override
+  String get providerFetchModels => '获取模型列表';
+
+  @override
+  String providerFetchedModels(int count) {
+    return '已获取 $count 个模型';
+  }
+
+  @override
+  String get providerFetchingOnSave => '正在从 API 获取模型…';
+
+  @override
+  String providerDefaultModelValue(String model) {
+    return '默认模型：$model';
+  }
+
+  @override
+  String get providerHasKey => '已保存 Key';
+
+  @override
+  String get providerThinkingBadge => '默认思考';
+
+  @override
+  String providerSwitched(String name) {
+    return '当前会话已切换到“$name”。';
+  }
+
+  @override
+  String get providerErrorInvalid =>
+      '有内容没填对，请检查 API 地址（需以 http:// 或 https:// 开头）和模型。';
+
+  @override
+  String get providerErrorName =>
+      '名称需为 1–64 个字母、数字、点、横线或下划线，以字母或数字开头，且不能使用保留名称。';
+
+  @override
+  String get providerErrorFile =>
+      'provider-profiles.json 内容损坏，读取不了。请先手动修好这个文件。';
+
+  @override
+  String get providerErrorNotFound => '这个配置已经不存在了，可能在别处被删了。请刷新后再试。';
+
+  @override
+  String get providerErrorActivate => '未能确认切换成功，请刷新并检查当前模型后再试。';
+
+  @override
+  String get providerErrorUnreachable => '连不上这个 API 地址，请检查地址和网络。';
+
+  @override
+  String get providerErrorUnauthorized => 'API Key 不对，或者没有权限获取模型列表。';
+
+  @override
+  String get providerErrorHttp => '服务器拒绝了获取模型列表的请求，请确认地址是否正确。';
+
+  @override
+  String get providerErrorNotJson => '这个地址没有返回模型列表，请确认地址是否正确（通常以 /v1 结尾）。';
+
+  @override
+  String get providerErrorEmpty => '服务器没有返回任何模型，请手动填写模型 ID。';
+
+  @override
+  String get providerErrorKeyEnv => '找不到 Key 里引用的环境变量。请确认它已设置，或者直接填 Key。';
+
+  @override
+  String get providerErrorKeyCommand => '运行 Key 命令失败，请检查 ! 后面的命令。';
+
+  @override
+  String providerErrorGeneric(String detail) {
+    return '操作没有完成：$detail';
+  }
+
+  @override
+  String get providerManualModels => '每行一个模型 ID，也可用逗号分隔';
+
+  @override
+  String get providerErrorExists => '这个名称已经有配置了，请换个名称，或返回列表编辑原配置。';
+
+  @override
+  String get providerErrorBusy => '当前会话正在处理消息，请等它结束后再切换配置。';
+
+  @override
+  String get providerErrorKeyEndpoint =>
+      'API 地址或接口类型已更改。为避免把旧 Key 发给其他服务，请重新填写 Key，或选择「移除已存 Key」。';
+
+  @override
+  String get providerErrorUnknownOutcome => '暂未确认操作结果，请先刷新配置确认，不要重复提交。';
+
+  @override
+  String get providerErrorBackend => '当前运行的后端还不支持此功能。请结束任务后重新启动应用，再试一次。';
+
+  @override
+  String get providerErrorFallback => '操作未完成，请检查连接后重试；仍失败时请查看 Pi 日志。';
+
+  @override
+  String get providerNoMatches => '没有匹配的配置，试试其他关键词。';
+
+  @override
+  String get providerShowKey => '显示本次输入的 Key';
+
+  @override
+  String get providerHideKey => '隐藏 Key';
+
+  @override
+  String get providerSavedKey => '已存 Key';
+
+  @override
+  String get providerRetainKey => '保留（输入新 Key 可替换）';
+
+  @override
+  String get providerClearKey => '移除已存 Key';
 }

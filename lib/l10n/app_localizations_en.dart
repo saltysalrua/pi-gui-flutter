@@ -1946,4 +1946,242 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get historyPreviewFailed =>
       'Could not load this entry\'s preview. Try again.';
+
+  @override
+  String get providerTitle => 'Provider profiles';
+
+  @override
+  String get providerDescription =>
+      'Add an API endpoint and key, fetch models, then use them through Pi. You can save profiles before enabling the extension.';
+
+  @override
+  String get providerNotInstalled =>
+      'The provider extension is not installed. You can manage profiles first; using them requires a confirmed installation.';
+
+  @override
+  String get providerDisabled =>
+      'The extension is installed but disabled. New sessions load it once enabled.';
+
+  @override
+  String get providerInstallTitle => 'Install provider extension';
+
+  @override
+  String get providerInstallWarning =>
+      'This installs the bundled pi-provider-switch into Pi\'s global configuration. Extensions run with Pi\'s full system permissions; new sessions will load it and refresh models for an active profile. Profiles may contain API keys, so prefer environment variables. Automatic paid image-capability probes for unknown models are disabled by default. Install?';
+
+  @override
+  String get providerAdd => 'Add profile';
+
+  @override
+  String get providerEdit => 'Edit profile';
+
+  @override
+  String get providerSave => 'Save profile';
+
+  @override
+  String get providerActivate => 'Use this profile';
+
+  @override
+  String get providerSelected => 'Default';
+
+  @override
+  String providerActive(String name) {
+    return 'Default profile: $name';
+  }
+
+  @override
+  String get providerNone => 'None';
+
+  @override
+  String get providerNextSession =>
+      'Default saved. The extension is not loaded in this session; it will take effect in a new session or on next launch.';
+
+  @override
+  String get providerEmpty =>
+      'No provider profiles yet. Add one to get started.';
+
+  @override
+  String providerModelCount(int count) {
+    return '$count models';
+  }
+
+  @override
+  String providerRemoveWarning(String name) {
+    return 'Delete profile $name? The extension stays installed. This cannot be undone.';
+  }
+
+  @override
+  String get providerInvalid =>
+      'Enter a profile name and an API endpoint first.';
+
+  @override
+  String get providerName =>
+      'e.g. my-api (letters, digits, dots, dashes, underscores)';
+
+  @override
+  String get providerBaseUrl => 'https://api.example.com/v1';
+
+  @override
+  String get providerApi => 'API type';
+
+  @override
+  String get providerKey => 'sk-… or \$ENV_VAR';
+
+  @override
+  String get providerKeepKey => 'Key saved; leave blank to keep it';
+
+  @override
+  String get providerKeyHint =>
+      'Keys are stored in the extension\'s provider-profiles.json. Prefer \$ENV_VAR and never commit that file.';
+
+  @override
+  String get providerModels =>
+      'Leave blank to fetch on save, or fetch first to choose a default. Refresh keeps existing IDs. Enter IDs manually if listing is unsupported.';
+
+  @override
+  String get providerDefaultModel => 'Default model';
+
+  @override
+  String get providerThinking => 'Default reasoning support';
+
+  @override
+  String get providerEnable => 'Enable extension';
+
+  @override
+  String get providerNameLabel => 'Profile name';
+
+  @override
+  String get providerBaseUrlLabel => 'API endpoint';
+
+  @override
+  String get providerKeyLabel => 'API key';
+
+  @override
+  String get providerModelsLabel => 'Models';
+
+  @override
+  String get providerFetchModels => 'Fetch models';
+
+  @override
+  String providerFetchedModels(int count) {
+    return 'Fetched $count models';
+  }
+
+  @override
+  String get providerFetchingOnSave => 'Fetching models from the API…';
+
+  @override
+  String providerDefaultModelValue(String model) {
+    return 'Default model: $model';
+  }
+
+  @override
+  String get providerHasKey => 'Key saved';
+
+  @override
+  String get providerThinkingBadge => 'Reasoning';
+
+  @override
+  String providerSwitched(String name) {
+    return 'This session now uses “$name”.';
+  }
+
+  @override
+  String get providerErrorInvalid =>
+      'Something is not filled in correctly. Check the endpoint (http:// or https://) and the models.';
+
+  @override
+  String get providerErrorName =>
+      'Use 1–64 letters, digits, dots, dashes or underscores, starting with a letter or digit. Reserved names are not allowed.';
+
+  @override
+  String get providerErrorFile =>
+      'provider-profiles.json is damaged and cannot be read. Fix the file manually first.';
+
+  @override
+  String get providerErrorNotFound =>
+      'This profile no longer exists; it may have been deleted elsewhere. Refresh and try again.';
+
+  @override
+  String get providerErrorActivate =>
+      'The switch could not be confirmed. Refresh and check the current model before trying again.';
+
+  @override
+  String get providerErrorUnreachable =>
+      'Cannot reach this endpoint. Check the address and your network.';
+
+  @override
+  String get providerErrorUnauthorized =>
+      'The API key is wrong or lacks permission to list models.';
+
+  @override
+  String get providerErrorHttp =>
+      'The server rejected the model list request. Check the endpoint.';
+
+  @override
+  String get providerErrorNotJson =>
+      'This address did not return a model list. Check the endpoint (it usually ends with /v1).';
+
+  @override
+  String get providerErrorEmpty =>
+      'The server returned no models. Enter model IDs manually.';
+
+  @override
+  String get providerErrorKeyEnv =>
+      'The environment variable referenced by the key is not set. Set it or enter the key directly.';
+
+  @override
+  String get providerErrorKeyCommand =>
+      'The key command failed. Check the command after !.';
+
+  @override
+  String providerErrorGeneric(String detail) {
+    return 'The action did not finish: $detail';
+  }
+
+  @override
+  String get providerManualModels =>
+      'One model ID per line, or separated by commas';
+
+  @override
+  String get providerErrorExists =>
+      'This profile name already exists. Choose another name or edit the existing profile.';
+
+  @override
+  String get providerErrorBusy =>
+      'This session is processing messages. Wait until it finishes before switching profiles.';
+
+  @override
+  String get providerErrorKeyEndpoint =>
+      'The endpoint or API type changed. Re-enter the key or choose Remove saved key to avoid sending the old key to another service.';
+
+  @override
+  String get providerErrorUnknownOutcome =>
+      'The result is not confirmed yet. Refresh profiles before submitting again.';
+
+  @override
+  String get providerErrorBackend =>
+      'The running backend does not support this feature yet. Finish your tasks, restart the app, and try again.';
+
+  @override
+  String get providerErrorFallback =>
+      'The action did not finish. Check the connection and retry; check Pi logs if it keeps failing.';
+
+  @override
+  String get providerNoMatches => 'No matching profiles. Try another search.';
+
+  @override
+  String get providerShowKey => 'Show the key entered here';
+
+  @override
+  String get providerHideKey => 'Hide key';
+
+  @override
+  String get providerSavedKey => 'Saved key';
+
+  @override
+  String get providerRetainKey => 'Keep (enter a new key to replace)';
+
+  @override
+  String get providerClearKey => 'Remove saved key';
 }

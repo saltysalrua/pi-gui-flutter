@@ -13,6 +13,7 @@ tags: [flutter, settings, packages, pi-backend, npm]
 1. **pi 页一键更新**：发现新版本后直接在页面里完成更新，不用打开终端。
 2. **插件市场**（插件页 → 市场 Tab）：浏览并安装 npm 上带 `pi-package` 关键词的公开包，数据与 [pi.dev/packages](https://pi.dev/packages) 同源。
 3. **插件管理**（插件页 → 管理 Tab）：列出已安装的插件包与它们提供的扩展 / 技能 / 提示词 / 主题资源，逐项启用或停用，语义与终端里的 `pi config`（全局模式）完全一致；还可移除、更新插件。
+4. **Provider 配置**（插件页 → Provider 配置 Tab）：可选择安装随应用提供的 `pi-provider-switch`，再管理 Provider 配置。**安装必须点击并确认**；详见 [Provider 配置](provider_profiles.md)。
 
 ## 使用方法（人类视角）
 

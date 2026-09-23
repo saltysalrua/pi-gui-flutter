@@ -1,0 +1,12 @@
+{
+  "name": "pi-provider-switch",
+  "version": "1.0.0",
+  "description": "cc-switch style multi-provider manager for pi: /switch, /providers, /provider-add, model list auto-refresh, image-input detection.",
+  "keywords": ["pi-package", "pi", "provider", "llm"],
+  "license": "MIT",
+  "type": "module",
+  "files": ["extensions", "provider-profiles-subagent.ts", "provider-profiles.example.json", "README.md"],
+  "pi": {
+    "extensions": ["./extensions"]
+  }
+}

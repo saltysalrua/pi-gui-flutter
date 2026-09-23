@@ -14,6 +14,11 @@ class _PendingRequest {
   final settled = Completer<void>();
   bool get isMutation =>
       command == 'set_model' || command == 'set_thinking_level';
+  bool get isProviderMutation => const {
+    'gui_provider_profiles_save',
+    'gui_provider_profiles_remove',
+    'gui_provider_profiles_activate',
+  }.contains(command);
   bool get isWorkspaceMutation => const {
     'gui_open_workspace',
     'gui_create_workspace',
@@ -194,8 +199,8 @@ class PiRpcClient
         }
       } catch (error) {
         _record(PiRpcDiagnosticKind.invalidResponse, command: pending.command);
-        if (pending.isConversationMutation) {
-          // A malformed acknowledgement cannot prove a prompt was rejected.
+        if (pending.isConversationMutation || pending.isProviderMutation) {
+          // A malformed acknowledgement cannot prove a mutation was rejected.
           acknowledged = false;
           _pending[decoded['id'] as String] = pending;
           if (!pending.result.isCompleted) {
@@ -335,6 +340,8 @@ class PiRpcClient
           .where(
             (pending) =>
                 pending.isWorkspaceMutation ||
+                (pending.isProviderMutation &&
+                    command.startsWith('gui_provider_profiles_')) ||
                 (pending.isMutation &&
                     !const {'abort', 'clear_queue'}.contains(command)) ||
                 (pending.isConversationMutation &&
@@ -381,10 +388,15 @@ class PiRpcClient
         PiRpcException(
           'Request timed out',
           command: command,
-          outcomeUnknown: pending.isMutation || pending.isConversationMutation,
+          outcomeUnknown:
+              pending.isMutation ||
+              pending.isConversationMutation ||
+              pending.isProviderMutation,
         ),
       );
-      if (!pending.isMutation && !pending.isConversationMutation) {
+      if (!pending.isMutation &&
+          !pending.isConversationMutation &&
+          !pending.isProviderMutation) {
         _pending.remove(id);
         pending.settled.complete();
       }
@@ -452,6 +464,25 @@ class PiRpcClient
     return List.unmodifiable(
       (data['messages'] as List).map(PiChatMessage.fromJson),
     );
+  }
+
+  /// Check provenance before dispatching an extension slash command: an
+  /// unknown /switch would otherwise be sent to the model as a user prompt.
+  Future<bool> hasProviderSwitchCommand() async {
+    final data = rpcObject(await _request('get_commands'));
+    final commands = data['commands'];
+    if (commands is! List) return false;
+    return commands.whereType<Map>().any((entry) {
+      final sourcePath =
+          entry['path'] ??
+          (entry['sourceInfo'] is Map ? entry['sourceInfo']['path'] : null);
+      return entry['name'] == 'switch' &&
+          entry['source'] == 'extension' &&
+          sourcePath is String &&
+          sourcePath
+              .replaceAll('\\', '/')
+              .endsWith('/extensions/provider-switch.ts');
+    });
   }
 
   @override

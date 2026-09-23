@@ -1,7 +1,7 @@
-import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:pi_gui/ui/atoms/app_progress_indicator.dart';
 
 import '../../../atoms/app_action_button.dart';
 import '../../../atoms/app_badge.dart';
@@ -19,8 +19,10 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/theme/theme_context_extensions.dart';
 import '../../../../core/rpc/pi_packages_types.dart';
 import '../controllers/packages_controller.dart';
+import '../controllers/provider_profiles_controller.dart';
+import 'provider_profiles_view.dart';
 
-enum _PackagesTab { gallery, manage }
+enum _PackagesTab { gallery, manage, providers }
 
 /// Settings page "plugins": gallery (npm pi-package search) plus a
 /// pi-config-style management tab. Pure rendering; all logic lives in
@@ -29,9 +31,11 @@ class PackagesSettingsContent extends StatefulWidget {
   const PackagesSettingsContent({
     super.key,
     required this.controller,
+    required this.profiles,
     this.query = '',
   });
   final PackagesController controller;
+  final ProviderProfilesController profiles;
   final String query;
 
   @override
@@ -102,11 +106,13 @@ class _PackagesSettingsContentState extends State<PackagesSettingsContent> {
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
-          Row(
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
             children: [
               _tabButton(_PackagesTab.gallery, l.pluginsTabGallery),
-              const SizedBox(width: AppSpacing.sm),
               _tabButton(_PackagesTab.manage, l.pluginsTabManage),
+              _tabButton(_PackagesTab.providers, l.providerTitle),
             ],
           ),
           const SizedBox(height: AppSpacing.xxl),
@@ -124,6 +130,11 @@ class _PackagesSettingsContentState extends State<PackagesSettingsContent> {
               controller: widget.controller,
               query: widget.query,
             ),
+            _PackagesTab.providers => ProviderProfilesView(
+              packages: widget.controller,
+              profiles: widget.profiles,
+              query: widget.query,
+            ),
           },
         ],
       ),
@@ -138,7 +149,9 @@ class _PackagesSettingsContentState extends State<PackagesSettingsContent> {
             leading: Icon(
               tab == _PackagesTab.gallery
                   ? Icons.storefront_outlined
-                  : Icons.tune_rounded,
+                  : tab == _PackagesTab.manage
+                  ? Icons.tune_rounded
+                  : Icons.hub_outlined,
             ),
             onPressed: () => setState(() => _tab = tab),
           )
@@ -147,7 +160,9 @@ class _PackagesSettingsContentState extends State<PackagesSettingsContent> {
             leading: Icon(
               tab == _PackagesTab.gallery
                   ? Icons.storefront_outlined
-                  : Icons.tune_rounded,
+                  : tab == _PackagesTab.manage
+                  ? Icons.tune_rounded
+                  : Icons.hub_outlined,
             ),
             onPressed: () => setState(() => _tab = tab),
           );

@@ -44,6 +44,10 @@ flutter:
     - assets/backend/gui_history.mjs
     - assets/backend/gui_image_upload.mjs
     - assets/backend/gui_packages.mjs
+    - assets/backend/gui_provider_profiles.mjs
+    - pi-provider-switch/package.json
+    - pi-provider-switch/extensions/provider-switch.ts
+    - pi-provider-switch/extensions/provider-switch/inputs.ts
     - assets/images/
 
   fonts:
