@@ -1,37 +1,90 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 
-/// 只按 LF 分帧；不把 JSON 字符串里的 CR / U+2028 / U+2029 当换行。
-Stream<String> decodePiJsonl(Stream<List<int>> bytes) async* {
-  final fragments = StringBuffer();
-  await for (final chunk in bytes.transform(utf8.decoder)) {
+/// 只按 LF 字节分帧；不把 JSON 字符串里的 CR / U+2028 / U+2029 当换行。
+/// UTF-8 多字节序列里不会出现 0x0A，所以按字节切分与按字符切分等价，
+/// 但省掉整行先转成 Dart String 再解析的那一次完整复制。
+Stream<Uint8List> splitPiJsonlBytes(Stream<List<int>> input) async* {
+  final carry = BytesBuilder();
+  Uint8List? trim(Uint8List line) {
+    final end = line.isNotEmpty && line.last == 13
+        ? line.length - 1
+        : line.length;
+    if (end == 0) return null;
+    return end == line.length ? line : Uint8List.sublistView(line, 0, end);
+  }
+
+  await for (final raw in input) {
+    final chunk = raw is Uint8List ? raw : Uint8List.fromList(raw);
     var start = 0;
     int newline;
-    // Scan each decoded chunk once. A large get_messages line must not copy
-    // and rescan its entire accumulated prefix whenever another chunk arrives.
-    while ((newline = chunk.indexOf('\n', start)) >= 0) {
-      var line = chunk.substring(start, newline);
+    // Scan each chunk once; a large get_messages line never rescans its prefix.
+    while ((newline = chunk.indexOf(10, start)) >= 0) {
+      var line = Uint8List.sublistView(chunk, start, newline);
       start = newline + 1;
-      if (fragments.isNotEmpty) {
-        fragments.write(line);
-        line = fragments.toString();
-        fragments.clear();
+      if (carry.isNotEmpty) {
+        carry.add(line);
+        line = carry.takeBytes();
       }
-      if (line.endsWith('\r')) line = line.substring(0, line.length - 1);
-      if (line.isNotEmpty) yield line;
+      final framed = trim(line);
+      if (framed != null) yield framed;
     }
-    if (start < chunk.length) fragments.write(chunk.substring(start));
+    if (start < chunk.length) {
+      carry.add(Uint8List.sublistView(chunk, start));
+    }
   }
-  var tail = fragments.toString();
-  if (tail.endsWith('\r')) tail = tail.substring(0, tail.length - 1);
-  if (tail.isNotEmpty) yield tail;
+  final tail = trim(carry.takeBytes());
+  if (tail != null) yield tail;
 }
+
+/// 字符串形式的分帧，仅供工具脚本/测试使用；客户端走 [decodePiJsonValues]。
+Stream<String> decodePiJsonl(Stream<List<int>> bytes) =>
+    splitPiJsonlBytes(bytes).map((line) => utf8.decode(line));
+
+/// stdout 上不是合法 JSON 的一行（扩展日志、坏 UTF-8 等）。只作诊断，不断连。
+final class PiNonProtocolLine {
+  const PiNonProtocolLine(this.text);
+  final String text;
+}
+
+/// 超过这个字节数的单行（整包历史、超大工具结果）放到后台 Isolate 解码，
+/// 避免在 UI 线程上卡住几十到几百毫秒。小事件同步解码，没有调度开销。
+const piJsonIsolateThreshold = 1 << 20;
+
+final _jsonUtf8 = utf8.decoder.fuse(json.decoder);
+
+Object? _decodeFrame(Uint8List line) {
+  try {
+    return _jsonUtf8.convert(line);
+  } on FormatException {
+    return PiNonProtocolLine(utf8.decode(line, allowMalformed: true));
+  }
+}
+
+/// 分帧 + 直接从字节解码为 JSON 值（Map/List/...），坏行变成 [PiNonProtocolLine]。
+/// asyncMap 保证顺序：大行在后台解码时，后面的小事件会等它完成再派发。
+Stream<Object?> decodePiJsonValues(Stream<List<int>> bytes) =>
+    splitPiJsonlBytes(bytes).asyncMap<Object?>(
+      (line) => line.length >= piJsonIsolateThreshold
+          ? Isolate.run(() => _decodeFrame(line))
+          : _decodeFrame(line),
+    );
 
 abstract interface class PiRpcTransport {
   Stream<List<int>> get stdout;
   Future<void> send(String line);
   Future<void> close();
+}
+
+/// 进程内逻辑通道：直接交换已解码的 JSON 值，不再为同一条消息
+/// 重复“编码成文本 → 转字节 → 再分帧解码”。
+abstract interface class PiRpcMessageTransport implements PiRpcTransport {
+  /// 已解码的消息；坏行以 [PiNonProtocolLine] 传递。
+  Stream<Object?> get messages;
+  Future<void> sendMessage(Map<String, Object?> message);
 }
 
 class PiProcessTransport implements PiRpcTransport {

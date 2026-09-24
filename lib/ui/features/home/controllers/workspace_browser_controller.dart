@@ -33,6 +33,10 @@ class WorkspaceBrowserController extends ChangeNotifier {
   Timer? _debounce;
   static const _refreshDelay = Duration(milliseconds: 500);
 
+  /// Pi's built-in tools that never touch the disk. Their completion does not
+  /// re-run git status; agent_settled still refreshes once per run.
+  static const _readOnlyTools = {'read', 'grep', 'find', 'ls'};
+
   bool get refreshing => _refreshing != null;
   bool get graphLoading => _graphLoad != null;
   bool loadingDirectory(String path) => _directoryLoads.containsKey(path);
@@ -148,7 +152,9 @@ class WorkspaceBrowserController extends ChangeNotifier {
     } else if (event is PiRpcConnected) {
       refreshIfOpen();
     } else if (event is PiChatEvent &&
-        const {'tool_execution_end', 'agent_settled'}.contains(event.type)) {
+        (event.type == 'agent_settled' ||
+            event.type == 'tool_execution_end' &&
+                !_readOnlyTools.contains(event.toolName))) {
       _dirty = true;
       if (!isOpen) return;
       _debounce?.cancel();

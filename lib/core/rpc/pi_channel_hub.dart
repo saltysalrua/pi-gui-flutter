@@ -11,7 +11,7 @@ class PiChannelHub {
   final _channels = <String, _ChannelTransport>{};
   PiRpcTransport? _transport;
   Future<void>? _starting;
-  StreamSubscription<String>? _subscription;
+  StreamSubscription<Object?>? _subscription;
   bool _closed = false, _lost = false;
 
   /// One client owns one lease. Reconnecting that client must never resurrect
@@ -57,25 +57,21 @@ class PiChannelHub {
         'primary',
         () => _ChannelTransport(this, 'primary'),
       );
-      _subscription = decodePiJsonl(transport.stdout).listen(
-        (line) {
-          Object? value;
-          try {
-            value = jsonDecode(line);
-          } catch (_) {
-            return;
-          }
+      // One decode per frame: the routed inner message is handed to the
+      // logical client as a Map, never re-encoded and parsed a second time.
+      _subscription = decodePiJsonValues(transport.stdout).listen(
+        (value) {
           if (value is! Map || value['type'] != 'gui_channel') return;
           final channel = _channels[value['channel']];
           if (channel == null || channel.closed) return;
           final message = value['message'];
           if (message is Map && message['type'] == 'gui_channel_exited') {
             unawaited(channel.close());
+          } else if (value['line'] is String) {
+            // Node forwards unparsable Pi stdout verbatim as `line`.
+            channel.output.add(PiNonProtocolLine(value['line'] as String));
           } else {
-            final text = value['line'] is String
-                ? value['line'] as String
-                : jsonEncode(message);
-            channel.output.add(utf8.encode('$text\n'));
+            channel.output.add(message);
           }
         },
         onError: (Object _) => _disconnect(),
@@ -100,12 +96,12 @@ class PiChannelHub {
     }
   }
 
-  Future<void> _send(String id, String line) async {
+  Future<void> _send(String id, Object? message) async {
     if (_closed || _lost || _transport == null) {
       throw StateError('Supervisor disconnected');
     }
     await _transport!.send(
-      '${jsonEncode({'type': 'gui_channel', 'channel': id, 'message': jsonDecode(line)})}\n',
+      '${jsonEncode({'type': 'gui_channel', 'channel': id, 'message': message})}\n',
     );
   }
 
@@ -121,18 +117,34 @@ class PiChannelHub {
   }
 }
 
-class _ChannelTransport implements PiRpcTransport {
+class _ChannelTransport implements PiRpcMessageTransport {
   _ChannelTransport(this.hub, this.id);
   final PiChannelHub hub;
   final String id;
-  final output = StreamController<List<int>>();
+  final output = StreamController<Object?>();
   bool closed = false;
+
   @override
-  Stream<List<int>> get stdout => output.stream;
+  Stream<Object?> get messages => output.stream;
+
+  /// Byte view for generic consumers only; PiRpcClient uses [messages].
+  @override
+  Stream<List<int>> get stdout => output.stream.map(
+    (value) => utf8.encode(
+      '${value is PiNonProtocolLine ? value.text : jsonEncode(value)}\n',
+    ),
+  );
+
+  @override
+  Future<void> sendMessage(Map<String, Object?> message) async {
+    if (closed) throw StateError('Session disconnected');
+    await hub._send(id, message);
+  }
+
   @override
   Future<void> send(String line) async {
     if (closed) throw StateError('Session disconnected');
-    await hub._send(id, line);
+    await hub._send(id, jsonDecode(line));
   }
 
   @override

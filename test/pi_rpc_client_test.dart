@@ -83,6 +83,28 @@ void main() {
     ]);
   });
 
+  test('byte decoding keeps order across off-isolate lines and isolates bad frames', () async {
+    final big = jsonEncode({
+      'type': 'big',
+      'text': '中文😀' * (piJsonIsolateThreshold ~/ 7 + 1),
+    });
+    final bytes = utf8.encode(
+      '${jsonEncode({'type': 'a'})}\n$big\n\xff not json\r\n'
+      '${jsonEncode({'type': 'b'})}\n',
+    );
+    final chunks = [
+      for (var i = 0; i < bytes.length; i += 65521)
+        bytes.sublist(i, i + 65521 < bytes.length ? i + 65521 : bytes.length),
+    ];
+    final values = await decodePiJsonValues(Stream.fromIterable(chunks))
+        .toList();
+    expect(values, hasLength(4));
+    expect((values[0] as Map)['type'], 'a');
+    expect((values[1] as Map)['text'], jsonDecode(big)['text']);
+    expect(values[2], isA<PiNonProtocolLine>());
+    expect((values[3] as Map)['type'], 'b');
+  });
+
   test(
     'correlates reversed responses and preserves extension UI events',
     () async {

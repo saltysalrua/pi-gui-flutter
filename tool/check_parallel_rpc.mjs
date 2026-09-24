@@ -24,6 +24,7 @@ for (const name of [
   "workspace_browser.mjs",
   "gui_tool_diff.mjs",
   "gui_image_upload.mjs",
+  "gui_history.mjs",
 ]) {
   await cp(
     fileURLToPath(new URL(`../assets/backend/${name}`, import.meta.url)),

@@ -53,7 +53,22 @@ class ChatToolCall {
 
 /// Pure RPC projection. Tool updates replace accumulated output, never append it.
 class ChatTimeline {
-  final messages = <PiChatMessage>[];
+  final _messages = <PiChatMessage>[];
+
+  /// Streaming text/thinking/tool-argument deltas of the active message, by
+  /// contentIndex. Appending to an immutable String on every token copies the
+  /// whole block each time (quadratic for long replies); deltas are buffered
+  /// here and folded into the block once, when anyone reads [messages] or a
+  /// non-delta event arrives. Readers therefore always see complete text.
+  final _pendingText = <int, StringBuffer>{};
+
+  List<PiChatMessage> get messages {
+    _flush();
+    return _messages;
+  }
+
+  /// Cheap emptiness check that does not fold pending streaming text.
+  bool get isEmpty => _messages.isEmpty;
   final tools = <String, ChatToolCall>{};
   // Count visible references, including orphan placeholders. A final message
   // may remove a draft tool call, so a grow-only set would hide later results.
@@ -97,17 +112,17 @@ class ChatTimeline {
   }
 
   List<String> _toolOrder() {
-    final order = <String>[];
-    for (final message in messages) {
+    _flush();
+    // Insertion-ordered set: long sessions must not pay O(n²) list lookups.
+    final order = <String>{};
+    for (final message in _messages) {
       for (final block in message.content) {
-        if (block.kind == PiContentKind.toolCall &&
-            block.id.isNotEmpty &&
-            !order.contains(block.id)) {
+        if (block.kind == PiContentKind.toolCall && block.id.isNotEmpty) {
           order.add(block.id);
         }
       }
     }
-    return order;
+    return order.toList();
   }
 
   static int _retainedBytes(ChatToolCall tool) {
@@ -158,10 +173,10 @@ class ChatTimeline {
   /// Orphan tool-result messages hold their own result copy; release it too,
   /// otherwise the budget would be defeated by compacted-history orphans.
   void _releaseOrphanResult(String id, PiToolResult? replacement) {
-    for (var i = 0; i < messages.length; i++) {
-      final current = messages[i];
+    for (var i = 0; i < _messages.length; i++) {
+      final current = _messages[i];
       if (current.toolCallId == id && current.result != null) {
-        messages[i] = PiChatMessage(
+        _messages[i] = PiChatMessage(
           role: current.role,
           content: current.content,
           timestamp: current.timestamp,
@@ -197,7 +212,7 @@ class ChatTimeline {
   List<int?> get assistantNumbers {
     var number = 0;
     return [
-      for (final message in messages)
+      for (final message in _messages)
         message.role == 'assistant' ? ++number : null,
     ];
   }
@@ -205,7 +220,8 @@ class ChatTimeline {
   void load(List<PiChatMessage> history) {
     // Live tool events may carry details absent in old persisted tool results.
     final previous = Map<String, ChatToolCall>.of(tools);
-    messages.clear();
+    _pendingText.clear();
+    _messages.clear();
     tools.clear();
     _toolReferences.clear();
     _active = null;
@@ -225,6 +241,7 @@ class ChatTimeline {
   }
 
   void apply(PiChatEvent event) {
+    if (event.type != 'message_update') _flush();
     switch (event.type) {
       case 'message_start':
         if (event.message != null) _message(event.message!, start: true);
@@ -255,9 +272,10 @@ class ChatTimeline {
   }
 
   void settle() {
+    _flush();
     _thinkingContentIndex = null;
     if (_active != null) {
-      messages[_active!] = messages[_active!].copyWith(isStreaming: false);
+      _messages[_active!] = _messages[_active!].copyWith(isStreaming: false);
       _active = null;
     }
     for (final entry in tools.entries.toList()) {
@@ -310,7 +328,7 @@ class ChatTimeline {
       );
       // Orphan results (e.g. compacted history) must still remain visible.
       if (!_toolReferences.containsKey(id)) {
-        messages.add(
+        _messages.add(
           PiChatMessage(
             role: 'toolResult',
             toolCallId: id,
@@ -327,30 +345,89 @@ class ChatTimeline {
             timestamp: message.timestamp,
           ),
         );
-        _registerTools(messages.last);
+        _registerTools(_messages.last);
       }
       return;
     }
     if (start) {
-      messages.add(message.copyWith(isStreaming: message.role == 'assistant'));
-      _active = messages.length - 1;
+      _messages.add(message.copyWith(isStreaming: message.role == 'assistant'));
+      _active = _messages.length - 1;
       _thinkingContentIndex = null;
-    } else if (_active != null && messages[_active!].role == message.role) {
-      for (final block in messages[_active!].content) {
+    } else if (_active != null && _messages[_active!].role == message.role) {
+      for (final block in _messages[_active!].content) {
         _unregisterTool(block);
       }
-      messages[_active!] = message;
+      _messages[_active!] = message;
       _active = null;
       _thinkingContentIndex = null;
     } else {
-      messages.add(message);
+      _messages.add(message);
     }
     _registerTools(message);
   }
 
+  /// Text length of the newest message including buffered deltas, without
+  /// folding them (used to pick the streaming notify interval per event).
+  int get lastMessageTextLength {
+    final last = _messages.lastOrNull;
+    if (last == null) return 0;
+    var length = last.content.fold<int>(0, (sum, b) => sum + b.text.length);
+    if (_active == _messages.length - 1) {
+      for (final buffer in _pendingText.values) {
+        length += buffer.length;
+      }
+    }
+    return length;
+  }
+
+  /// Folds buffered streaming deltas into the active message (one copy per
+  /// block per read, instead of one per token).
+  void _flush() {
+    if (_pendingText.isEmpty) return;
+    final index = _active;
+    if (index == null) {
+      _pendingText.clear();
+      return;
+    }
+    final message = _messages[index];
+    final blocks = [...message.content];
+    for (final MapEntry(key: i, value: buffer) in _pendingText.entries) {
+      blocks[i] = blocks[i].withText(blocks[i].text + buffer.toString());
+    }
+    _pendingText.clear();
+    _messages[index] = message.copyWith(content: List.unmodifiable(blocks));
+  }
+
+  /// Appends a text/thinking/tool-argument delta to an existing block of the
+  /// same kind without rebuilding the message. Returns false when the normal
+  /// path must create or convert the block.
+  bool _buffer(PiContentDelta delta) {
+    final index = _active;
+    if (index == null || _messages[index].role != 'assistant') return false;
+    final content = _messages[index].content;
+    if (delta.index >= content.length) return false;
+    final kind = content[delta.index].kind;
+    final matches = switch (delta.type) {
+      'text_delta' => kind == PiContentKind.text,
+      'thinking_delta' => kind == PiContentKind.thinking,
+      'toolcall_delta' => true,
+      _ => false,
+    };
+    if (!matches) return false;
+    _pendingText.putIfAbsent(delta.index, StringBuffer.new).write(delta.delta);
+    return true;
+  }
+
   void _delta(PiContentDelta delta) {
-    if (_active == null || messages[_active!].role != 'assistant') {
-      messages.add(
+    if (_buffer(delta)) {
+      _thinkingContentIndex = delta.type == 'thinking_delta'
+          ? delta.index
+          : null;
+      return;
+    }
+    _flush();
+    if (_active == null || _messages[_active!].role != 'assistant') {
+      _messages.add(
         PiChatMessage(
           role: 'assistant',
           content: const [],
@@ -358,7 +435,7 @@ class ChatTimeline {
           isStreaming: true,
         ),
       );
-      _active = messages.length - 1;
+      _active = _messages.length - 1;
       _thinkingContentIndex = null;
     }
     _thinkingContentIndex = switch (delta.type) {
@@ -373,7 +450,7 @@ class ChatTimeline {
       'toolcall_end' => null,
       _ => _thinkingContentIndex,
     };
-    final message = messages[_active!];
+    final message = _messages[_active!];
     final blocks = [...message.content];
     while (blocks.length <= delta.index) {
       blocks.add(const PiContent(PiContentKind.unknown));
@@ -408,7 +485,7 @@ class ChatTimeline {
       case 'toolcall_end':
         if (delta.toolCall != null) blocks[delta.index] = delta.toolCall!;
     }
-    messages[_active!] = message.copyWith(content: List.unmodifiable(blocks));
+    _messages[_active!] = message.copyWith(content: List.unmodifiable(blocks));
     // Only the changed block needs bookkeeping, not every prior tool in this
     // assistant message on every text/thinking delta.
     _unregisterTool(old);

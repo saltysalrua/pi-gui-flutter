@@ -515,6 +515,17 @@ main(process.argv.slice(2));
   return launcherPath;
 }
 
+// Built-in read-only tools cannot change the working tree; skip git cache
+// invalidation for them. agent_settled still invalidates once per run.
+const READ_ONLY_TOOLS = new Set(["read", "grep", "find", "ls"]);
+export function changesDisk(message) {
+  return (
+    message?.type === "agent_settled" ||
+    (message?.type === "tool_execution_end" &&
+      !READ_ONLY_TOOLS.has(message.toolName))
+  );
+}
+
 // Decode once for internal probes and adapter bookkeeping. Public output keeps
 // its original bytes/text: unknown events and malformed lines still reach Dart.
 export function routePiOutput(line, pendingRequests, emit) {
@@ -547,6 +558,7 @@ export function routePiOutput(line, pendingRequests, emit) {
     try {
       const response = JSON.parse(message.statusText);
       if (response.id !== id || response.command !== "gui_history_bridge" || typeof response.success !== "boolean") throw new Error("Invalid history response");
+      line = message.statusText; // Keep text and object identical for splicing.
       message = response;
     } catch {
       // A broken bridge acknowledgement is not proof that a mutation failed.
@@ -733,9 +745,7 @@ export class WorkspaceAdapter {
             this.service.invalidateSessions();
           }
         }
-        if (["tool_execution_end", "agent_settled"].includes(message?.type)) {
-          this.browser.invalidate();
-        }
+        if (changesDisk(message)) this.browser.invalidate();
         if (message?.type === "agent_start") this.agentBusy = true;
         if (message?.type === "agent_settled") this.agentBusy = false;
         if (
@@ -745,7 +755,7 @@ export class WorkspaceAdapter {
         ) {
           this.service.invalidateSessions();
         }
-        this.emit(line);
+        this.emit(line, message);
       },
       sessionPath,
     );
@@ -754,15 +764,17 @@ export class WorkspaceAdapter {
     return child.request("get_state", {}, 0);
   }
   reply(request, data, error) {
-    this.emit(
-      JSON.stringify({
-        type: "response",
-        id: request.id,
-        command: request.type,
-        success: !error,
-        ...(error ? { error: error.code ?? "WORKSPACE_FAILED" } : { data }),
-      }),
-    );
+    const message = {
+      type: "response",
+      id: request.id,
+      command: request.type,
+      success: !error,
+      ...(error ? { error: error.code ?? "WORKSPACE_FAILED" } : { data }),
+    };
+    this.emitMessage(message);
+  }
+  emitMessage(message) {
+    this.emit(JSON.stringify(message), message);
   }
   async ensureIdle() {
     if (this.agentBusy || this.forwarded.size || this.preparingImages || this.historyMutating)
@@ -789,14 +801,14 @@ export class WorkspaceAdapter {
         : undefined;
     await this.service.remember(previousPath, previousSession);
     await this.pi.stop();
-    this.emit(JSON.stringify({ type: "gui_workspace_reset" }));
+    this.emitMessage({ type: "gui_workspace_reset" });
     this.service.current = cwd;
     try {
       // A folder switch starts empty; prior conversations are explicitly selectable in the sidebar.
       await this.start();
     } catch {
       await this.pi?.stop();
-      this.emit(JSON.stringify({ type: "gui_workspace_reset" }));
+      this.emitMessage({ type: "gui_workspace_reset" });
       this.service.current = previousPath;
       try {
         await this.start(previousSession);
@@ -806,7 +818,7 @@ export class WorkspaceAdapter {
       fail("WORKSPACE_START_FAILED");
     }
     await this.service.remember(cwd);
-    this.emit(JSON.stringify({ type: "gui_workspace_changed", path: cwd }));
+    this.emitMessage({ type: "gui_workspace_changed", path: cwd });
     return this.service.snapshot();
   }
   async handleHistory(request) {

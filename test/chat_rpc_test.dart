@@ -96,6 +96,63 @@ class FakeChatGateway implements PiChatGateway {
 
 void main() {
   test(
+    'buffered streaming deltas fold in order and survive block switches',
+    () {
+      final timeline = ChatTimeline();
+      PiChatEvent update(Map<String, Object?> event) => PiChatEvent(
+        'message_update',
+        {'type': 'message_update', 'assistantMessageEvent': event},
+      );
+      timeline.apply(
+        PiChatEvent('message_start', {
+          'type': 'message_start',
+          'message': {'role': 'assistant', 'content': [], 'timestamp': 1},
+        }),
+      );
+      timeline.apply(update({'type': 'thinking_start', 'contentIndex': 0}));
+      for (final part in ['想', '一', '想']) {
+        timeline.apply(
+          update({'type': 'thinking_delta', 'contentIndex': 0, 'delta': part}),
+        );
+      }
+      expect(timeline.thinkingIndexFor(0), 0);
+      timeline.apply(update({'type': 'text_start', 'contentIndex': 1}));
+      for (var i = 0; i < 500; i++) {
+        timeline.apply(
+          update({'type': 'text_delta', 'contentIndex': 1, 'delta': '$i,'}),
+        );
+        // Reading mid-stream must always see every delta so far.
+        if (i == 10) {
+          expect(timeline.messages[0].content[1].text, endsWith('10,'));
+        }
+      }
+      expect(timeline.lastMessageTextLength, 3 + 1890);
+      timeline.apply(
+        update({
+          'type': 'toolcall_start',
+          'contentIndex': 2,
+          'id': 'call-1',
+          'toolName': 'bash',
+        }),
+      );
+      timeline.apply(
+        update({'type': 'toolcall_delta', 'contentIndex': 2, 'delta': '{"a"'}),
+      );
+      timeline.apply(
+        update({'type': 'toolcall_delta', 'contentIndex': 2, 'delta': ':1}'}),
+      );
+      final content = timeline.messages.single.content;
+      expect(content[0].text, '想一想');
+      expect(content[1].text, [for (var i = 0; i < 500; i++) '$i,'].join());
+      expect(content[2].kind, PiContentKind.toolCall);
+      expect(content[2].text, '{"a":1}');
+      expect(timeline.tools.containsKey('call-1'), isTrue);
+      timeline.settle();
+      expect(timeline.messages.single.isStreaming, isFalse);
+      expect(timeline.messages.single.content[1].text, content[1].text);
+    },
+  );
+  test(
     'model errors survive RPC live projection, copies and history reads',
     () async {
       const detail =

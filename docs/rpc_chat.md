@@ -1,6 +1,6 @@
 ---
 title: "RPC 对话、Markdown 与文件改动"
-version: "1.11.0"
+version: "1.12.0"
 status: "implemented"
 type: "feature"
 tags: [flutter, pi-rpc, chat, markdown, diff]
@@ -221,7 +221,10 @@ assistantNumbers: null,       null, 1,         2,         null, 3
 
 仍采用 Flutter/Dart → Node 适配层 → Pi RPC，不引入 Rust、不直接解析 Pi 私有历史，也不改变空会话居中 / 有消息底部输入的两态布局。
 
-- **按数据块分帧**：`lib/core/rpc/pi_rpc_transport.dart` 的 `decodePiJsonl` 只扫描当前 UTF-8 解码块，把未结束的一行放入 `StringBuffer`；遇到 LF 才合并。`assets/backend/workspace_rpc.mjs` 的 `lines` 同样用片段数组处理，避免大 `get_messages` 每收到一块就复制、重扫整个前缀。LF/CRLF、跨块 UTF-8、U+2028/U+2029、空行行为不变；Dart 保留原来的 EOF 尾行读取行为，Node 仍只派发完整 LF 帧。
+- **按字节分帧、一次解码**：`lib/core/rpc/pi_rpc_transport.dart` 的 `splitPiJsonlBytes` 直接在字节上找 LF（UTF-8 多字节序列里不会出现 0x0A），未结束的一行存进 `BytesBuilder`；`decodePiJsonValues` 用 `utf8.decoder.fuse(json.decoder)` 从字节直接解码成 Map，不再先转成完整 Dart String。单行 ≥ `piJsonIsolateThreshold`（1 MiB，比如整包 `get_messages`/`get_entries`、超大工具结果）放到 `Isolate.run` 里解码，UI 线程不卡；小事件同步解码。用的是 `asyncMap`，所以后台解码大行时，后面的小事件会排队等它完成，**事件顺序不变**。坏行（日志、坏 UTF-8）变成 `PiNonProtocolLine`，只记诊断，不断开。`decodePiJsonl`（字符串形式）只留给工具脚本/测试用。`assets/backend/workspace_rpc.mjs` 的 `lines` 仍用片段数组分帧。
+- **进程内通道不重复编解码**：`PiChannelHub` 对物理 stdout 只解码一次，把 `gui_channel.message` 这个 Map 通过 `PiRpcMessageTransport.messages` 直接交给各会话的 `PiRpcClient`；发送端 `sendMessage(Map)` 由 Hub 包进信封后编码一次。以前是“Hub 解码 → 重新编码成字节 → 客户端再分帧解码”。旧的 `stdout`/`send(String)` 仍保留，给单进程兼容模式和普通 transport 用。
+- **Node 中转不重复解析**：`WorkspaceAdapter` 调 `emit(line, message)` 时把 `routePiOutput` 已经解析好的对象一起传下去，`workspace_manager.mjs` 不再 `JSON.parse` 第二遍；外层信封直接拼接原始 JSON 文本：`{"type":"gui_channel","channel":…,"message":<原行>}`，不再对整个对象 `JSON.stringify`。解析失败的行仍以 `line` 字段原样转发。历史桥（`pi-gui-history:` 状态键）改写的响应同时替换 `line` 与 `message`，拼接内容与对象保持一致。
+- **实测（本机，36 MB 真实会话拼出的 `get_messages`）**：Dart 端旧链路约 600 ms（Hub 解码 165 + 重新编码 275 + 客户端解码 165），全在 UI 线程；现在一次字节解码约 40–50 ms，且在后台 Isolate（主线程最大停顿约 15–25 ms）。Node 中转从约 166 ms 降到几乎 0。不引入 Rust：Pi 本体和 SDK 都在 Node 里，FFI 解析后仍要转成 Dart 对象，剩下的空间很小，反而会增加 CI 工具链。
 - **基础输出路由**：`routePiOutput` 把解析结果一并交给 `WorkspaceAdapter` 做响应关联和运行状态维护。兼容单会话输出保留原始 JSON 行；并行管理器额外封装通道身份。内部探测响应不外泄，未知事件、旁路文字和坏行在所属通道隔离，`agent_end` 仍不解除运行锁。
 - **工具引用索引**：`lib/core/models/chat_timeline.dart` 用 `toolCallId → 可见引用数` 判断结果是否已有消息引用，避免每个工具结果都扫描全部前文。最终消息替换、内容块替换、历史重载会维护/清空引用数；不能使用只增不减的 Set，否则被最终消息删除的草稿工具会错误隐藏后续孤立结果。流式更新只维护变化的内容块，不反复登记整条消息的工具。孤立结果、编号、累计输出与 Diff 证据保持原行为。
 - **摘要缓存与加载调度**：见 [工作区历史缓存](workspaces_sessions.md#后端结构)。消息本身不做跨会话缓存，不绕过 Pi 的当前分支/压缩投影。
@@ -280,6 +283,22 @@ dart run tool/check_session_performance.dart 1000 5000
 - Prompt 确认在 settled 之后才返回时，`_runRevision` 区分“完整 Agent 已运行完毕”和“扩展命令未启动 Agent”；只有后者主动请求完整同步。已排队的完整刷新不会被轻量状态读取降级。
 
 不更改运行锁：`agent_end` 不能解锁；未知写入仍等待确认，读取超时不杀 Pi，也不重发 Prompt。`test/chat_rpc_test.dart` 覆盖普通轮次请求计数、确认晚于 settled、扩展命令、重试/压缩/坏事件/缺失结束、快照竞态及刷新合并。
+
+### 流式增量先缓冲再合并
+
+`ChatTimeline` 以前每收到一个 `text_delta`/`thinking_delta`/`toolcall_delta` 都执行 `old.text + delta` 并复制整条消息，长回复会变成平方级复制（30 万字符实测约 830 ms，缓冲只要几毫秒）。现在：
+
+- 同类型的已有内容块，增量写进 `_pendingText[contentIndex]`（`StringBuffer`），不重建消息。
+- **任何读取 `timeline.messages` 的地方都会先合并**（getter 里调用 `_flush()`），所以 UI、复制、预算、测试看到的永远是完整文本；非 `message_update` 事件、`settle()`、`load()` 前也会合并或清空。
+- 新建块、块类型转换（`*_start`）、`*_end`、`toolcall_end` 仍走原来的路径。`thinkingIndexFor` 的“正在思考”标记不变。
+- `ChatController` 选择通知间隔时用 `timeline.lastMessageTextLength`，判断空态用 `timeline.isEmpty`，这两个都不会触发合并；实际合并只在 40/80/150 ms 一次的时间线刷新里发生。
+- `_toolOrder()` 改用有序 Set，长会话做输出预算时不再 O(n²)。
+
+回归：`test/chat_rpc_test.dart` 的 “buffered streaming deltas fold in order and survive block switches”。
+
+### 只读工具不触发 Git 刷新
+
+`read`/`grep`/`find`/`ls` 是 Pi 内置的只读工具，结束时不会改动磁盘。`WorkspaceBrowserController` 和 Node 端 `changesDisk()`（`workspace_rpc.mjs`，`workspace_manager.mjs` 复用）不再因为它们的 `tool_execution_end` 去失效 Git 缓存、重跑 `git status`；写入类工具、`bash`、未知/自定义工具照常触发，`agent_settled` 每轮仍兜底刷新一次。
 
 ### 工具 Diff 只保留当前工具行的一份解析
 

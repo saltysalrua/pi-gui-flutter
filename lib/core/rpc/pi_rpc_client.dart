@@ -73,7 +73,7 @@ class PiRpcClient
   final _pending = <String, _PendingRequest>{};
   final _diagnostics = <PiRpcDiagnostic>[];
   PiRpcTransport? _transport;
-  StreamSubscription<String>? _subscription;
+  StreamSubscription<Object?>? _subscription;
   Future<void>? _connecting;
   Future<void>? _disconnecting;
   bool _closed = false;
@@ -114,9 +114,14 @@ class PiRpcClient
     _transport = transport;
     _connectionCount++;
     _events.add(const PiRpcConnected());
-    _subscription = decodePiJsonl(transport.stdout).listen(
-      (line) {
-        if (identical(_transport, transport)) _onLine(line);
+    // In-process channels hand over decoded messages; a raw process pipe is
+    // framed and decoded once from bytes (large lines off the UI isolate).
+    final values = transport is PiRpcMessageTransport
+        ? transport.messages
+        : decodePiJsonValues(transport.stdout);
+    _subscription = values.listen(
+      (value) {
+        if (identical(_transport, transport)) _onValue(value);
       },
       onError: (Object error) => _disconnect(error, source: transport),
       onDone: () => _disconnect(
@@ -134,15 +139,8 @@ class PiRpcClient
     if (!_closed) _events.add(diagnostic);
   }
 
-  void _onLine(String line) {
-    Object? decoded;
-    try {
-      decoded = jsonDecode(line);
-    } on FormatException {
-      // 扩展/启动器可能往 stdout 打日志；一条旁路输出不能杀死健康的 Pi。
-      _record(PiRpcDiagnosticKind.nonProtocolLine);
-      return;
-    }
+  void _onValue(Object? decoded) {
+    // 扩展/启动器可能往 stdout 打日志；一条旁路输出不能杀死健康的 Pi。
     if (decoded is! Map<String, dynamic> || decoded['type'] is! String) {
       _record(PiRpcDiagnosticKind.nonProtocolLine);
       return;
@@ -403,9 +401,11 @@ class PiRpcClient
       // 读超时只影响本次请求；写超时保留待确认屏障，都不主动杀 Pi。
     });
     unawaited(
-      transport
-          .send('${jsonEncode({'id': id, 'type': command, ...fields})}\n')
-          .catchError((Object error) => _disconnect(error, source: transport)),
+      _sendFrame(transport, {
+        'id': id,
+        'type': command,
+        ...fields,
+      }).catchError((Object error) => _disconnect(error, source: transport)),
     );
     try {
       return await pending.result.future;
@@ -413,6 +413,14 @@ class PiRpcClient
       timer.cancel();
     }
   }
+
+  /// Logical channels take the Map as-is; a process pipe gets one JSONL line.
+  static Future<void> _sendFrame(
+    PiRpcTransport transport,
+    Map<String, Object?> message,
+  ) => transport is PiRpcMessageTransport
+      ? transport.sendMessage(message)
+      : transport.send('${jsonEncode(message)}\n');
 
   /// GUI adapter commands used only by the typed management service.
   Future<Object?> requestGui(String command, Map<String, Object?> fields) {
@@ -624,9 +632,13 @@ class PiRpcClient
     final transport = _transport;
     if (transport == null || _closed) return;
     try {
-      await transport.send(
-        '${jsonEncode({'type': 'extension_ui_response', 'id': id, if (cancelled) 'cancelled': true, if (!cancelled && value != null) 'value': value, if (!cancelled && confirmed != null) 'confirmed': confirmed})}\n',
-      );
+      await _sendFrame(transport, {
+        'type': 'extension_ui_response',
+        'id': id,
+        if (cancelled) 'cancelled': true,
+        if (!cancelled && value != null) 'value': value,
+        if (!cancelled && confirmed != null) 'confirmed': confirmed,
+      });
     } catch (error) {
       _disconnect(error, source: transport);
     }

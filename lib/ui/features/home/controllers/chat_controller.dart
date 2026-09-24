@@ -438,7 +438,7 @@ class ChatController extends ChangeNotifier {
       // Missing final messages/tool results must not make partial drafts authoritative.
       _needsHistory = true;
     }
-    final wasEmpty = timeline.messages.isEmpty;
+    final wasEmpty = timeline.isEmpty;
     timeline.apply(event);
     switch (event.type) {
       case 'agent_start':
@@ -482,7 +482,7 @@ class ChatController extends ChangeNotifier {
     if (_stopping) activity = ChatActivity.stopping;
     if ((event.type == 'message_update' ||
             event.type == 'tool_execution_update') &&
-        !(wasEmpty && timeline.messages.isNotEmpty)) {
+        !(wasEmpty && !timeline.isEmpty)) {
       _frame ??= Timer(_streamInterval, () {
         _frame = null;
         _notifyTimeline();
@@ -508,12 +508,7 @@ class ChatController extends ChangeNotifier {
   // Coalesce large drafts more, rather than splitting fences/tables/references
   // at arbitrary token boundaries. Final messages always bypass this delay.
   Duration get _streamInterval {
-    final length =
-        timeline.messages.lastOrNull?.content.fold<int>(
-          0,
-          (sum, block) => sum + block.text.length,
-        ) ??
-        0;
+    final length = timeline.lastMessageTextLength;
     if (length > 60000) return AppDurations.quick;
     if (length > 12000) return AppDurations.micro;
     return AppDurations.stagger;

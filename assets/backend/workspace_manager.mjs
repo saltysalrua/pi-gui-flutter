@@ -7,6 +7,7 @@ import {
   WorkspaceError,
   directory,
   gitInfo,
+  changesDisk,
 } from "./workspace_rpc.mjs";
 
 const key = (value) =>
@@ -262,13 +263,17 @@ export class WorkspaceManager {
         this.createChild(directory, output, sessionPath, () =>
           this.exited(entry),
         ),
-      (line) => {
+      // The adapter passes the object it already parsed; only lines it could
+      // not decode arrive without one. Never parse the same event twice.
+      (line, parsed) => {
         if (entry.closed) return;
-        let message;
-        try {
-          message = JSON.parse(line);
-        } catch {
-          message = null;
+        let message = parsed ?? null;
+        if (parsed === undefined) {
+          try {
+            message = JSON.parse(line);
+          } catch {
+            message = null;
+          }
         }
         if (
           message?.type === "response" &&
@@ -289,16 +294,15 @@ export class WorkspaceManager {
             void this.rememberSession(entry.cwd, entry.sessionFile);
           }
         }
-        if (["tool_execution_end", "agent_settled"].includes(message?.type))
-          this.scope(cwd).browser?.invalidate();
+        if (changesDisk(message)) this.scope(cwd).browser?.invalidate();
         if (message?.type === "agent_start") entry.status = "running";
         if (message?.type === "agent_settled") entry.status = "ready";
+        // Splice the original JSON text into the envelope instead of
+        // re-serializing the whole object (large get_messages replies).
         this.emit(
-          JSON.stringify({
-            type: "gui_channel",
-            channel: id,
-            ...(message ? { message } : { line }),
-          }),
+          message
+            ? `{"type":"gui_channel","channel":${JSON.stringify(id)},"message":${line}}`
+            : JSON.stringify({ type: "gui_channel", channel: id, line }),
         );
         if (["agent_start", "agent_settled"].includes(message?.type))
           this.changed();
