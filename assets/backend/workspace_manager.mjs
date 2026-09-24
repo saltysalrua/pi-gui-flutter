@@ -530,7 +530,6 @@ export class WorkspaceManager {
       case "gui_provider_profiles_state":
       case "gui_provider_profiles_save":
       case "gui_provider_profiles_remove":
-      case "gui_provider_profiles_activate":
       case "gui_provider_profiles_models":
         return this.providerProfiles(request);
       // Browse any registered worktree without creating an Agent.

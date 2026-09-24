@@ -42,6 +42,24 @@ class _HomeViewState extends State<HomeView> with WindowListener {
   final _toolCards = ToolCardRegistry();
   bool _closing = false;
   Future<void> _closeQueue = Future.value();
+  Timer? _modelRefresh;
+
+  /// Not a motion token: covers the plugin's file-watch debounce (250 ms)
+  /// plus its re-registration before the model list is read again.
+  static const _providerReloadDelay = Duration(milliseconds: 900);
+
+  /// Provider profiles are live-reloaded by the plugin inside every running
+  /// Pi (file watcher, ~250 ms debounce). Re-read each session's model list
+  /// once that has happened; no Pi restart and no model change.
+  void _refreshModelLists() {
+    _modelRefresh?.cancel();
+    _modelRefresh = Timer(_providerReloadDelay, () {
+      for (final session in _workbench.sessions.values) {
+        unawaited(session.models.refresh());
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -201,6 +219,7 @@ class _HomeViewState extends State<HomeView> with WindowListener {
 
   @override
   void dispose() {
+    _modelRefresh?.cancel();
     windowManager.removeListener(this);
     _workbench.dispose();
     super.dispose();
@@ -342,12 +361,12 @@ class _HomeViewState extends State<HomeView> with WindowListener {
               onSettings: () => showSettings(
                 context,
                 control: _workbench.control,
-                activeSessionClient: () => _workbench.activeSession?.client,
+                onProvidersChanged: _refreshModelLists,
               ),
               onQuota: () => showSettings(
                 context,
                 control: _workbench.control,
-                activeSessionClient: () => _workbench.activeSession?.client,
+                onProvidersChanged: _refreshModelLists,
                 initialPage: SettingsPage.quota,
               ),
             ),

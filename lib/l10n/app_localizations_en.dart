@@ -1951,12 +1951,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerTitle => 'Provider profiles';
 
   @override
-  String get providerDescription =>
-      'Add an API endpoint and key, fetch models, then use them through Pi. You can save profiles before enabling the extension.';
-
-  @override
   String get providerNotInstalled =>
-      'The provider extension is not installed. You can manage profiles first; using them requires a confirmed installation.';
+      'The provider extension is not installed yet. Models appear in the model picker once it is installed.';
 
   @override
   String get providerDisabled =>
@@ -1967,38 +1963,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerInstallWarning =>
-      'This installs the bundled pi-provider-switch into Pi\'s global configuration. Extensions run with Pi\'s full system permissions; new sessions will load it and refresh models for an active profile. Profiles may contain API keys, so prefer environment variables. Automatic paid image-capability probes for unknown models are disabled by default. Install?';
+      'This installs the bundled pi-provider-switch into Pi\'s global configuration. Extensions run with Pi\'s full system permissions; sessions started afterwards load it and use the profile keys to list models. Profiles may contain API keys, so prefer environment variables. Install?';
 
   @override
   String get providerAdd => 'Add profile';
 
   @override
-  String get providerEdit => 'Edit profile';
-
-  @override
-  String get providerSave => 'Save profile';
-
-  @override
-  String get providerActivate => 'Use this profile';
-
-  @override
-  String get providerSelected => 'Default';
-
-  @override
-  String providerActive(String name) {
-    return 'Default profile: $name';
-  }
-
-  @override
-  String get providerNone => 'None';
-
-  @override
-  String get providerNextSession =>
-      'Default saved. The extension is not loaded in this session; it will take effect in a new session or on next launch.';
-
-  @override
-  String get providerEmpty =>
-      'No provider profiles yet. Add one to get started.';
+  String get providerSave => 'Save';
 
   @override
   String providerModelCount(int count) {
@@ -2011,12 +1982,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get providerInvalid =>
-      'Enter a profile name and an API endpoint first.';
-
-  @override
-  String get providerName =>
-      'e.g. my-api (letters, digits, dots, dashes, underscores)';
+  String get providerName => 'e.g. my-api';
 
   @override
   String get providerBaseUrl => 'https://api.example.com/v1';
@@ -2031,20 +1997,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerKeepKey => 'Key saved; leave blank to keep it';
 
   @override
-  String get providerKeyHint =>
-      'Keys are stored in the extension\'s provider-profiles.json. Prefer \$ENV_VAR and never commit that file.';
-
-  @override
-  String get providerModels =>
-      'Leave blank to fetch on save, or fetch first to choose a default. Refresh keeps existing IDs. Enter IDs manually if listing is unsupported.';
-
-  @override
-  String get providerDefaultModel => 'Default model';
-
-  @override
-  String get providerThinking => 'Default reasoning support';
-
-  @override
   String get providerEnable => 'Enable extension';
 
   @override
@@ -2057,9 +2009,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerKeyLabel => 'API key';
 
   @override
-  String get providerModelsLabel => 'Models';
-
-  @override
   String get providerFetchModels => 'Fetch models';
 
   @override
@@ -2068,31 +2017,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get providerFetchingOnSave => 'Fetching models from the API…';
-
-  @override
-  String providerDefaultModelValue(String model) {
-    return 'Default model: $model';
-  }
-
-  @override
-  String get providerHasKey => 'Key saved';
-
-  @override
-  String get providerThinkingBadge => 'Reasoning';
-
-  @override
-  String providerSwitched(String name) {
-    return 'This session now uses “$name”.';
-  }
-
-  @override
   String get providerErrorInvalid =>
       'Something is not filled in correctly. Check the endpoint (http:// or https://) and the models.';
 
   @override
   String get providerErrorName =>
-      'Use 1–64 letters, digits, dots, dashes or underscores, starting with a letter or digit. Reserved names are not allowed.';
+      'Use 1–64 letters (any language), digits, dots, dashes or underscores, starting with a letter or digit; reserved names are not allowed.';
 
   @override
   String get providerErrorFile =>
@@ -2101,10 +2031,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get providerErrorNotFound =>
       'This profile no longer exists; it may have been deleted elsewhere. Refresh and try again.';
-
-  @override
-  String get providerErrorActivate =>
-      'The switch could not be confirmed. Refresh and check the current model before trying again.';
 
   @override
   String get providerErrorUnreachable =>
@@ -2140,16 +2066,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get providerManualModels =>
-      'One model ID per line, or separated by commas';
-
-  @override
   String get providerErrorExists =>
       'This profile name already exists. Choose another name or edit the existing profile.';
-
-  @override
-  String get providerErrorBusy =>
-      'This session is processing messages. Wait until it finishes before switching profiles.';
 
   @override
   String get providerErrorKeyEndpoint =>
@@ -2184,4 +2102,111 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerClearKey => 'Remove saved key';
+
+  @override
+  String providerOutdated(String version, String latest) {
+    return 'The installed provider extension is an old version ($version). It replaces the model with the \"default profile\" model every time a session opens. Updating to $latest fixes that.';
+  }
+
+  @override
+  String get providerUpgradeTitle => 'Update provider extension';
+
+  @override
+  String providerUpgradeWarning(String latest) {
+    return 'This replaces the old extension registration with the bundled $latest. Sessions already open keep the old version; newly opened sessions load the new one. Update?';
+  }
+
+  @override
+  String get providerDiscard => 'Discard changes';
+
+  @override
+  String get providerRemove => 'Delete profile';
+
+  @override
+  String get providerNewTitle => 'New profile';
+
+  @override
+  String get providerModelsTitle => 'Models';
+
+  @override
+  String providerModelsSummary(int enabled, int total) {
+    return '$enabled/$total models shown';
+  }
+
+  @override
+  String get providerSync => 'Sync model list automatically';
+
+  @override
+  String providerSyncedAt(String time) {
+    return 'Last fetched: $time';
+  }
+
+  @override
+  String get providerNeverSynced => 'Model list not fetched yet';
+
+  @override
+  String get providerFilterModels => 'Filter models';
+
+  @override
+  String get providerEnableAll => 'Show all';
+
+  @override
+  String get providerDisableAll => 'Hide all';
+
+  @override
+  String get providerShowModel => 'Show in model picker';
+
+  @override
+  String get providerHideModel => 'Hide from model picker';
+
+  @override
+  String get providerAddModelHint => 'Add a model ID manually';
+
+  @override
+  String get providerAddModel => 'Add';
+
+  @override
+  String get providerRemoveModel => 'Remove this manual model';
+
+  @override
+  String get providerManualBadge => 'Manual';
+
+  @override
+  String get providerCustomBadge => 'Custom';
+
+  @override
+  String get providerReasoningBadge => 'Reasoning';
+
+  @override
+  String get providerImageBadge => 'Image';
+
+  @override
+  String providerContextK(String count) {
+    return '${count}K';
+  }
+
+  @override
+  String providerContextM(String count) {
+    return '${count}M';
+  }
+
+  @override
+  String get providerNoModels => 'No models yet';
+
+  @override
+  String get providerNoModelMatches => 'No matching models.';
+
+  @override
+  String get providerSaved => 'Saved';
+
+  @override
+  String get providerDiscardTitle => 'Discard unsaved changes?';
+
+  @override
+  String get providerDiscardBody =>
+      'This profile has unsaved changes that will be lost if you leave.';
+
+  @override
+  String get providerErrorNoModels =>
+      'Keep at least one model visible in the model picker.';
 }

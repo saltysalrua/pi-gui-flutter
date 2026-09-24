@@ -1,12 +1,24 @@
 {
   "name": "pi-provider-switch",
-  "version": "1.0.0",
-  "description": "cc-switch style multi-provider manager for pi: /switch, /providers, /provider-add, model list auto-refresh, image-input detection.",
-  "keywords": ["pi-package", "pi", "provider", "llm"],
+  "version": "2.0.0",
+  "description": "Config-file driven providers for pi: every profile in provider-profiles.json becomes a normal provider with live /models discovery and models.dev capability metadata.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "provider",
+    "llm"
+  ],
   "license": "MIT",
   "type": "module",
-  "files": ["extensions", "provider-profiles-subagent.ts", "provider-profiles.example.json", "README.md"],
+  "files": [
+    "extensions",
+    "provider-profiles-subagent.ts",
+    "provider-profiles.example.json",
+    "README.md"
+  ],
   "pi": {
-    "extensions": ["./extensions"]
+    "extensions": [
+      "./extensions"
+    ]
   }
 }

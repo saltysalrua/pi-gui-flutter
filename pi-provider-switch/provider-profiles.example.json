@@ -1,29 +1,28 @@
 {
-  "active": "my-openai-gateway",
   "profiles": {
     "my-openai-gateway": {
       "baseUrl": "https://api.example.com/v1",
       "api": "openai-responses",
       "apiKey": "$MY_GATEWAY_KEY",
-      "reasoning": false,
       "modelRules": [
-        { "match": ["gpt-5", "o3"], "reasoning": true },
         { "match": ["claude"], "transform": "claude-responses", "reasoning": true }
       ],
       "models": [
         { "id": "gpt-5", "contextWindow": 400000, "maxTokens": 128000 },
-        { "id": "claude-sonnet-4-5", "input": ["text", "image"] }
-      ],
-      "defaultModel": "gpt-5"
+        { "id": "internal-alias", "manual": true },
+        { "id": "text-embedding-3-large", "disabled": true }
+      ]
     },
     "anthropic-direct": {
-      "baseUrl": "https://api.anthropic.com",
+      "baseUrl": "https://api.anthropic.com/v1",
       "api": "anthropic-messages",
-      "apiKey": "!pass show anthropic/api-key",
-      "reasoning": true,
-      "models": [
-        { "id": "claude-opus-4-1" }
-      ]
+      "apiKey": "!pass show anthropic/api-key"
+    },
+    "local-llama": {
+      "baseUrl": "http://127.0.0.1:8080/v1",
+      "api": "openai-completions",
+      "syncModels": false,
+      "models": [{ "id": "llama-3.3-70b", "manual": true, "reasoning": false }]
     }
   }
 }

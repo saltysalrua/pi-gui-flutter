@@ -1,68 +1,68 @@
 /**
- * provider-switch — cc-switch style multi-provider manager for pi.
+ * provider-switch 2.x — config-file driven providers for pi.
  *
- * Profiles live in <agent dir>/provider-profiles.json (default ~/.pi/agent, honours PI_CODING_AGENT_DIR).
- * Switching is session-scoped: it calls pi.registerProvider() + pi.setModel()
- * at runtime and never touches models.json.
+ * Every profile in <agent dir>/provider-profiles.json (default ~/.pi/agent,
+ * honours PI_CODING_AGENT_DIR) becomes an ordinary pi provider at extension
+ * load time, exactly like hand-written relay providers (yuukarin, 猫饭 …):
+ * its models show up in /model and the GUI model picker, and pi's own session
+ * restore / defaultModel logic decides which model a session uses.
  *
- * Commands:
- *   /switch [name]      Switch to a profile (no arg: interactive picker)
- *   /providers          List profiles and pick one to activate
- *   /provider-add       Interactive wizard to create a profile
- *   /provider-remove    Delete a profile (interactive picker or pass name)
- *   /provider-thinking [name] [on|off]  Set a profile's default thinking support
- *   /provider-refresh [name]  Re-fetch /models now (default: active profile)
+ * The extension never selects a model. 1.x called pi.setModel() for an
+ * "active" profile on every session_start, which replaced the model of a
+ * resumed session; `active` / `defaultModel` are now ignored.
  *
- * Model lists auto-refresh: every /switch and every session_start applies the
- * cached list immediately, then re-fetches /models in the background. New ids
- * are appended; ids gone upstream are dropped only if they carry no custom
- * config and are not defaultModel. Fetch failures keep the cached list.
+ * Models:
+ * - Ids come live from GET {baseUrl}/models (OpenAI, Anthropic and Google
+ *   list shapes) through pi's refreshModels hook and are cached per profile in
+ *   <agent dir>/.cache/provider-switch/ — the config file is never rewritten
+ *   by a background refresh. `syncModels: false` turns discovery off.
+ * - Capabilities (reasoning, image input, context window, output limit,
+ *   thinking effort levels) are inferred from the models.dev catalog with the
+ *   same relaxed id matching as the 猫饭 relay provider, cached on disk for
+ *   offline starts. Explicit settings always win:
+ *   model entry > matching modelRule > image probe / pi catalog > models.dev
+ *   > profile default.
+ * - `models` holds only user pins: `{ id, manual: true }` for ids the
+ *   endpoint does not list, `{ id, disabled: true }` to hide an id, and any
+ *   per-model override (name, reasoning, input, contextWindow, maxTokens,
+ *   api, baseUrl, compat, thinkingLevelMap).
  *
- * /provider-add fetches the model list from the provider's /models endpoint
- * (OpenAI, Anthropic, and Google shapes supported); manual entry is only a
- * fallback when the fetch fails.
+ * Edits to the config file (Pi GUI, /provider-add, a text editor) are picked
+ * up by running sessions through a file watcher; no restart is needed.
  *
- * Profile fields: baseUrl, api, apiKey (literal, "$ENV_VAR", or "!cmd"),
- * headers?, reasoning? (default false), modelRules? (first keyword match wins),
- * models[] (id required; name/reasoning/contextWindow/maxTokens optional),
- * input is inferred from pi's built-in catalog unless explicitly set on a model.
- * Unknown selected models get one bounded synthetic-image probe; successful
- * results are cached per route for 30 days, inconclusive attempts retry after 1h.
- * No user image or conversation is used for capability detection.
- * Model/rule transport overrides: api?, baseUrl?, compat?, thinkingLevelMap?.
- * Rules may also set transform: "claude-responses" — a before_provider_request
- * hook then rewrites Responses-format tools to chat-wrapped tools and maps
- * reasoning.effort to Anthropic adaptive thinking fields (for gateways whose
- * Responses->Claude conversion only understands those shapes).
- * Priority: explicit model settings > matching rule > profile defaults.
- * A model's explicit API skips a rule for a different API (including its URL/compat).
- * defaultModel? (defaults to first model).
- * Model reasoning overrides the profile default, including explicit false.
- * /provider-thinking changes capability, not the thinking effort level; use
- * pi's thinking controls to choose the effort after enabling support.
- *
- * Note: a profile named like a built-in provider (e.g. "anthropic") overrides
- * that provider for the session — useful for proxy routing.
+ * Commands: /providers, /provider-refresh [name], /provider-add,
+ * /provider-remove [name].
  */
 
-import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { watch, type FSWatcher } from "node:fs";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI, ExtensionContext, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { InputCapabilities, capabilityKey, validInput, visionChallenge } from "./provider-switch/inputs.js";
+import {
+	API_TYPES,
+	ModelsDevCatalog,
+	discoverModelIds,
+	endpointKey,
+	profileModelEntries,
+	readDiscovered,
+	removeDiscovered,
+	resolveApiKey,
+	resolveModel,
+	writeDiscovered,
+} from "./provider-switch/catalog.mjs";
 
-const STORE_PATH = join(getAgentDir(), "provider-profiles.json");
-const STATUS_KEY = "provider-switch";
-export const inputCapabilities = new InputCapabilities(join(dirname(STORE_PATH), ".cache", "provider-inputs"));
+const AGENT_DIR = getAgentDir();
+const STORE_PATH = join(AGENT_DIR, "provider-profiles.json");
+const CACHE_DIR = join(AGENT_DIR, ".cache", "provider-switch");
+/** Background refreshes re-list an endpoint at most this often. */
+const SYNC_MAX_AGE_MS = 10 * 60 * 1000;
 
-const API_TYPES = [
-	"openai-completions",
-	"openai-responses",
-	"anthropic-messages",
-	"google-generative-ai",
-] as const;
+export const inputCapabilities = new InputCapabilities(join(AGENT_DIR, ".cache", "provider-inputs"));
+export const modelsDev = new ModelsDevCatalog(join(CACHE_DIR, "models-dev.json"));
+
 type ApiType = (typeof API_TYPES)[number];
 
 interface ModelTransport {
@@ -75,12 +75,18 @@ interface ModelTransport {
 interface ModelRule extends ModelTransport {
 	/** Any non-empty keyword in the model ID, case-insensitive. First rule wins. */
 	match: string[];
+	reasoning?: boolean;
+	input?: string[];
+	contextWindow?: number;
+	maxTokens?: number;
 	/** Optional outbound payload rewrite applied by the before_provider_request hook. */
 	transform?: "claude-responses";
 }
 
 interface ProfileModel extends ModelTransport {
 	id: string;
+	manual?: boolean;
+	disabled?: boolean;
 	name?: string;
 	reasoning?: boolean;
 	input?: string[];
@@ -88,166 +94,68 @@ interface ProfileModel extends ModelTransport {
 	maxTokens?: number;
 }
 
-interface Profile {
+export interface Profile {
 	baseUrl: string;
 	api: ApiType;
-	reasoning?: boolean;
 	apiKey?: string;
 	headers?: Record<string, string>;
+	reasoning?: boolean;
+	syncModels?: boolean;
 	modelRules?: ModelRule[];
-	models: ProfileModel[];
-	defaultModel?: string;
+	models?: ProfileModel[];
 }
 
-interface Store {
-	active?: string;
+export interface Store {
 	/** Explicit consent for billable image capability probes (disabled by default). */
 	imageProbeEnabled?: boolean;
 	profiles: Record<string, Profile>;
 }
 
-/**
- * Resolve a pi-style apiKey value for our own outbound calls (model fetch).
- * pi resolves these again at request time; this is only for GET /models.
- * Supports: literal, "$VAR" / "${VAR}" (whole-string), "!command".
- */
-export function resolveApiKey(value?: string): string | undefined {
-	if (!value) return undefined;
-	if (value.startsWith("!")) {
-		return execSync(value.slice(1), { encoding: "utf8" }).trim();
-	}
-	const m = value.match(/^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))$/);
-	if (m) return process.env[m[1] ?? m[2]];
-	return value;
+interface Discovered {
+	version: 1;
+	endpoint: string;
+	syncedAt: number;
+	ids: string[];
 }
 
-/** Fetch one candidate /models URL. Throws on non-OK or non-JSON. */
-async function fetchModelsOnce(root: string, api: ApiType, apiKey?: string): Promise<string[]> {
-	const url =
-		api === "google-generative-ai" && apiKey
-			? `${root}/models?key=${encodeURIComponent(apiKey)}`
-			: `${root}/models`;
-	const headers: Record<string, string> = {};
-	if (apiKey) {
-		if (api === "anthropic-messages") {
-			headers["x-api-key"] = apiKey;
-			headers["anthropic-version"] = "2023-06-01";
-		} else if (api === "google-generative-ai") {
-			headers["x-goog-api-key"] = apiKey;
-		} else {
-			headers["authorization"] = `Bearer ${apiKey}`;
-		}
-	}
-	const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
-	if (!res.ok) throw new Error(`GET ${url} -> HTTP ${res.status}`);
-	const text = await res.text();
-	let payload: { data?: Array<{ id?: string } | string>; models?: Array<{ name?: string }> };
-	try {
-		payload = JSON.parse(text);
-	} catch {
-		throw new Error(`GET ${url} returned non-JSON (no /models endpoint here?)`);
-	}
-	const raw: unknown[] = Array.isArray(payload.data)
-		? payload.data
-		: Array.isArray(payload.models)
-			? payload.models
-			: [];
-	return raw
-		.map((m) => (typeof m === "string" ? m : ((m as { id?: string; name?: string }).id ?? (m as { name?: string }).name ?? "")))
-		.map((s) => s.replace(/^models\//, ""))
-		.filter(Boolean);
-}
+type RawStore = { profiles: Record<string, unknown> } & Record<string, unknown>;
 
-/**
- * Fetch model ids from the provider. Tries baseUrl as entered, then retries
- * with /v1 appended (common omission). Returns the baseUrl that worked so the
- * profile stores the corrected value.
- */
-export async function fetchModelIds(
-	baseUrl: string,
-	api: ApiType,
-	apiKey?: string,
-): Promise<{ baseUrl: string; ids: string[] }> {
-	const root = baseUrl.replace(/\/+$/, "");
-	const candidates = [root];
-	if (api !== "google-generative-ai" && !/\/v\d+[a-z]*$/i.test(root)) {
-		candidates.push(`${root}/v1`);
-	}
-	let lastErr: unknown;
-	for (const candidate of candidates) {
-		try {
-			return { baseUrl: candidate, ids: await fetchModelsOnce(candidate, api, apiKey) };
-		} catch (err) {
-			lastErr = err;
-		}
-	}
-	throw lastErr;
-}
-
-/**
- * Merge upstream ids into a profile's models. Existing entries keep their
- * per-model config; new ids are appended as bare {id}; stale ids are removed
- * only when they are plain {id} entries and not the defaultModel.
- */
-export function mergeModelIds(
-	profile: Profile,
-	ids: string[],
-): { models: ProfileModel[]; added: string[]; removed: string[] } {
-	const upstream = new Set(ids);
-	const known = new Set(profile.models.map((m) => m.id));
-	const removed: string[] = [];
-	const kept = profile.models.filter((m) => {
-		if (upstream.has(m.id)) return true;
-		const custom = Object.keys(m).some((k) => k !== "id");
-		if (custom || m.id === profile.defaultModel) return true;
-		removed.push(m.id);
-		return false;
-	});
-	const added = ids.filter((id) => !known.has(id));
-	return { models: [...kept, ...added.map((id) => ({ id }))], added, removed };
-}
+const validProfile = (p: unknown): p is Profile =>
+	!!p && typeof p === "object" && !Array.isArray(p) &&
+	typeof (p as Profile).baseUrl === "string" && (API_TYPES as readonly string[]).includes((p as Profile).api);
 
 export async function loadStore(): Promise<Store> {
-	if (!existsSync(STORE_PATH)) return { profiles: {} };
 	try {
-		const raw = JSON.parse(await readFile(STORE_PATH, "utf8")) as Store;
-		return { active: raw.active, profiles: raw.profiles ?? {} };
+		const raw = JSON.parse(await readFile(STORE_PATH, "utf8"));
+		const profiles: Record<string, Profile> = {};
+		for (const [name, profile] of Object.entries(raw?.profiles ?? {})) {
+			if (validProfile(profile)) profiles[name] = profile;
+		}
+		return { imageProbeEnabled: raw?.imageProbeEnabled === true, profiles };
 	} catch {
 		return { profiles: {} };
 	}
 }
 
-async function saveStore(store: Store): Promise<void> {
+/** Read-modify-write that keeps unknown top-level and profile fields. */
+async function updateStore(mutate: (raw: RawStore) => void): Promise<void> {
+	let raw: RawStore;
+	try {
+		raw = JSON.parse(await readFile(STORE_PATH, "utf8"));
+		if (!raw || typeof raw !== "object" || !raw.profiles || typeof raw.profiles !== "object") throw new Error("invalid");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") throw new Error("provider-profiles.json is not valid; fix it first.");
+		raw = { profiles: {} };
+	}
+	mutate(raw);
 	await mkdir(dirname(STORE_PATH), { recursive: true });
-	await writeFile(STORE_PATH, JSON.stringify(store, null, 2) + "\n", "utf8");
-}
-
-/** Resolve model metadata once; registration, switching and thinking refresh share it. */
-export function resolveProfileModel(profile: Profile, model: ProfileModel): ProviderModelConfig {
-	const id = model.id.toLowerCase();
-	const matched = profile.modelRules?.find((rule) =>
-		Array.isArray(rule.match) && rule.match.some((keyword) =>
-			typeof keyword === "string" && keyword.trim().length > 0 && id.includes(keyword.trim().toLowerCase()),
-		),
-	);
-	// Never carry an Anthropic URL/compat/map into an explicit OpenAI override, or vice versa.
-	const rule = model.api && model.api !== (matched?.api ?? profile.api) ? undefined : matched;
-	const config = {
-		id: model.id,
-		name: model.name ?? model.id,
-		api: model.api ?? rule?.api ?? profile.api,
-		baseUrl: model.baseUrl ?? rule?.baseUrl ?? profile.baseUrl,
-		...(rule?.compat || model.compat ? { compat: { ...rule?.compat, ...model.compat } } : {}),
-		...(rule?.thinkingLevelMap || model.thinkingLevelMap
-			? { thinkingLevelMap: { ...rule?.thinkingLevelMap, ...model.thinkingLevelMap } } : {}),
-		reasoning: model.reasoning ?? profile.reasoning ?? false,
-		input: ["text"] as ("text" | "image")[],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: model.contextWindow ?? 128000,
-		maxTokens: model.maxTokens ?? 16384,
-	};
-	config.input = validInput(model.input) ?? inputCapabilities.resolve(model.id, profileCapabilityKey(profile, config)) ?? ["text"];
-	return config;
+	const temporary = `${STORE_PATH}.${randomUUID()}.tmp`;
+	try {
+		await writeFile(temporary, JSON.stringify(raw, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+		await rename(temporary, STORE_PATH);
+	} finally {
+		await unlink(temporary).catch(() => {});
+	}
 }
 
 /** Include route and auth identity without persisting URLs, headers or credentials. */
@@ -256,19 +164,25 @@ export function profileCapabilityKey(profile: Profile, model: ProviderModelConfi
 		headers: profile.headers, compat: model.compat, transform: findTransformRule(profile, model.id)?.transform });
 }
 
+/** Resolve one profile model entry to pi's model config (explicit > rule > evidence > models.dev). */
+export function resolveProfileModel(profile: Profile, entry: ProfileModel): ProviderModelConfig {
+	return resolveModel(profile, entry, modelsDev, (id: string, config: ProviderModelConfig) =>
+		inputCapabilities.resolve(id, profileCapabilityKey(profile, config))).config as ProviderModelConfig;
+}
+
+/** Enabled models of a profile in display order. */
+export function profileModels(profile: Profile, discovered?: Discovered): ProviderModelConfig[] {
+	return (profileModelEntries(profile, discovered) as ProfileModel[])
+		.filter((entry) => entry.disabled !== true)
+		.map((entry) => resolveProfileModel(profile, entry));
+}
+
 /**
- * Rewrite a Responses payload for gateways that proxy Claude behind
- * /v1/responses but only understand chat-wrapped tools and Anthropic-native
- * thinking fields (observed on a Responses-to-Claude gateway after it retired
- * /chat/completions and /messages):
- *   tools: {type:"function",name,parameters,...} -> {type:"function",function:{name,parameters,...}}
- *   reasoning:{effort} -> thinking:{type:"adaptive"} + output_config:{effort}
- * Pure function; returns the payload unchanged when there is nothing to do.
- */
-/** Responses-style gateways emulating Claude reject array function_call_output.output (pi emits
+ * Responses-style gateways emulating Claude reject array function_call_output.output (pi emits
  * input_text/input_image arrays for image tool results). Keep the text in the tool output and hand the
- * images over in an immediately following user message so any Responses endpoint accepts them. */
-export function stringifyToolOutputImages(input: unknown): unknown {
+ * images over in an immediately following user message so any Responses endpoint accepts them.
+ */
+export function stringifyToolOutputImages<T>(input: T): T | unknown[] {
 	if (!Array.isArray(input) || !input.some(i => i && typeof i === "object" && (i as Record<string, unknown>).type === "function_call_output" && Array.isArray((i as Record<string, unknown>).output))) return input;
 	const items: unknown[] = [];
 	for (const item of input as unknown[]) {
@@ -284,7 +198,15 @@ export function stringifyToolOutputImages(input: unknown): unknown {
 	return items;
 }
 
-export function applyClaudeResponsesTransform(payload: unknown): unknown {
+/**
+ * Rewrite a Responses payload for gateways that proxy Claude behind
+ * /v1/responses but only understand chat-wrapped tools and Anthropic-native
+ * thinking fields:
+ *   tools: {type:"function",name,parameters,...} -> {type:"function",function:{name,parameters,...}}
+ *   reasoning:{effort} -> thinking:{type:"adaptive"} + output_config:{effort}
+ * Pure function; returns the payload unchanged when there is nothing to do.
+ */
+export function applyClaudeResponsesTransform<T>(payload: T): T | Record<string, unknown> {
 	if (!payload || typeof payload !== "object") return payload;
 	const next = { ...(payload as Record<string, unknown>) };
 	if (Array.isArray(next.tools)) {
@@ -331,421 +253,314 @@ export function findTransformRule(profile: Profile | undefined, modelId: string)
 	);
 }
 
-export default function (pi: ExtensionAPI) {
-	// Providers this extension registered in the current process.
-	const registered = new Set<string>();
+export default async function (pi: ExtensionAPI) {
+	let store = await loadStore();
+	await modelsDev.load({ allowNetwork: false });
+	const discovered = new Map<string, Discovered | undefined>();
+	/** Signature of what is currently registered per provider. */
+	const registered = new Map<string, string>();
+	const syncing = new Map<string, Promise<boolean>>();
 	const checkingInputs = new Set<string>();
+	let disposed = false;
 
-	// /model, model cycling and /switch all use the same capability path.
+	const cached = await Promise.all(Object.keys(store.profiles).map(async (name) => [name, await readDiscovered(CACHE_DIR, name)] as const));
+	for (const [name, value] of cached) discovered.set(name, value);
+
+	/**
+	 * Re-list one endpoint (bounded by SYNC_MAX_AGE_MS unless forced) and
+	 * update the per-profile id cache. Never throws; false = kept old list.
+	 */
+	function syncIds(name: string, profile: Profile, options: { force?: boolean; signal?: AbortSignal } = {}): Promise<boolean> {
+		if (profile.syncModels === false) return Promise.resolve(false);
+		const cached = discovered.get(name);
+		if (!options.force && cached?.endpoint === endpointKey(profile) && Date.now() - cached.syncedAt < SYNC_MAX_AGE_MS) {
+			return Promise.resolve(false);
+		}
+		const running = syncing.get(name);
+		if (running) return running;
+		const job = (async () => {
+			try {
+				const { ids } = await discoverModelIds(profile.baseUrl, profile.api, resolveApiKey(profile.apiKey), { signal: options.signal });
+				discovered.set(name, await writeDiscovered(CACHE_DIR, name, profile, ids));
+				return true;
+			} catch {
+				return false;
+			} finally {
+				syncing.delete(name);
+			}
+		})();
+		syncing.set(name, job);
+		return job;
+	}
+
+	function signatureOf(profile: Profile, models: ProviderModelConfig[]): string {
+		return JSON.stringify([profile.baseUrl, profile.api, profile.apiKey ?? null, profile.headers ?? null, models]);
+	}
+
+	function providerConfig(name: string, profile: Profile, models: ProviderModelConfig[]) {
+		return {
+			name,
+			baseUrl: profile.baseUrl,
+			api: profile.api,
+			// Keyless endpoints (local servers) still need a configured credential,
+			// otherwise pi lists every model as unavailable.
+			apiKey: profile.apiKey || "none",
+			headers: profile.headers,
+			models,
+			// Pi calls this on every model refresh: offline at startup, then a
+			// background network refresh (RPC/TUI) and on manual refreshes.
+			refreshModels: async (context: { allowNetwork?: boolean; force?: boolean; signal?: AbortSignal }) => {
+				const current = store.profiles[name] ?? profile;
+				if (context?.allowNetwork) {
+					await Promise.all([
+						modelsDev.load({ allowNetwork: true, signal: context.signal }),
+						syncIds(name, current, { force: context.force, signal: context.signal }),
+					]);
+				}
+				const next = profileModels(current, discovered.get(name));
+				// Keep the registration's static list in step so a later catalog
+				// rebuild does not fall back to an older list.
+				if (signatureOf(current, next) !== registered.get(name)) setTimeout(() => register(name), 0);
+				return next;
+			},
+		};
+	}
+
+	function register(name: string, force = false): void {
+		if (disposed) return;
+		const profile = store.profiles[name];
+		try {
+			const models = profile ? profileModels(profile, discovered.get(name)) : [];
+			// A provider without enabled models would only surface errors.
+			if (!profile || !models.length) {
+				if (registered.delete(name)) pi.unregisterProvider(name);
+				return;
+			}
+			const signature = signatureOf(profile, models);
+			if (!force && registered.get(name) === signature) return;
+			pi.registerProvider(name, providerConfig(name, profile, models));
+			registered.set(name, signature);
+		} catch {
+			/* A broken profile must not take the other providers down. */
+		}
+	}
+
+	/**
+	 * Pi only refreshes providers that are already registered. A new profile
+	 * (or one whose endpoint changed) has no cached ids yet, so list it once
+	 * in the background and register when the ids arrive.
+	 */
+	function ensureListed(name: string): void {
+		const profile = store.profiles[name];
+		if (!profile || profile.syncModels === false || process.env.PI_OFFLINE) return;
+		if (discovered.get(name)?.endpoint === endpointKey(profile)) return;
+		void syncIds(name, profile).then((ok) => {
+			if (ok) register(name);
+		});
+	}
+
+	for (const name of Object.keys(store.profiles)) {
+		register(name);
+		ensureListed(name);
+	}
+
+	// Pick up edits from the GUI / other processes without a restart.
+	let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+	const reload = () => {
+		clearTimeout(reloadTimer);
+		reloadTimer = setTimeout(async () => {
+			if (disposed) return;
+			store = await loadStore();
+			await modelsDev.load({ allowNetwork: false });
+			for (const name of [...registered.keys()]) {
+				if (!store.profiles[name]) register(name);
+			}
+			for (const name of Object.keys(store.profiles)) {
+				discovered.set(name, await readDiscovered(CACHE_DIR, name));
+				register(name);
+				ensureListed(name);
+			}
+		}, 250);
+	};
+	const watchers: FSWatcher[] = [];
+	const watchDir = async (dir: string, match: (file: string) => boolean) => {
+		try {
+			await mkdir(dir, { recursive: true });
+			const watcher = watch(dir, { persistent: false }, (_event, file) => {
+				if (file && match(String(file))) reload();
+			});
+			watcher.on("error", () => {});
+			watchers.push(watcher);
+		} catch {
+			/* Watching is best effort; a restart still picks up changes. */
+		}
+	};
+	await watchDir(AGENT_DIR, (file) => file === "provider-profiles.json");
+	await watchDir(CACHE_DIR, (file) => (file.startsWith("discovered-") || file === "models-dev.json") && !file.endsWith(".tmp"));
+
+	pi.on("session_shutdown", async () => {
+		disposed = true;
+		clearTimeout(reloadTimer);
+		for (const watcher of watchers.splice(0)) watcher.close();
+	});
+
+	// Optional, consent-gated image capability probe for unknown models.
 	pi.on("model_select", async (event, ctx) => {
 		const selected = event.model;
-		const store = await loadStore();
 		// A model selection must never silently make a billable request.
 		if (store.imageProbeEnabled !== true) return;
 		const profile = store.profiles[selected.provider];
-		const model = profile?.models.find(m => m.id === selected.id);
-		if (!profile || !model || validInput(model.input)) return;
-		const resolved = resolveProfileModel(profile, model);
+		const entry = profile && (profileModelEntries(profile, discovered.get(selected.provider)) as ProfileModel[])
+			.find((m) => m.id === selected.id);
+		if (!profile || !entry || validInput(entry.input) || selected.input?.includes("image")) return;
+		const resolved = resolveProfileModel(profile, entry);
 		const key = profileCapabilityKey(profile, resolved);
 		if (checkingInputs.has(key)) return;
 		checkingInputs.add(key);
 		try {
-			let input = inputCapabilities.resolve(model.id, key);
-			if (!input) {
-				const ok = await inputCapabilities.ensure(key, async signal => {
-					ctx.ui.notify(`Checking image input: ${model.id}`, "info");
-					const challenge = visionChallenge();
-					const response = await ctx.modelRegistry.complete(
-						{ ...selected, ...resolved, provider: selected.provider, input: ["text", "image"] },
-						{ messages: [{ role: "user", timestamp: Date.now(), content: [
-							{ type: "text", text: "This image has two rows of eight colored squares. Read left to right, top row then bottom row. Output one letter per square: R for red, G for green, B for blue, Y for yellow. Reply with exactly 16 letters, nothing else." },
-							{ type: "image", data: challenge.data, mimeType: challenge.mimeType },
-						] }] },
-						{ signal, maxTokens: 1024, reasoningEffort: "low", onPayload: payload => findTransformRule(profile, model.id)?.transform === "claude-responses" ? applyClaudeResponsesTransform(payload) : undefined },
-					);
-					const text = response.content.filter(b => b.type === "text").map(b => b.text).join("").trim();
-					if (response.stopReason === "error" || response.stopReason === "aborted") return { ok: false, reason: `${response.stopReason}: ${response.errorMessage ?? ""}`.slice(0, 300) };
-					if (text.toUpperCase().replace(/\s/g, "") !== challenge.expected) return { ok: false, reason: `mismatch (${response.stopReason}, ${text.length} chars)` };
-					return true;
-				}, ctx.signal);
-				if (!ok) return;
-				input = inputCapabilities.cached(key);
-			}
-			// A slow probe must never switch back after the user chose another model.
-			if (!input || ctx.model?.provider !== selected.provider || ctx.model.id !== selected.id) return;
-			if (JSON.stringify(selected.input) === JSON.stringify(input)) return;
-			// Re-read config after network I/O; a changed route needs its own evidence.
-			const fresh = (await loadStore()).profiles[selected.provider];
-			const freshModel = fresh?.models.find(m => m.id === selected.id);
-			if (!fresh || !freshModel || profileCapabilityKey(fresh, resolveProfileModel(fresh, freshModel)) !== key) return;
-			registerProfile(selected.provider, fresh);
-			const updated = ctx.modelRegistry.find(selected.provider, selected.id);
-			if (updated && await pi.setModel(updated)) ctx.ui.notify(`Image input enabled: ${model.id}`, "info");
+			const ok = await inputCapabilities.ensure(key, async signal => {
+				ctx.ui.notify(`Checking image input: ${entry.id}`, "info");
+				const challenge = visionChallenge();
+				const response = await ctx.modelRegistry.complete(
+					{ ...selected, ...resolved, provider: selected.provider, input: ["text", "image"] },
+					{ messages: [{ role: "user", timestamp: Date.now(), content: [
+						{ type: "text", text: "This image has two rows of eight colored squares. Read left to right, top row then bottom row. Output one letter per square: R for red, G for green, B for blue, Y for yellow. Reply with exactly 16 letters, nothing else." },
+						{ type: "image", data: challenge.data, mimeType: challenge.mimeType },
+					] }] },
+					{ signal, maxTokens: 1024, reasoningEffort: "low", onPayload: payload => findTransformRule(profile, entry.id)?.transform === "claude-responses" ? applyClaudeResponsesTransform(payload) : undefined },
+				);
+				const text = response.content.filter(b => b.type === "text").map(b => b.text).join("").trim();
+				if (response.stopReason === "error" || response.stopReason === "aborted") return { ok: false, reason: `${response.stopReason}: ${response.errorMessage ?? ""}`.slice(0, 300) };
+				if (text.toUpperCase().replace(/\s/g, "") !== challenge.expected) return { ok: false, reason: `mismatch (${response.stopReason}, ${text.length} chars)` };
+				return true;
+			}, ctx.signal);
+			if (!ok) return;
+			// Re-registering refreshes the session's current model object in place.
+			register(selected.provider, true);
+			ctx.ui.notify(`Image input enabled: ${entry.id}`, "info");
 		} finally { checkingInputs.delete(key); }
 	});
 
-	function profileLabel(name: string, p: Profile, active?: string): string {
-		const mark = name === active ? " ● active" : "";
-		const apiLabel = p.modelRules?.length ? `${p.api} (default; model rules enabled)` : p.api;
-		return `${name} — ${apiLabel} @ ${p.baseUrl} (${p.models.length} model(s))${mark}`;
-	}
-
-	function registerProfile(name: string, profile: Profile): void {
-		pi.registerProvider(name, {
-			baseUrl: profile.baseUrl,
-			api: profile.api,
-			apiKey: profile.apiKey,
-			headers: profile.headers,
-			models: profile.models.map((model) => resolveProfileModel(profile, model)),
-		});
-		registered.add(name);
-	}
-
-	async function applyProfile(
-		name: string,
-		ctx: ExtensionContext,
-		preserveModel = false,
-	): Promise<boolean> {
-		const store = await loadStore();
-		const profile = store.profiles[name];
-		if (!profile) {
-			ctx.ui.notify(`Profile "${name}" not found. See /providers.`, "error");
-			return false;
-		}
-		if (profile.models.length === 0) {
-			ctx.ui.notify(`Profile "${name}" has no models.`, "error");
-			return false;
-		}
-
-		registerProfile(name, profile);
-		const modelId = preserveModel && ctx.model?.provider === name && profile.models.some(m => m.id === ctx.model!.id)
-			? ctx.model.id : profile.defaultModel ?? profile.models[0].id;
-		const model = ctx.modelRegistry.find(name, modelId);
-		if (!model) {
-			ctx.ui.notify(`Registered "${name}" but model "${modelId}" was not found.`, "error");
-			return false;
-		}
-		const ok = await pi.setModel(model);
-		if (!ok) {
-			ctx.ui.notify(
-				`Registered "${name}" but no API key resolved (check apiKey / env var). Model not switched.`,
-				"error",
-			);
-			return false;
-		}
-
-		store.active = name;
-		await saveStore(store);
-		ctx.ui.setStatus(STATUS_KEY, `⚡ ${name}/${modelId}`);
-		ctx.ui.notify(`Switched to ${name} (${modelId})`, "info");
-		// Non-blocking: cached list is live already; pull upstream changes behind it.
-		void refreshProfileModels(name, ctx, false);
-		return true;
-	}
-
-	// One refresh per profile at a time; a /switch storm must not race saveStore.
-	const refreshing = new Set<string>();
-
-	/**
-	 * Re-fetch /models for a profile, merge into the store, re-register if the
-	 * list changed. Never throws; failures keep the cached list.
-	 * `verbose` also reports "no changes" / failures (manual /provider-refresh).
-	 */
-	async function refreshProfileModels(name: string, ctx: ExtensionContext, verbose: boolean): Promise<void> {
-		if (refreshing.has(name)) return;
-		refreshing.add(name);
-		try {
-			let profile = (await loadStore()).profiles[name];
-			if (!profile) return;
-			let ids: string[];
-			try {
-				ids = (await fetchModelIds(profile.baseUrl, profile.api, resolveApiKey(profile.apiKey))).ids;
-			} catch (err) {
-				if (verbose) ctx.ui.notify(`${name}: model refresh failed (${(err as Error).message}); keeping cached list.`, "warning");
-				return;
-			}
-			if (ids.length === 0) {
-				if (verbose) ctx.ui.notify(`${name}: /models returned nothing; keeping cached list.`, "warning");
-				return;
-			}
-			// Re-read after the network round-trip so concurrent edits are retained.
-			const store = await loadStore();
-			profile = store.profiles[name];
-			if (!profile) return;
-			const { models, added, removed } = mergeModelIds(profile, ids);
-			if (added.length === 0 && removed.length === 0) {
-				if (verbose) ctx.ui.notify(`${name}: ${ids.length} model(s) upstream, list unchanged.`, "info");
-				return;
-			}
-			profile.models = models;
-			await saveStore(store);
-			if (registered.has(name) || ctx.model?.provider === name) registerProfile(name, profile);
-			const parts = [];
-			if (added.length) parts.push(`+${added.length}: ${added.slice(0, 5).join(", ")}${added.length > 5 ? ", …" : ""}`);
-			if (removed.length) parts.push(`-${removed.length}: ${removed.slice(0, 5).join(", ")}${removed.length > 5 ? ", …" : ""}`);
-			ctx.ui.notify(`${name}: model list refreshed (${parts.join("; ")}) → ${models.length} total.`, "info");
-		} catch (err) {
-			if (verbose) ctx.ui.notify(`${name}: model refresh error: ${(err as Error).message}`, "warning");
-		} finally {
-			refreshing.delete(name);
-		}
-	}
-
-	async function pickAndSwitch(ctx: ExtensionContext): Promise<void> {
-		if (!ctx.hasUI) {
-			ctx.ui.notify("Interactive picker needs the TUI. Use /switch <name>.", "warning");
-			return;
-		}
-		const store = await loadStore();
-		const names = Object.keys(store.profiles);
-		if (names.length === 0) {
-			ctx.ui.notify("No profiles yet. Create one with /provider-add.", "info");
-			return;
-		}
-		const options = names.map((n) => profileLabel(n, store.profiles[n], store.active));
-		const choice = await ctx.ui.select("Switch provider profile:", options);
-		if (!choice) return;
-		const name = names[options.indexOf(choice)];
-		await applyProfile(name, ctx);
-	}
-
 	// Gateways needing a payload rewrite (e.g. Claude behind a Responses-only
 	// proxy) declare transform on their model rule; apply it per request.
-	pi.on("before_provider_request", async (event) => {
+	pi.on("before_provider_request", (event, ctx) => {
+		const profile = ctx.model ? store.profiles[ctx.model.provider] : undefined;
+		if (!profile) return undefined;
 		const modelId = (event.payload as { model?: unknown } | undefined)?.model;
-		if (typeof modelId !== "string" || modelId.length === 0) return undefined;
-		const store = await loadStore();
-		const profile = store.active ? store.profiles[store.active] : undefined;
-		const rule = findTransformRule(profile, modelId);
-		if (rule?.transform === "claude-responses") {
+		if (typeof modelId === "string" && findTransformRule(profile, modelId)?.transform === "claude-responses") {
 			return applyClaudeResponsesTransform(event.payload);
 		}
-		// Image tool results on any Responses route of an active profile: same rewrite, no per-model config.
+		// Image tool results on any Responses route of a profile: same rewrite, no per-model config.
 		const payload = event.payload as { input?: unknown } | undefined;
-		if (profile && payload && typeof payload === "object" && Array.isArray(payload.input)) {
+		if (payload && typeof payload === "object" && Array.isArray(payload.input)) {
 			const input = stringifyToolOutputImages(payload.input);
 			if (input !== payload.input) return { ...payload, input };
 		}
 		return undefined;
 	});
 
-	// Re-apply the active profile on startup/reload/new session so the
-	// registration survives pi's runtime teardowns without touching models.json.
-	pi.on("session_start", async (event, ctx) => {
-		const store = await loadStore();
-		if (!store.active || !store.profiles[store.active]) {
-			ctx.ui.setStatus(STATUS_KEY, undefined);
-			return;
-		}
-		await applyProfile(store.active, ctx, event.reason === "reload");
-	});
-
-	pi.registerCommand("switch", {
-		description: "Switch provider profile: /switch <name>, or no arg for a picker",
-		handler: async (args, ctx) => {
-			const name = args.trim();
-			if (name) await applyProfile(name, ctx);
-			else await pickAndSwitch(ctx);
-		},
-	});
+	function describe(name: string, profile: Profile): string {
+		const entries = profileModelEntries(profile, discovered.get(name)) as ProfileModel[];
+		const enabled = entries.filter((m) => m.disabled !== true).length;
+		return `${name} — ${profile.api} @ ${profile.baseUrl} (${enabled}/${entries.length} model(s))`;
+	}
 
 	pi.registerCommand("providers", {
-		description: "List provider profiles and pick one to activate",
+		description: "List provider profiles registered from provider-profiles.json",
 		handler: async (_args, ctx) => {
-			await pickAndSwitch(ctx);
+			const names = Object.keys(store.profiles);
+			if (!names.length) {
+				ctx.ui.notify("No provider profiles yet. Add one with /provider-add or in Pi GUI settings.", "info");
+				return;
+			}
+			ctx.ui.notify(names.map((name) => describe(name, store.profiles[name])).join("\n"), "info");
 		},
 	});
 
 	pi.registerCommand("provider-refresh", {
-		description: "Re-fetch /models for a profile now: /provider-refresh [name] (default: active)",
+		description: "Re-fetch /models now: /provider-refresh [name] (default: all profiles)",
 		handler: async (args, ctx) => {
-			const store = await loadStore();
-			const name = args.trim() || store.active;
-			if (!name || !Object.hasOwn(store.profiles, name)) {
-				ctx.ui.notify(name ? `Profile "${name}" not found.` : "No active profile. Use /provider-refresh <name>.", "error");
-				return;
-			}
-			await refreshProfileModels(name, ctx, true);
-		},
-	});
-
-	pi.registerCommand("provider-thinking", {
-		description: "Set default thinking support: /provider-thinking [name] [on|off] (model overrides preserved)",
-		handler: async (args, ctx) => {
-			let store = await loadStore();
-			let name = args.trim();
-			let enabled: boolean | undefined;
-			// Prefer an exact profile name, including names containing spaces.
+			const name = args.trim();
 			if (name && !Object.hasOwn(store.profiles, name)) {
-				const match = name.match(/^(.*?)\s+(on|off)$/i);
-				if (match) {
-					name = match[1].trim();
-					enabled = match[2].toLowerCase() === "on";
-				}
-			}
-			if (!name) {
-				if (!ctx.hasUI) {
-					ctx.ui.notify("Use /provider-thinking <name> <on|off>.", "warning");
-					return;
-				}
-				const names = Object.keys(store.profiles);
-				if (names.length === 0) {
-					ctx.ui.notify("No profiles yet. Create one with /provider-add.", "info");
-					return;
-				}
-				const options = names.map((n) => profileLabel(n, store.profiles[n], store.active));
-				const choice = await ctx.ui.select("Set thinking support for which provider?", options);
-				if (!choice) return;
-				name = names[options.indexOf(choice)];
-			}
-			if (!Object.hasOwn(store.profiles, name)) {
-				ctx.ui.notify(`Profile "${name}" not found. Use /provider-thinking <name> <on|off>.`, "error");
+				ctx.ui.notify(`Profile "${name}" not found.`, "error");
 				return;
 			}
-			if (enabled === undefined) {
-				if (!ctx.hasUI) {
-					ctx.ui.notify("Use /provider-thinking <name> <on|off>.", "warning");
-					return;
-				}
-				const current = store.profiles[name].reasoning ?? false;
-				const choice = await ctx.ui.select(
-					`Default thinking support for "${name}" (currently ${current ? "on" : "off"}; model overrides preserved):`,
-					["On", "Off"],
-				);
-				if (!choice) return;
-				enabled = choice === "On";
-			}
-
-			await ctx.waitForIdle();
-			// Re-read after dialogs/waiting so unrelated profile edits are retained.
-			store = await loadStore();
-			if (!Object.hasOwn(store.profiles, name)) {
-				ctx.ui.notify(`Profile "${name}" no longer exists.`, "error");
-				return;
-			}
-			const profile = store.profiles[name];
-			profile.reasoning = enabled;
-			await saveStore(store);
-
-			const currentModel = ctx.model;
-			try {
-				if (registered.has(name) || currentModel?.provider === name) {
-					registerProfile(name, profile);
-				}
-				if (currentModel?.provider === name) {
-					// Refresh capability on the current model without switching to the default.
-					const model = ctx.modelRegistry.find(name, currentModel.id);
-					if (!model || !(await pi.setModel(model))) {
-						ctx.ui.notify(`Thinking support saved for "${name}", but the current model could not be refreshed. Retry /switch ${name}.`, "warning");
-						return;
-					}
-					ctx.ui.setStatus(STATUS_KEY, `⚡ ${name}/${model.id}`);
-				}
-			} catch {
-				ctx.ui.notify(`Thinking support saved for "${name}", but runtime refresh failed. Retry /switch ${name}.`, "warning");
-				return;
-			}
-			ctx.ui.notify(`Default thinking support for "${name}": ${enabled ? "on" : "off"}. Model overrides preserved.`, "info");
+			const names = name ? [name] : Object.keys(store.profiles);
+			await modelsDev.load({ allowNetwork: true, signal: ctx.signal, maxAgeMs: 0 });
+			const results = await Promise.all(names.map(async (n) => [n, await syncIds(n, store.profiles[n], { force: true })] as const));
+			for (const [n] of results) register(n, true);
+			ctx.ui.notify(results.map(([n, ok]) => `${ok ? "✓" : "✗"} ${describe(n, store.profiles[n])}`).join("\n"), "info");
 		},
 	});
 
 	pi.registerCommand("provider-add", {
 		description: "Interactive wizard: add a provider profile",
-		handler: async (_args, ctx) => {
+		handler: async (_args, ctx: ExtensionContext) => {
 			if (!ctx.hasUI) {
-				ctx.ui.notify("The add wizard needs the TUI.", "warning");
+				ctx.ui.notify("The add wizard needs an interactive UI.", "warning");
 				return;
 			}
 			const name = (await ctx.ui.input("Profile name (used as provider id):", "e.g. deepseek"))?.trim();
 			if (!name) return;
+			if (!/^[\p{L}\p{N}][\p{L}\p{N}._-]{0,63}$/u.test(name) || ["__proto__", "constructor", "prototype"].includes(name)) {
+				ctx.ui.notify("Use 1–64 letters (any language), digits, dots, dashes or underscores.", "error");
+				return;
+			}
+			if (Object.hasOwn(store.profiles, name)) {
+				ctx.ui.notify(`Profile "${name}" already exists.`, "error");
+				return;
+			}
 			let baseUrl = (await ctx.ui.input("Base URL:", "https://api.example.com/v1"))?.trim();
 			if (!baseUrl) return;
-			const apiChoice = await ctx.ui.select("API type:", [...API_TYPES]);
-			if (!apiChoice) return;
+			const api = await ctx.ui.select("API type:", [...API_TYPES]);
+			if (!api) return;
 			const apiKey = (await ctx.ui.input("API key (literal, $ENV_VAR, or !cmd; empty to skip):", "$MY_API_KEY"))?.trim();
-
-			// Pull the model catalogue from the provider; fall back to manual entry.
-			let models: ProfileModel[] = [];
+			let manual: string[] = [];
 			try {
-				const result = await fetchModelIds(baseUrl, apiChoice as ApiType, resolveApiKey(apiKey || undefined));
-				if (result.ids.length > 0) {
-					models = result.ids.map((id) => ({ id }));
-					if (result.baseUrl !== baseUrl) {
-						baseUrl = result.baseUrl;
-						ctx.ui.notify(`Auto-corrected baseUrl to ${result.baseUrl}`, "info");
-					}
-					ctx.ui.notify(`Fetched ${result.ids.length} model(s) from provider.`, "info");
-				}
-			} catch (err) {
-				ctx.ui.notify(`Model fetch failed (${(err as Error).message}); enter manually.`, "warning");
+				const result = await discoverModelIds(baseUrl, api as ApiType, resolveApiKey(apiKey || undefined));
+				baseUrl = result.baseUrl;
+				ctx.ui.notify(`Found ${result.ids.length} model(s).`, "info");
+			} catch (error) {
+				ctx.ui.notify(`Model listing failed (${(error as Error).message}); enter ids manually.`, "warning");
+				manual = ((await ctx.ui.input("Model ids, comma-separated:", "model-a, model-b")) ?? "")
+					.split(",").map((s) => s.trim()).filter(Boolean);
+				if (!manual.length) return;
 			}
-			if (models.length === 0) {
-				const modelsRaw = (await ctx.ui.input("Model ids, comma-separated:", "model-a, model-b"))?.trim();
-				if (!modelsRaw) return;
-				models = modelsRaw
-					.split(",")
-					.map((s) => s.trim())
-					.filter(Boolean)
-					.map((id) => ({ id }));
-				if (models.length === 0) {
-					ctx.ui.notify("No valid model ids.", "error");
-					return;
-				}
-			}
-			const defaultChoice = await ctx.ui.select(
-				"Default model:",
-				models.map((m) => m.id),
-			);
-			if (!defaultChoice) return;
-
-			const store = await loadStore();
-			store.profiles[name] = {
-				baseUrl,
-				api: apiChoice as ApiType,
-				...(apiKey ? { apiKey } : {}),
-				models,
-				defaultModel: defaultChoice,
-			};
-			await saveStore(store);
-			ctx.ui.notify(`Profile "${name}" saved. Activate with /switch ${name}`, "info");
+			await updateStore((raw) => {
+				raw.profiles[name] = {
+					baseUrl,
+					api,
+					...(apiKey ? { apiKey } : {}),
+					...(manual.length ? { syncModels: false, models: manual.map((id) => ({ id, manual: true })) } : {}),
+				};
+			});
+			ctx.ui.notify(`Profile "${name}" saved. Its models appear in /model shortly.`, "info");
 		},
 	});
 
 	pi.registerCommand("provider-remove", {
 		description: "Remove a provider profile: /provider-remove [name]",
 		handler: async (args, ctx) => {
-			const store = await loadStore();
 			let name = args.trim();
 			if (!name) {
-				if (!ctx.hasUI) {
-					ctx.ui.notify("Pass a profile name: /provider-remove <name>", "warning");
-					return;
-				}
 				const names = Object.keys(store.profiles);
-				if (names.length === 0) {
-					ctx.ui.notify("No profiles to remove.", "info");
+				if (!ctx.hasUI || !names.length) {
+					ctx.ui.notify(names.length ? "Pass a profile name: /provider-remove <name>" : "No profiles to remove.", "info");
 					return;
 				}
-				const options = names.map((n) => profileLabel(n, store.profiles[n], store.active));
-				const choice = await ctx.ui.select("Remove which profile?", options);
+				const choice = await ctx.ui.select("Remove which profile?", names);
 				if (!choice) return;
-				name = names[options.indexOf(choice)];
+				name = choice;
 			}
-			if (!store.profiles[name]) {
+			if (!Object.hasOwn(store.profiles, name)) {
 				ctx.ui.notify(`Profile "${name}" not found.`, "error");
 				return;
 			}
-			if (ctx.hasUI) {
-				const ok = await ctx.ui.confirm("Remove profile", `Delete "${name}"? This cannot be undone.`);
-				if (!ok) return;
-			}
-			delete store.profiles[name];
-			if (store.active === name) delete store.active;
-			await saveStore(store);
-			if (registered.has(name)) {
-				pi.unregisterProvider(name);
-				registered.delete(name);
-			}
+			if (ctx.hasUI && !(await ctx.ui.confirm("Remove profile", `Delete "${name}"? This cannot be undone.`))) return;
+			await updateStore((raw) => {
+				delete raw.profiles[name];
+			});
+			await removeDiscovered(CACHE_DIR, name);
 			ctx.ui.notify(`Profile "${name}" removed.`, "info");
 		},
 	});

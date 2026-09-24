@@ -13,7 +13,7 @@ class AppTextField extends StatelessWidget {
   const AppTextField({
     super.key,
     required this.controller,
-    required this.hintText,
+    this.hintText,
     this.onChanged,
     this.onSubmitted,
     this.leading,
@@ -22,6 +22,7 @@ class AppTextField extends StatelessWidget {
     this.enabled = true,
     this.maxLines = 1,
     this.isCompact = false,
+    this.readOnly = false,
     this.focusNode,
     this.minLines,
     this.borderless = false,
@@ -32,14 +33,14 @@ class AppTextField extends StatelessWidget {
   });
 
   final TextEditingController controller;
-  final String hintText;
+  final String? hintText;
   final String? labelText, errorText;
   final ValueChanged<String>? onChanged, onSubmitted;
   final Widget? leading, trailing;
   final bool autofocus, enabled;
   final int? maxLines, minLines;
   final FocusNode? focusNode;
-  final bool isCompact, borderless, obscureText;
+  final bool isCompact, borderless, obscureText, readOnly;
 
   /// Return true when a non-text paste was handled; false preserves Flutter text editing.
   final Future<bool> Function()? onPaste;
@@ -79,6 +80,7 @@ class AppTextField extends StatelessWidget {
       onSubmitted: onSubmitted,
       autofocus: autofocus,
       enabled: enabled,
+      readOnly: readOnly,
       maxLines: maxLines,
       obscureText: obscureText,
       autocorrect: !obscureText,

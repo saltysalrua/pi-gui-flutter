@@ -1,16 +1,25 @@
-// GUI adapter for provider-switch's own config file (not Pi's models.json).
+// GUI adapter for pi-provider-switch's own config file (not Pi's models.json).
 // No extension is loaded or installed here. Credentials never travel back to Flutter.
+//
+// Listing rules and capability inference come from the plugin's catalog.mjs,
+// bundled next to this file as provider_catalog.mjs, so the settings page and
+// the running extension always agree on ids and badges.
 import { readFile, mkdir, open, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { execSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { WorkspaceError } from "./workspace_rpc.mjs";
 
 const fail = (code) => { throw new WorkspaceError(code); };
-const nameOk = (name) => typeof name === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(name) &&
+// Pi provider ids are opaque strings; CJK names (e.g. 猫饭) are fine. No "/"
+// (breaks provider/model references) and no whitespace.
+const nameOk = (name) => typeof name === "string" && /^[\p{L}\p{N}][\p{L}\p{N}._-]{0,63}$/u.test(name) &&
   !["__proto__", "constructor", "prototype"].includes(name);
 const apis = new Set(["openai-completions", "openai-responses", "anthropic-messages", "google-generative-ai"]);
+const MAX_MODELS = 500;
+/** A listing waits this long for a first models.dev download, then returns without badges. */
+const CATALOG_WAIT_MS = 6000;
+
 const safeEndpoint = (value) => {
   try {
     const url = new URL(value);
@@ -25,7 +34,6 @@ const validEndpoint = (value) => {
       !url.username && !url.password && !url.search && !url.hash;
   } catch { return false; }
 };
-
 const sameEndpoint = (saved, requested, api) => {
   if (!validEndpoint(saved) || !validEndpoint(requested)) return false;
   try {
@@ -39,53 +47,43 @@ const validKey = (p) =>
   (p.apiKey === undefined || (typeof p.apiKey === "string" && p.apiKey.length <= 4096)) &&
   (p.clearApiKey === undefined || typeof p.clearApiKey === "boolean") &&
   !(p.clearApiKey && p.apiKey);
+const idList = (value) => value === undefined || (Array.isArray(value) && value.length <= MAX_MODELS &&
+  value.every((id) => typeof id === "string" && id.trim() && id.length <= 200));
 
-// Same key forms as provider-switch: literal, "$VAR"/"${VAR}", "!command".
-const resolveKey = (value) => {
-  if (typeof value !== "string" || !value) return undefined;
-  if (value.startsWith("!")) {
-    try { return execSync(value.slice(1), { encoding: "utf8", timeout: 5000, windowsHide: true }).trim() || undefined; }
-    catch { fail("MODELS_KEY_COMMAND_FAILED"); }
+// Dev scripts import this file from assets/backend; the app copies the plugin
+// catalog next to it as provider_catalog.mjs.
+async function loadCatalogModule() {
+  try {
+    return await import("./provider_catalog.mjs");
+  } catch (error) {
+    if (error?.code !== "ERR_MODULE_NOT_FOUND") throw error;
+    return import("../../pi-provider-switch/extensions/provider-switch/catalog.mjs");
   }
-  const env = value.match(/^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))$/);
-  if (env) return process.env[env[1] ?? env[2]] || fail("MODELS_KEY_ENV_MISSING");
-  return value;
-};
-
-// Only GET {baseUrl}/models (a listing, not a model request). Mirrors the
-// plugin's fetchModelIds so GUI and /provider-add agree on the result.
-async function listModels(root, api, key) {
-  const url = `${root}/models`;
-  // Never put credentials in the URL or follow redirects to another origin.
-  const headers = api === "anthropic-messages" ? { "anthropic-version": "2023-06-01" } : {};
-  if (key) {
-    if (api === "anthropic-messages") { headers["x-api-key"] = key; headers["anthropic-version"] = "2023-06-01"; }
-    else if (api === "google-generative-ai") headers["x-goog-api-key"] = key;
-    else headers.authorization = `Bearer ${key}`;
-  }
-  let res;
-  try { res = await fetch(url, { headers, redirect: "error", signal: AbortSignal.timeout(8000) }); }
-  catch { fail("MODELS_UNREACHABLE"); }
-  if (res.status === 401 || res.status === 403) fail("MODELS_UNAUTHORIZED");
-  if (!res.ok) fail("MODELS_HTTP_ERROR");
-  let payload;
-  try { payload = JSON.parse(await res.text()); } catch { fail("MODELS_NOT_JSON"); }
-  const raw = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.models) ? payload.models : [];
-  const ids = raw.map(m => typeof m === "string" ? m : (m?.id ?? m?.name ?? ""))
-    .filter(id => typeof id === "string").map(id => (api === "google-generative-ai" ? id.replace(/^models\//, "") : id).trim())
-    .filter(id => id && id.length <= 200);
-  return [...new Set(ids)].slice(0, 500);
 }
 
 export class GuiProviderProfiles {
   constructor(packageRoot) {
     this.packageRoot = packageRoot;
     this.queue = Promise.resolve();
+    this.context = undefined;
   }
 
-  async #location() {
-    const sdk = await import(pathToFileURL(path.join(this.packageRoot, "dist/index.js")).href);
-    return path.join(sdk.getAgentDir(), "provider-profiles.json");
+  async #context() {
+    if (!this.context) {
+      const [sdk, catalog] = await Promise.all([
+        import(pathToFileURL(path.join(this.packageRoot, "dist/index.js")).href),
+        loadCatalogModule(),
+      ]);
+      const agentDir = sdk.getAgentDir();
+      const cacheDir = path.join(agentDir, ".cache", "provider-switch");
+      this.context = {
+        catalog,
+        file: path.join(agentDir, "provider-profiles.json"),
+        cacheDir,
+        modelsDev: new catalog.ModelsDevCatalog(path.join(cacheDir, "models-dev.json")),
+      };
+    }
+    return this.context;
   }
 
   async #read(file) {
@@ -103,15 +101,39 @@ export class GuiProviderProfiles {
     }
   }
 
-  #public(store) {
+  /** Public capability badges for one resolved model. */
+  #modelInfo(ctx, profile, entry) {
+    const { config } = ctx.catalog.resolveModel(profile, entry, ctx.modelsDev);
     return {
-      active: store.active ?? null,
-      profiles: Object.entries(store.profiles).map(([name, p]) => ({
-        name, baseUrl: safeEndpoint(p.baseUrl), api: p.api, reasoning: p.reasoning === true,
-        models: Array.isArray(p.models) ? p.models.map(m => m.id).filter(id => typeof id === "string") : [],
-        defaultModel: p.defaultModel ?? null, hasApiKey: !!p.apiKey,
-      })),
+      id: entry.id,
+      reasoning: config.reasoning === true,
+      image: config.input.includes("image"),
+      contextWindow: config.contextWindow,
     };
+  }
+
+  async #public(ctx, store) {
+    const profiles = [];
+    for (const [name, p] of Object.entries(store.profiles)) {
+      const discovered = await ctx.catalog.readDiscovered(ctx.cacheDir, name);
+      const synced = ctx.catalog.currentDiscovered(p, discovered) !== undefined;
+      profiles.push({
+        name,
+        baseUrl: safeEndpoint(p.baseUrl),
+        api: p.api,
+        hasApiKey: !!p.apiKey,
+        syncModels: p.syncModels !== false,
+        syncedAt: synced ? discovered.syncedAt : null,
+        models: ctx.catalog.profileModelEntries(p, discovered).map((entry) => ({
+          ...this.#modelInfo(ctx, p, entry),
+          enabled: entry.disabled !== true,
+          manual: entry.manual === true,
+          discovered: entry.discovered === true,
+          custom: ctx.catalog.hasOverrides(entry),
+        })),
+      });
+    }
+    return { profiles };
   }
 
   async #write(file, store) {
@@ -136,76 +158,129 @@ export class GuiProviderProfiles {
   // An empty apiKey reuses the saved key of `name` without echoing it back.
   async #models(request) {
     if (!validEndpoint(request.baseUrl) || !apis.has(request.api) || !validKey(request)) fail("PROFILE_INVALID");
+    const ctx = await this.#context();
     let stored;
     if (!request.apiKey && !request.clearApiKey && nameOk(request.name)) {
       await this.queue;
-      const store = await this.#read(await this.#location());
+      const store = await this.#read(ctx.file);
       if (Object.hasOwn(store.profiles, request.name)) {
         const profile = store.profiles[request.name];
         if (profile.apiKey && (!sameEndpoint(profile.baseUrl, request.baseUrl, profile.api) || profile.api !== request.api)) fail("PROFILE_KEY_ENDPOINT_CHANGED");
         stored = profile.apiKey;
       }
     }
-    const key = resolveKey(typeof request.apiKey === "string" && request.apiKey ? request.apiKey : stored);
-    const root = request.baseUrl.replace(/\/+$/, "");
-    const candidates = [root];
-    if (request.api !== "google-generative-ai" && !/\/v\d+[a-z]*$/i.test(root)) candidates.push(`${root}/v1`);
-    let lastError;
-    for (const candidate of candidates) {
-      try {
-        const models = await listModels(candidate, request.api, key);
-        if (!models.length) fail("MODELS_EMPTY");
-        return { baseUrl: candidate, models };
-      } catch (error) {
-        // Auth failures will not improve with another path; report them now.
-        if (error.code === "MODELS_UNAUTHORIZED") throw error;
-        lastError = error;
-      }
+    // Badges come from models.dev; a slow first download must not hold the list.
+    const catalogReady = ctx.modelsDev.load({ allowNetwork: true });
+    let result;
+    try {
+      const key = ctx.catalog.resolveApiKey(typeof request.apiKey === "string" && request.apiKey ? request.apiKey : stored);
+      result = await ctx.catalog.discoverModelIds(request.baseUrl, request.api, key);
+    } catch (error) {
+      fail(typeof error?.code === "string" && error.code.startsWith("MODELS_") ? error.code : "MODELS_UNREACHABLE");
     }
-    throw lastError;
+    await Promise.race([catalogReady, new Promise((resolve) => setTimeout(resolve, CATALOG_WAIT_MS))]);
+    const profile = { baseUrl: result.baseUrl, api: request.api };
+    return {
+      baseUrl: result.baseUrl,
+      models: result.ids.map((id) => this.#modelInfo(ctx, profile, { id })),
+    };
+  }
+
+  async #save(ctx, store, name, request) {
+    const p = request.profile;
+    // Rename: entry + discovered cache move to the new name in one write.
+    const previous = typeof request.renameFrom === "string" &&
+      request.renameFrom !== name ? request.renameFrom : undefined;
+    if (!p || typeof p !== "object" || !validEndpoint(p.baseUrl) || !apis.has(p.api) ||
+        typeof p.syncModels !== "boolean" || !idList(p.manual) || !idList(p.disabled) ||
+        !idList(p.discovered) || !idList(p.listed) || !validKey(p)) fail("PROFILE_INVALID");
+    if (request.createOnly && Object.hasOwn(store.profiles, name)) fail("PROFILE_EXISTS");
+    if (previous) {
+      if (!nameOk(previous)) fail("PROFILE_NAME_INVALID");
+      if (!Object.hasOwn(store.profiles, previous)) fail("PROFILE_NOT_FOUND");
+      if (Object.hasOwn(store.profiles, name)) fail("PROFILE_EXISTS");
+      await rename(
+        ctx.catalog.discoveredFile(ctx.cacheDir, previous),
+        ctx.catalog.discoveredFile(ctx.cacheDir, name),
+      ).catch(() => {});
+    }
+    const existing = Object.hasOwn(store.profiles, previous ?? name) ? store.profiles[previous ?? name] : {};
+    if (existing.apiKey && !p.apiKey && !p.clearApiKey &&
+        (!sameEndpoint(existing.baseUrl, p.baseUrl, existing.api) || existing.api !== p.api)) fail("PROFILE_KEY_ENDPOINT_CHANGED");
+
+    const manual = new Set((p.manual ?? []).map((id) => id.trim()));
+    const disabled = new Set((p.disabled ?? []).map((id) => id.trim()));
+    const listed = new Set((p.listed ?? []).map((id) => id.trim()));
+    const endpoint = ctx.catalog.endpointKey({ baseUrl: p.baseUrl, api: p.api });
+    let discovered = await ctx.catalog.readDiscovered(ctx.cacheDir, name);
+    if (p.discovered && p.syncModels) discovered = { endpoint, ids: p.discovered };
+    // Without any listing for this endpoint, 1.x plain {id} entries are the
+    // only model list; keep the ones the editor still shows.
+    const keepPlain = !p.syncModels || discovered?.endpoint !== endpoint;
+    // Pins keep their advanced per-model settings; only the flags change.
+    const models = [];
+    const seen = new Set();
+    for (const entry of Array.isArray(existing.models) ? existing.models : []) {
+      if (!entry || typeof entry.id !== "string" || seen.has(entry.id)) continue;
+      seen.add(entry.id);
+      const { manual: _m, disabled: _d, ...rest } = entry;
+      const next = { ...rest, ...(manual.has(entry.id) ? { manual: true } : {}), ...(disabled.has(entry.id) ? { disabled: true } : {}) };
+      if (ctx.catalog.hasOverrides(next) || next.manual || next.disabled || (keepPlain && listed.has(entry.id))) models.push(next);
+    }
+    for (const id of [...manual, ...disabled]) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      models.push({ id, ...(manual.has(id) ? { manual: true } : {}), ...(disabled.has(id) ? { disabled: true } : {}) });
+    }
+    const { defaultModel: _legacyDefault, models: _old, ...kept } = existing;
+    const profile = {
+      ...kept,
+      baseUrl: p.baseUrl,
+      api: p.api,
+      ...(p.apiKey ? { apiKey: p.apiKey } : {}),
+      ...(p.syncModels ? {} : { syncModels: false }),
+      ...(models.length ? { models } : {}),
+    };
+    if (p.syncModels) delete profile.syncModels;
+    if (p.clearApiKey) delete profile.apiKey;
+
+    // At least one model must remain visible, or the provider would vanish.
+    const visible = ctx.catalog.profileModelEntries(profile, discovered).filter((m) => m.disabled !== true);
+    if (!visible.length) fail("PROFILE_NO_MODELS");
+
+    store.profiles[name] = profile;
+    if (previous) delete store.profiles[previous];
+    // 1.x selection fields are ignored by 2.x; drop them so nobody relies on them.
+    delete store.active;
+    await this.#write(ctx.file, store);
+    if (p.discovered && p.syncModels) await ctx.catalog.writeDiscovered(ctx.cacheDir, name, profile, p.discovered);
+    else if (!p.syncModels) await ctx.catalog.removeDiscovered(ctx.cacheDir, name);
   }
 
   async handle(request) {
     if (request.type === "gui_provider_profiles_state") {
       await this.queue;
-      return this.#public(await this.#read(await this.#location()));
+      const ctx = await this.#context();
+      await ctx.modelsDev.load({ allowNetwork: false });
+      return this.#public(ctx, await this.#read(ctx.file));
     }
     if (request.type === "gui_provider_profiles_models") return this.#models(request);
     return this.#mutate(async () => {
-      const file = await this.#location();
-      const store = await this.#read(file);
+      const ctx = await this.#context();
+      const store = await this.#read(ctx.file);
       const name = request.name;
       if (!nameOk(name)) fail("PROFILE_NAME_INVALID");
       if (request.type === "gui_provider_profiles_save") {
-        const p = request.profile;
-        if (!p || typeof p !== "object" || !validEndpoint(p.baseUrl) ||
-            !apis.has(p.api) || typeof p.reasoning !== "boolean" || !Array.isArray(p.models) ||
-            !p.models.length || p.models.length > 500 || p.models.some(id => typeof id !== "string" || !id.trim() || id.length > 200) ||
-            typeof p.defaultModel !== "string" || !p.models.includes(p.defaultModel) ||
-            !validKey(p)) fail("PROFILE_INVALID");
-        if (request.createOnly && Object.hasOwn(store.profiles, name)) fail("PROFILE_EXISTS");
-        const existing = Object.hasOwn(store.profiles, name) ? store.profiles[name] : {};
-        if (existing.apiKey && !p.apiKey && !p.clearApiKey &&
-            (!sameEndpoint(existing.baseUrl, p.baseUrl, existing.api) || existing.api !== p.api)) fail("PROFILE_KEY_ENDPOINT_CHANGED");
-        // Preserve advanced model/routing settings for unchanged IDs.
-        const oldModels = new Map((Array.isArray(existing.models) ? existing.models : []).map(m => [m.id, m]));
-        store.profiles[name] = {
-          ...existing, baseUrl: p.baseUrl, api: p.api, reasoning: p.reasoning,
-          models: [...new Set(p.models)].map(id => oldModels.get(id) ?? { id }),
-          defaultModel: p.defaultModel,
-          ...(p.apiKey ? { apiKey: p.apiKey } : {}),
-        };
-        if (p.clearApiKey) delete store.profiles[name].apiKey;
+        await this.#save(ctx, store, name, request);
       } else if (request.type === "gui_provider_profiles_remove") {
         if (!Object.hasOwn(store.profiles, name)) fail("PROFILE_NOT_FOUND");
         delete store.profiles[name];
         if (store.active === name) delete store.active;
-      } else if (request.type === "gui_provider_profiles_activate") {
-        if (!Object.hasOwn(store.profiles, name)) fail("PROFILE_NOT_FOUND");
-        store.active = name;
+        await this.#write(ctx.file, store);
+        await ctx.catalog.removeDiscovered(ctx.cacheDir, name);
       } else fail("UNKNOWN_COMMAND");
-      await this.#write(file, store);
-      return this.#public(store);
+      await ctx.modelsDev.load({ allowNetwork: false });
+      return this.#public(ctx, store);
     });
   }
 }

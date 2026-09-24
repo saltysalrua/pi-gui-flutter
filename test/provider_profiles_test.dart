@@ -2,78 +2,140 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pi_gui/core/rpc/pi_provider_profiles_types.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_client.dart';
 import 'package:pi_gui/core/rpc/pi_rpc_types.dart';
+import 'package:pi_gui/core/services/provider_plugin_installer.dart';
 import 'package:pi_gui/ui/features/settings/controllers/provider_profiles_controller.dart';
 
 import 'pi_rpc_client_test.dart' show TestTransport;
 
 final profileState = {
-  'active': 'gateway',
   'profiles': [
     {
-      'name': 'gateway',
-      'api': 'openai-responses',
+      'name': '猫饭',
+      'api': 'openai-completions',
       'baseUrl': 'https://example.test/v1',
-      'models': ['model-a', 'model-b'],
-      'defaultModel': 'model-b',
-      'reasoning': true,
       'hasApiKey': true,
+      'syncModels': true,
+      'syncedAt': 1700000000000,
+      'models': [
+        {
+          'id': 'gpt-5',
+          'reasoning': true,
+          'image': true,
+          'contextWindow': 400000,
+          'enabled': true,
+          'discovered': true,
+        },
+        {'id': 'embed', 'enabled': false, 'discovered': true},
+        {'id': 'alias', 'enabled': true, 'manual': true, 'custom': true},
+      ],
     },
   ],
 };
 
 void main() {
-  test('profile listing and model discovery map public metadata', () {
+  test('profile state maps models, badges and visibility', () {
     final state = PiProviderProfilesState.fromJson(profileState);
-    expect(state.active, 'gateway');
-    expect(state.profiles.single.models, ['model-a', 'model-b']);
-    expect(state.profiles.single.defaultModel, 'model-b');
-    expect(state.profiles.single.hasApiKey, isTrue);
+    final profile = state.profiles.single;
+    expect(profile.name, '猫饭');
+    expect(
+      profile.syncedAt,
+      DateTime.fromMillisecondsSinceEpoch(1700000000000),
+    );
+    expect(profile.enabledCount, 2);
+    final gpt = profile.models.first;
+    expect([gpt.reasoning, gpt.image, gpt.contextWindow], [true, true, 400000]);
+    expect(profile.models[1].enabled, isFalse);
+    expect([profile.models[2].manual, profile.models[2].custom], [true, true]);
+    expect(() => profile.models.add(gpt), throwsUnsupportedError);
     final list = PiProviderModelList.fromJson({
       'baseUrl': 'https://example.test/v1',
-      'models': ['model-a', 'model-b'],
+      'models': [
+        {'id': 'model-a', 'reasoning': false},
+      ],
     });
-    expect(list.models, ['model-a', 'model-b']);
-    expect(() => list.models.add('oops'), throwsUnsupportedError);
+    expect(list.models.single.id, 'model-a');
+    expect(list.models.single.enabled, isTrue, reason: 'listing defaults on');
   });
 
-  test(
-    'discovery needs no model ID; key removal and create-only reach RPC',
-    () async {
-      final transport = TestTransport();
-      final client = PiRpcClient(transportFactory: () async => transport);
-      addTearDown(client.close);
-      final service = PiProviderProfilesService(client);
-      transport.onSend = (request) => transport.reply(
-        request,
-        request['type'] == 'gui_provider_profiles_models'
-            ? {
-                'baseUrl': 'https://example.test/v1',
-                'models': ['model-a'],
-              }
-            : profileState,
-      );
-      final list = await service.fetchModels(
-        baseUrl: 'https://example.test',
-        api: 'openai-responses',
-      );
-      expect(transport.commands.single.containsKey('models'), isFalse);
-      expect(transport.commands.single.containsKey('apiKey'), isFalse);
-      await service.save(
-        name: 'gateway',
-        baseUrl: list.baseUrl,
-        api: 'openai-responses',
-        reasoning: false,
-        models: list.models,
-        defaultModel: list.models.first,
-        createOnly: true,
-        clearApiKey: true,
-      );
-      final saved = transport.commands.last;
-      expect(saved['createOnly'], isTrue);
-      expect(saved['profile']['clearApiKey'], isTrue);
-      expect(saved['profile'].containsKey('apiKey'), isFalse);
-    },
-  );
+  test('installer reads the bundled version from an install path', () {
+    expect(
+      ProviderPluginInstaller.installedVersion(
+        r'C:\Users\a\AppData\Roaming\x\pi-provider-switch\1.0.0\extensions\provider-switch.ts',
+      ),
+      '1.0.0',
+    );
+    expect(
+      ProviderPluginInstaller.installedVersion('/opt/other/provider-switch.ts'),
+      isNull,
+    );
+  });
+
+  test('save sends manual/disabled/listed/discovered; key stays out', () async {
+    final transport = TestTransport();
+    final client = PiRpcClient(transportFactory: () async => transport);
+    addTearDown(client.close);
+    final controller = ProviderProfilesController(client);
+    addTearDown(controller.dispose);
+    transport.onSend = (request) => transport.reply(request, profileState);
+    final ok = await controller.save(
+      name: '猫饭',
+      baseUrl: 'https://example.test/v1',
+      api: 'openai-completions',
+      syncModels: true,
+      models: const [
+        PiProviderModel(id: 'gpt-5', discovered: true),
+        PiProviderModel(id: 'embed', enabled: false, discovered: true),
+        PiProviderModel(id: 'alias', manual: true),
+      ],
+      discovered: const ['gpt-5', 'embed'],
+      createOnly: true,
+      clearApiKey: true,
+    );
+    expect(ok, isTrue);
+    expect(controller.changed, isTrue);
+    expect(controller.selected, '猫饭');
+    final sent = transport.commands.single;
+    expect(sent['createOnly'], isTrue);
+    final profile = sent['profile'] as Map;
+    expect(profile['manual'], ['alias']);
+    expect(profile['disabled'], ['embed']);
+    expect(profile['listed'], ['gpt-5', 'embed', 'alias']);
+    expect(profile['discovered'], ['gpt-5', 'embed']);
+    expect(profile['clearApiKey'], isTrue);
+    expect(profile.containsKey('apiKey'), isFalse);
+  });
+
+  test('rename sends renameFrom; same name stays a plain save', () async {
+    final transport = TestTransport();
+    final client = PiRpcClient(transportFactory: () async => transport);
+    addTearDown(client.close);
+    final controller = ProviderProfilesController(client);
+    addTearDown(controller.dispose);
+    transport.onSend = (request) => transport.reply(request, profileState);
+    Future<bool> base({
+      required String name,
+      String? renameFrom,
+      bool createOnly = false,
+    }) => controller.save(
+      name: name,
+      baseUrl: 'https://example.test/v1',
+      api: 'openai-completions',
+      syncModels: true,
+      models: const [PiProviderModel(id: 'gpt-5')],
+      createOnly: createOnly,
+      renameFrom: renameFrom,
+    );
+    expect(await base(name: '新名字', renameFrom: '猫饭'), isTrue);
+    expect(transport.commands.single['renameFrom'], '猫饭');
+    expect(controller.selected, '新名字');
+    transport.commands.clear();
+    expect(await base(name: '猫饭', renameFrom: '猫饭'), isTrue);
+    expect(
+      transport.commands.single.containsKey('renameFrom'),
+      isFalse,
+      reason: 'unchanged name must not trigger a rename write',
+    );
+  });
 
   test(
     'timed-out save keeps a barrier until the original write settles',
@@ -107,89 +169,4 @@ void main() {
       expect(transport.closed, isFalse);
     },
   );
-
-  for (final mode in ['missing', 'wrong-source', 'busy', 'success', 'failed']) {
-    test(
-      'activation: $mode does not send an unsafe or unverified switch',
-      () async {
-        final controlTransport = TestTransport();
-        final sessionTransport = TestTransport();
-        final control = PiRpcClient(
-          transportFactory: () async => controlTransport,
-        );
-        final session = PiRpcClient(
-          transportFactory: () async => sessionTransport,
-        );
-        final controller = ProviderProfilesController(control, () => session);
-        addTearDown(() async {
-          controller.dispose();
-          await control.close();
-          await session.close();
-        });
-        var prompted = false;
-        controlTransport.onSend = (request) =>
-            controlTransport.reply(request, profileState);
-        sessionTransport.onSend = (request) {
-          final Object? data = switch (request['type']) {
-            'get_commands' => {
-              'commands': mode == 'missing'
-                  ? []
-                  : [
-                      {
-                        'name': 'switch',
-                        'source': 'extension',
-                        'path': mode == 'wrong-source'
-                            ? '/extensions/unrelated.ts'
-                            : '/package/extensions/provider-switch.ts',
-                      },
-                    ],
-            },
-            'get_state' => {
-              'isStreaming': mode == 'busy',
-              'model': {
-                'id': prompted && mode == 'success' ? 'model-b' : 'model-a',
-                'provider': 'gateway',
-                'name': 'Test',
-                'reasoning': true,
-              },
-              'thinkingLevel': 'off',
-            },
-            _ => null,
-          };
-          if (request['type'] == 'prompt') prompted = true;
-          sessionTransport.reply(request, data);
-        };
-        await controller.load();
-        final ok = await controller.activate('gateway');
-        expect(ok, mode != 'busy' && mode != 'failed');
-        expect(prompted, mode == 'success' || mode == 'failed');
-        if (mode == 'missing' || mode == 'wrong-source') {
-          expect(controller.switchedCurrentSession, isFalse);
-          expect(
-            controlTransport.commands.last['type'],
-            'gui_provider_profiles_activate',
-          );
-        } else if (mode == 'busy') {
-          expect(controller.error, 'PROFILE_SESSION_BUSY');
-          expect(
-            controlTransport.commands.any(
-              (c) => c['type'] == 'gui_provider_profiles_activate',
-            ),
-            isFalse,
-          );
-        } else if (mode == 'failed') {
-          expect(controller.error, 'PROFILE_ACTIVATE_FAILED');
-          expect(controller.switchedCurrentSession, isNull);
-        } else {
-          expect(controller.switchedCurrentSession, isTrue);
-          expect(
-            sessionTransport.commands.singleWhere(
-              (c) => c['type'] == 'prompt',
-            )['message'],
-            '/switch gateway',
-          );
-        }
-      },
-    );
-  }
 }

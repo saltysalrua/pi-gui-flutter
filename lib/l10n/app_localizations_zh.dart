@@ -1822,11 +1822,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerTitle => 'Provider 配置';
 
   @override
-  String get providerDescription =>
-      '添加 API 地址和 Key，获取模型后交给 Pi 使用。配置可以先保存，启用插件后再切换。';
-
-  @override
-  String get providerNotInstalled => '尚未安装 Provider 插件。你可以先管理配置；使用配置前需要确认安装。';
+  String get providerNotInstalled => '还没安装 Provider 插件。装好后模型才会出现在模型选择器里。';
 
   @override
   String get providerDisabled => '插件已安装，但目前是停用状态。启用后，新会话会加载它。';
@@ -1836,36 +1832,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerInstallWarning =>
-      '此操作会把随应用提供的 pi-provider-switch 安装到 Pi 的全局配置。扩展拥有与 Pi 相同的系统权限；之后的新会话会加载它，已启用的配置会从服务商刷新模型列表。配置可能包含 API Key，请优先使用环境变量。首次选中未知模型的图片能力探测默认关闭。确定安装吗？';
+      '此操作会把随应用提供的 pi-provider-switch 安装到 Pi 的全局配置。扩展拥有与 Pi 相同的系统权限，之后启动的会话会加载它，并用配置里的 Key 获取模型列表。配置可能包含 API Key，请优先使用环境变量。确定安装吗？';
 
   @override
   String get providerAdd => '添加配置';
 
   @override
-  String get providerEdit => '编辑配置';
-
-  @override
-  String get providerSave => '保存配置';
-
-  @override
-  String get providerActivate => '使用此配置';
-
-  @override
-  String get providerSelected => '默认';
-
-  @override
-  String providerActive(String name) {
-    return '当前默认配置：$name';
-  }
-
-  @override
-  String get providerNone => '无';
-
-  @override
-  String get providerNextSession => '已保存默认配置；当前会话未加载插件，新会话或下次启动后生效。';
-
-  @override
-  String get providerEmpty => '还没有 Provider 配置。添加一个后即可选择。';
+  String get providerSave => '保存';
 
   @override
   String providerModelCount(int count) {
@@ -1878,10 +1851,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get providerInvalid => '请先填写配置名称和 API 地址。';
-
-  @override
-  String get providerName => '例如 my-api（字母、数字、点、横线、下划线）';
+  String get providerName => '例如 my-api';
 
   @override
   String get providerBaseUrl => 'https://api.example.com/v1';
@@ -1896,20 +1866,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerKeepKey => '已保存 Key，留空则不修改';
 
   @override
-  String get providerKeyHint =>
-      'Key 会写进插件的 provider-profiles.json。更推荐填 \$环境变量名，别把这个文件提交到仓库。';
-
-  @override
-  String get providerModels =>
-      '留空保存时会自动获取模型；也可先点「获取模型列表」再选默认模型。刷新不会移除已有 ID，不支持列表接口时可手填。';
-
-  @override
-  String get providerDefaultModel => '默认模型';
-
-  @override
-  String get providerThinking => '默认支持思考';
-
-  @override
   String get providerEnable => '启用插件';
 
   @override
@@ -1922,9 +1878,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerKeyLabel => 'API Key';
 
   @override
-  String get providerModelsLabel => '模型';
-
-  @override
   String get providerFetchModels => '获取模型列表';
 
   @override
@@ -1933,31 +1886,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get providerFetchingOnSave => '正在从 API 获取模型…';
-
-  @override
-  String providerDefaultModelValue(String model) {
-    return '默认模型：$model';
-  }
-
-  @override
-  String get providerHasKey => '已保存 Key';
-
-  @override
-  String get providerThinkingBadge => '默认思考';
-
-  @override
-  String providerSwitched(String name) {
-    return '当前会话已切换到“$name”。';
-  }
-
-  @override
   String get providerErrorInvalid =>
       '有内容没填对，请检查 API 地址（需以 http:// 或 https:// 开头）和模型。';
 
   @override
   String get providerErrorName =>
-      '名称需为 1–64 个字母、数字、点、横线或下划线，以字母或数字开头，且不能使用保留名称。';
+      '名称可用中文、字母、数字、点、横线或下划线（1–64 个字），以文字或数字开头，不能用保留名称。';
 
   @override
   String get providerErrorFile =>
@@ -1965,9 +1899,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerErrorNotFound => '这个配置已经不存在了，可能在别处被删了。请刷新后再试。';
-
-  @override
-  String get providerErrorActivate => '未能确认切换成功，请刷新并检查当前模型后再试。';
 
   @override
   String get providerErrorUnreachable => '连不上这个 API 地址，请检查地址和网络。';
@@ -1996,13 +1927,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get providerManualModels => '每行一个模型 ID，也可用逗号分隔';
-
-  @override
   String get providerErrorExists => '这个名称已经有配置了，请换个名称，或返回列表编辑原配置。';
-
-  @override
-  String get providerErrorBusy => '当前会话正在处理消息，请等它结束后再切换配置。';
 
   @override
   String get providerErrorKeyEndpoint =>
@@ -2034,4 +1959,109 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerClearKey => '移除已存 Key';
+
+  @override
+  String providerOutdated(String version, String latest) {
+    return '已安装的 Provider 插件是旧版（$version）。旧版会在每次打开会话时把模型换成“默认配置”的模型，更新到 $latest 后就不会了。';
+  }
+
+  @override
+  String get providerUpgradeTitle => '更新 Provider 插件';
+
+  @override
+  String providerUpgradeWarning(String latest) {
+    return '会用随应用提供的 $latest 版替换旧版插件登记。已经打开的会话继续用旧版，新打开的会话才会加载新版。确定更新吗？';
+  }
+
+  @override
+  String get providerDiscard => '放弃更改';
+
+  @override
+  String get providerRemove => '删除配置';
+
+  @override
+  String get providerNewTitle => '新配置';
+
+  @override
+  String get providerModelsTitle => '模型';
+
+  @override
+  String providerModelsSummary(int enabled, int total) {
+    return '已显示 $enabled/$total 个模型';
+  }
+
+  @override
+  String get providerSync => '自动同步模型列表';
+
+  @override
+  String providerSyncedAt(String time) {
+    return '上次获取：$time';
+  }
+
+  @override
+  String get providerNeverSynced => '还没获取过模型列表';
+
+  @override
+  String get providerFilterModels => '筛选模型';
+
+  @override
+  String get providerEnableAll => '全部显示';
+
+  @override
+  String get providerDisableAll => '全部隐藏';
+
+  @override
+  String get providerShowModel => '在模型选择器中显示';
+
+  @override
+  String get providerHideModel => '在模型选择器中隐藏';
+
+  @override
+  String get providerAddModelHint => '手动添加模型 ID';
+
+  @override
+  String get providerAddModel => '添加';
+
+  @override
+  String get providerRemoveModel => '移除这个手动模型';
+
+  @override
+  String get providerManualBadge => '手动';
+
+  @override
+  String get providerCustomBadge => '自定义';
+
+  @override
+  String get providerReasoningBadge => '推理';
+
+  @override
+  String get providerImageBadge => '图片';
+
+  @override
+  String providerContextK(String count) {
+    return '${count}K';
+  }
+
+  @override
+  String providerContextM(String count) {
+    return '${count}M';
+  }
+
+  @override
+  String get providerNoModels => '还没有模型';
+
+  @override
+  String get providerNoModelMatches => '没有匹配的模型。';
+
+  @override
+  String get providerSaved => '已保存';
+
+  @override
+  String get providerDiscardTitle => '放弃未保存的修改？';
+
+  @override
+  String get providerDiscardBody => '这个配置还有没保存的修改，离开后会丢失。';
+
+  @override
+  String get providerErrorNoModels => '至少要保留一个在模型选择器中显示的模型。';
 }

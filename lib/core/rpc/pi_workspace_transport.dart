@@ -28,6 +28,14 @@ class PiWorkspaceTransport implements PiRpcTransport {
         await File('${directory.path}/$name')
             .writeAsString(script, flush: true);
       }
+      // The provider settings adapter shares listing/capability rules with
+      // the bundled pi-provider-switch plugin instead of duplicating them.
+      await File('${directory.path}/provider_catalog.mjs').writeAsString(
+        await rootBundle.loadString(
+          'pi-provider-switch/extensions/provider-switch/catalog.mjs',
+        ),
+        flush: true,
+      );
       final file = File('${directory.path}/workspace_rpc.mjs');
       return PiWorkspaceTransport._(
         await PiProcessTransport.startAdapter(

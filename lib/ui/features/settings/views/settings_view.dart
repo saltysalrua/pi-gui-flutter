@@ -35,14 +35,14 @@ typedef _SettingsPage = SettingsPage;
 Future<void> showSettings(
   BuildContext context, {
   PiRpcClient? control,
-  PiRpcClient? Function()? activeSessionClient,
+  VoidCallback? onProvidersChanged,
   SettingsPage initialPage = SettingsPage.appearance,
 }) => Navigator.of(context).push<void>(
   AppDesktopPageRoute<void>(
     reduceMotion: MediaQuery.disableAnimationsOf(context),
     builder: (_) => SettingsView(
       control: control,
-      activeSessionClient: activeSessionClient,
+      onProvidersChanged: onProvidersChanged,
       initialPage: initialPage,
     ),
   ),
@@ -55,11 +55,13 @@ class SettingsView extends StatefulWidget {
   const SettingsView({
     super.key,
     this.control,
-    this.activeSessionClient,
+    this.onProvidersChanged,
     this.initialPage = SettingsPage.appearance,
   });
   final PiRpcClient? control;
-  final PiRpcClient? Function()? activeSessionClient;
+  /// Called after provider profiles were saved or removed, so the host can
+  /// re-read model lists once the plugin has picked up the change.
+  final VoidCallback? onProvidersChanged;
   final SettingsPage initialPage;
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -103,6 +105,16 @@ class _SettingsViewState extends State<SettingsView> {
     super.dispose();
   }
 
+  ProviderProfilesController _createProfiles(PiRpcClient control) {
+    final controller = ProviderProfilesController(control);
+    controller.addListener(() {
+      if (!controller.changed) return;
+      controller.changed = false;
+      widget.onProvidersChanged?.call();
+    });
+    return controller..load();
+  }
+
   void _scrollToTop() {
     if (!_scroll.hasClients) return;
     _scroll.animateTo(
@@ -135,10 +147,7 @@ class _SettingsViewState extends State<SettingsView> {
       final control = widget.control;
       if (control != null) {
         _plugins ??= PackagesController(control)..load();
-        _profiles ??= ProviderProfilesController(
-          control,
-          widget.activeSessionClient ?? () => null,
-        )..load();
+        _profiles ??= _createProfiles(control);
       }
     }
     // Outgoing and incoming pages coexist during the cross-fade. They cannot
@@ -267,10 +276,7 @@ class _SettingsViewState extends State<SettingsView> {
                 }
                 return PackagesSettingsContent(
                   controller: _plugins ??= PackagesController(control)..load(),
-                  profiles: _profiles ??= ProviderProfilesController(
-                    control,
-                    widget.activeSessionClient ?? () => null,
-                  )..load(),
+                  profiles: _profiles ??= _createProfiles(control),
                   query: _query,
                 );
               }(),

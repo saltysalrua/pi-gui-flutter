@@ -48,6 +48,7 @@ flutter:
     - pi-provider-switch/package.json
     - pi-provider-switch/extensions/provider-switch.ts
     - pi-provider-switch/extensions/provider-switch/inputs.ts
+    - pi-provider-switch/extensions/provider-switch/catalog.mjs
     - assets/images/
 
   fonts:

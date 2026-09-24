@@ -3536,16 +3536,10 @@ abstract class AppLocalizations {
   /// **'Provider 配置'**
   String get providerTitle;
 
-  /// No description provided for @providerDescription.
-  ///
-  /// In zh, this message translates to:
-  /// **'添加 API 地址和 Key，获取模型后交给 Pi 使用。配置可以先保存，启用插件后再切换。'**
-  String get providerDescription;
-
   /// No description provided for @providerNotInstalled.
   ///
   /// In zh, this message translates to:
-  /// **'尚未安装 Provider 插件。你可以先管理配置；使用配置前需要确认安装。'**
+  /// **'还没安装 Provider 插件。装好后模型才会出现在模型选择器里。'**
   String get providerNotInstalled;
 
   /// No description provided for @providerDisabled.
@@ -3563,7 +3557,7 @@ abstract class AppLocalizations {
   /// No description provided for @providerInstallWarning.
   ///
   /// In zh, this message translates to:
-  /// **'此操作会把随应用提供的 pi-provider-switch 安装到 Pi 的全局配置。扩展拥有与 Pi 相同的系统权限；之后的新会话会加载它，已启用的配置会从服务商刷新模型列表。配置可能包含 API Key，请优先使用环境变量。首次选中未知模型的图片能力探测默认关闭。确定安装吗？'**
+  /// **'此操作会把随应用提供的 pi-provider-switch 安装到 Pi 的全局配置。扩展拥有与 Pi 相同的系统权限，之后启动的会话会加载它，并用配置里的 Key 获取模型列表。配置可能包含 API Key，请优先使用环境变量。确定安装吗？'**
   String get providerInstallWarning;
 
   /// No description provided for @providerAdd.
@@ -3572,53 +3566,11 @@ abstract class AppLocalizations {
   /// **'添加配置'**
   String get providerAdd;
 
-  /// No description provided for @providerEdit.
-  ///
-  /// In zh, this message translates to:
-  /// **'编辑配置'**
-  String get providerEdit;
-
   /// No description provided for @providerSave.
   ///
   /// In zh, this message translates to:
-  /// **'保存配置'**
+  /// **'保存'**
   String get providerSave;
-
-  /// No description provided for @providerActivate.
-  ///
-  /// In zh, this message translates to:
-  /// **'使用此配置'**
-  String get providerActivate;
-
-  /// No description provided for @providerSelected.
-  ///
-  /// In zh, this message translates to:
-  /// **'默认'**
-  String get providerSelected;
-
-  /// No description provided for @providerActive.
-  ///
-  /// In zh, this message translates to:
-  /// **'当前默认配置：{name}'**
-  String providerActive(String name);
-
-  /// No description provided for @providerNone.
-  ///
-  /// In zh, this message translates to:
-  /// **'无'**
-  String get providerNone;
-
-  /// No description provided for @providerNextSession.
-  ///
-  /// In zh, this message translates to:
-  /// **'已保存默认配置；当前会话未加载插件，新会话或下次启动后生效。'**
-  String get providerNextSession;
-
-  /// No description provided for @providerEmpty.
-  ///
-  /// In zh, this message translates to:
-  /// **'还没有 Provider 配置。添加一个后即可选择。'**
-  String get providerEmpty;
 
   /// No description provided for @providerModelCount.
   ///
@@ -3632,16 +3584,10 @@ abstract class AppLocalizations {
   /// **'删除配置“{name}”？这不会卸载插件，且无法撤销。'**
   String providerRemoveWarning(String name);
 
-  /// No description provided for @providerInvalid.
-  ///
-  /// In zh, this message translates to:
-  /// **'请先填写配置名称和 API 地址。'**
-  String get providerInvalid;
-
   /// No description provided for @providerName.
   ///
   /// In zh, this message translates to:
-  /// **'例如 my-api（字母、数字、点、横线、下划线）'**
+  /// **'例如 my-api'**
   String get providerName;
 
   /// No description provided for @providerBaseUrl.
@@ -3668,30 +3614,6 @@ abstract class AppLocalizations {
   /// **'已保存 Key，留空则不修改'**
   String get providerKeepKey;
 
-  /// No description provided for @providerKeyHint.
-  ///
-  /// In zh, this message translates to:
-  /// **'Key 会写进插件的 provider-profiles.json。更推荐填 \$环境变量名，别把这个文件提交到仓库。'**
-  String get providerKeyHint;
-
-  /// No description provided for @providerModels.
-  ///
-  /// In zh, this message translates to:
-  /// **'留空保存时会自动获取模型；也可先点「获取模型列表」再选默认模型。刷新不会移除已有 ID，不支持列表接口时可手填。'**
-  String get providerModels;
-
-  /// No description provided for @providerDefaultModel.
-  ///
-  /// In zh, this message translates to:
-  /// **'默认模型'**
-  String get providerDefaultModel;
-
-  /// No description provided for @providerThinking.
-  ///
-  /// In zh, this message translates to:
-  /// **'默认支持思考'**
-  String get providerThinking;
-
   /// No description provided for @providerEnable.
   ///
   /// In zh, this message translates to:
@@ -3716,12 +3638,6 @@ abstract class AppLocalizations {
   /// **'API Key'**
   String get providerKeyLabel;
 
-  /// No description provided for @providerModelsLabel.
-  ///
-  /// In zh, this message translates to:
-  /// **'模型'**
-  String get providerModelsLabel;
-
   /// No description provided for @providerFetchModels.
   ///
   /// In zh, this message translates to:
@@ -3734,36 +3650,6 @@ abstract class AppLocalizations {
   /// **'已获取 {count} 个模型'**
   String providerFetchedModels(int count);
 
-  /// No description provided for @providerFetchingOnSave.
-  ///
-  /// In zh, this message translates to:
-  /// **'正在从 API 获取模型…'**
-  String get providerFetchingOnSave;
-
-  /// No description provided for @providerDefaultModelValue.
-  ///
-  /// In zh, this message translates to:
-  /// **'默认模型：{model}'**
-  String providerDefaultModelValue(String model);
-
-  /// No description provided for @providerHasKey.
-  ///
-  /// In zh, this message translates to:
-  /// **'已保存 Key'**
-  String get providerHasKey;
-
-  /// No description provided for @providerThinkingBadge.
-  ///
-  /// In zh, this message translates to:
-  /// **'默认思考'**
-  String get providerThinkingBadge;
-
-  /// No description provided for @providerSwitched.
-  ///
-  /// In zh, this message translates to:
-  /// **'当前会话已切换到“{name}”。'**
-  String providerSwitched(String name);
-
   /// No description provided for @providerErrorInvalid.
   ///
   /// In zh, this message translates to:
@@ -3773,7 +3659,7 @@ abstract class AppLocalizations {
   /// No description provided for @providerErrorName.
   ///
   /// In zh, this message translates to:
-  /// **'名称需为 1–64 个字母、数字、点、横线或下划线，以字母或数字开头，且不能使用保留名称。'**
+  /// **'名称可用中文、字母、数字、点、横线或下划线（1–64 个字），以文字或数字开头，不能用保留名称。'**
   String get providerErrorName;
 
   /// No description provided for @providerErrorFile.
@@ -3787,12 +3673,6 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'这个配置已经不存在了，可能在别处被删了。请刷新后再试。'**
   String get providerErrorNotFound;
-
-  /// No description provided for @providerErrorActivate.
-  ///
-  /// In zh, this message translates to:
-  /// **'未能确认切换成功，请刷新并检查当前模型后再试。'**
-  String get providerErrorActivate;
 
   /// No description provided for @providerErrorUnreachable.
   ///
@@ -3842,23 +3722,11 @@ abstract class AppLocalizations {
   /// **'操作没有完成：{detail}'**
   String providerErrorGeneric(String detail);
 
-  /// No description provided for @providerManualModels.
-  ///
-  /// In zh, this message translates to:
-  /// **'每行一个模型 ID，也可用逗号分隔'**
-  String get providerManualModels;
-
   /// No description provided for @providerErrorExists.
   ///
   /// In zh, this message translates to:
   /// **'这个名称已经有配置了，请换个名称，或返回列表编辑原配置。'**
   String get providerErrorExists;
-
-  /// No description provided for @providerErrorBusy.
-  ///
-  /// In zh, this message translates to:
-  /// **'当前会话正在处理消息，请等它结束后再切换配置。'**
-  String get providerErrorBusy;
 
   /// No description provided for @providerErrorKeyEndpoint.
   ///
@@ -3919,6 +3787,192 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'移除已存 Key'**
   String get providerClearKey;
+
+  /// No description provided for @providerOutdated.
+  ///
+  /// In zh, this message translates to:
+  /// **'已安装的 Provider 插件是旧版（{version}）。旧版会在每次打开会话时把模型换成“默认配置”的模型，更新到 {latest} 后就不会了。'**
+  String providerOutdated(String version, String latest);
+
+  /// No description provided for @providerUpgradeTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新 Provider 插件'**
+  String get providerUpgradeTitle;
+
+  /// No description provided for @providerUpgradeWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'会用随应用提供的 {latest} 版替换旧版插件登记。已经打开的会话继续用旧版，新打开的会话才会加载新版。确定更新吗？'**
+  String providerUpgradeWarning(String latest);
+
+  /// No description provided for @providerDiscard.
+  ///
+  /// In zh, this message translates to:
+  /// **'放弃更改'**
+  String get providerDiscard;
+
+  /// No description provided for @providerRemove.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除配置'**
+  String get providerRemove;
+
+  /// No description provided for @providerNewTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'新配置'**
+  String get providerNewTitle;
+
+  /// No description provided for @providerModelsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'模型'**
+  String get providerModelsTitle;
+
+  /// No description provided for @providerModelsSummary.
+  ///
+  /// In zh, this message translates to:
+  /// **'已显示 {enabled}/{total} 个模型'**
+  String providerModelsSummary(int enabled, int total);
+
+  /// No description provided for @providerSync.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动同步模型列表'**
+  String get providerSync;
+
+  /// No description provided for @providerSyncedAt.
+  ///
+  /// In zh, this message translates to:
+  /// **'上次获取：{time}'**
+  String providerSyncedAt(String time);
+
+  /// No description provided for @providerNeverSynced.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没获取过模型列表'**
+  String get providerNeverSynced;
+
+  /// No description provided for @providerFilterModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'筛选模型'**
+  String get providerFilterModels;
+
+  /// No description provided for @providerEnableAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部显示'**
+  String get providerEnableAll;
+
+  /// No description provided for @providerDisableAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部隐藏'**
+  String get providerDisableAll;
+
+  /// No description provided for @providerShowModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'在模型选择器中显示'**
+  String get providerShowModel;
+
+  /// No description provided for @providerHideModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'在模型选择器中隐藏'**
+  String get providerHideModel;
+
+  /// No description provided for @providerAddModelHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'手动添加模型 ID'**
+  String get providerAddModelHint;
+
+  /// No description provided for @providerAddModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加'**
+  String get providerAddModel;
+
+  /// No description provided for @providerRemoveModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'移除这个手动模型'**
+  String get providerRemoveModel;
+
+  /// No description provided for @providerManualBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'手动'**
+  String get providerManualBadge;
+
+  /// No description provided for @providerCustomBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'自定义'**
+  String get providerCustomBadge;
+
+  /// No description provided for @providerReasoningBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'推理'**
+  String get providerReasoningBadge;
+
+  /// No description provided for @providerImageBadge.
+  ///
+  /// In zh, this message translates to:
+  /// **'图片'**
+  String get providerImageBadge;
+
+  /// No description provided for @providerContextK.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count}K'**
+  String providerContextK(String count);
+
+  /// No description provided for @providerContextM.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count}M'**
+  String providerContextM(String count);
+
+  /// No description provided for @providerNoModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有模型'**
+  String get providerNoModels;
+
+  /// No description provided for @providerNoModelMatches.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有匹配的模型。'**
+  String get providerNoModelMatches;
+
+  /// No description provided for @providerSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'已保存'**
+  String get providerSaved;
+
+  /// No description provided for @providerDiscardTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'放弃未保存的修改？'**
+  String get providerDiscardTitle;
+
+  /// No description provided for @providerDiscardBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'这个配置还有没保存的修改，离开后会丢失。'**
+  String get providerDiscardBody;
+
+  /// No description provided for @providerErrorNoModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'至少要保留一个在模型选择器中显示的模型。'**
+  String get providerErrorNoModels;
 }
 
 class _AppLocalizationsDelegate

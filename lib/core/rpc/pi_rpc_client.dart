@@ -17,7 +17,6 @@ class _PendingRequest {
   bool get isProviderMutation => const {
     'gui_provider_profiles_save',
     'gui_provider_profiles_remove',
-    'gui_provider_profiles_activate',
   }.contains(command);
   bool get isWorkspaceMutation => const {
     'gui_open_workspace',
@@ -472,25 +471,6 @@ class PiRpcClient
     return List.unmodifiable(
       (data['messages'] as List).map(PiChatMessage.fromJson),
     );
-  }
-
-  /// Check provenance before dispatching an extension slash command: an
-  /// unknown /switch would otherwise be sent to the model as a user prompt.
-  Future<bool> hasProviderSwitchCommand() async {
-    final data = rpcObject(await _request('get_commands'));
-    final commands = data['commands'];
-    if (commands is! List) return false;
-    return commands.whereType<Map>().any((entry) {
-      final sourcePath =
-          entry['path'] ??
-          (entry['sourceInfo'] is Map ? entry['sourceInfo']['path'] : null);
-      return entry['name'] == 'switch' &&
-          entry['source'] == 'extension' &&
-          sourcePath is String &&
-          sourcePath
-              .replaceAll('\\', '/')
-              .endsWith('/extensions/provider-switch.ts');
-    });
   }
 
   @override

@@ -764,27 +764,12 @@
   "historyImageOnly": "图片消息",
   "historyPreviewFailed": "无法加载此节点的预览，请重试。",
   "providerTitle": "Provider 配置",
-  "providerDescription": "添加 API 地址和 Key，获取模型后交给 Pi 使用。配置可以先保存，启用插件后再切换。",
-  "providerNotInstalled": "尚未安装 Provider 插件。你可以先管理配置；使用配置前需要确认安装。",
+  "providerNotInstalled": "还没安装 Provider 插件。装好后模型才会出现在模型选择器里。",
   "providerDisabled": "插件已安装，但目前是停用状态。启用后，新会话会加载它。",
   "providerInstallTitle": "安装 Provider 插件",
-  "providerInstallWarning": "此操作会把随应用提供的 pi-provider-switch 安装到 Pi 的全局配置。扩展拥有与 Pi 相同的系统权限；之后的新会话会加载它，已启用的配置会从服务商刷新模型列表。配置可能包含 API Key，请优先使用环境变量。首次选中未知模型的图片能力探测默认关闭。确定安装吗？",
+  "providerInstallWarning": "此操作会把随应用提供的 pi-provider-switch 安装到 Pi 的全局配置。扩展拥有与 Pi 相同的系统权限，之后启动的会话会加载它，并用配置里的 Key 获取模型列表。配置可能包含 API Key，请优先使用环境变量。确定安装吗？",
   "providerAdd": "添加配置",
-  "providerEdit": "编辑配置",
-  "providerSave": "保存配置",
-  "providerActivate": "使用此配置",
-  "providerSelected": "默认",
-  "providerActive": "当前默认配置：{name}",
-  "@providerActive": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "providerNone": "无",
-  "providerNextSession": "已保存默认配置；当前会话未加载插件，新会话或下次启动后生效。",
-  "providerEmpty": "还没有 Provider 配置。添加一个后即可选择。",
+  "providerSave": "保存",
   "providerModelCount": "{count} 个模型",
   "@providerModelCount": {
     "placeholders": {
@@ -801,21 +786,15 @@
       }
     }
   },
-  "providerInvalid": "请先填写配置名称和 API 地址。",
-  "providerName": "例如 my-api（字母、数字、点、横线、下划线）",
+  "providerName": "例如 my-api",
   "providerBaseUrl": "https://api.example.com/v1",
   "providerApi": "接口类型",
   "providerKey": "sk-… 或 $ENV_VAR",
   "providerKeepKey": "已保存 Key，留空则不修改",
-  "providerKeyHint": "Key 会写进插件的 provider-profiles.json。更推荐填 $环境变量名，别把这个文件提交到仓库。",
-  "providerModels": "留空保存时会自动获取模型；也可先点「获取模型列表」再选默认模型。刷新不会移除已有 ID，不支持列表接口时可手填。",
-  "providerDefaultModel": "默认模型",
-  "providerThinking": "默认支持思考",
   "providerEnable": "启用插件",
   "providerNameLabel": "配置名称",
   "providerBaseUrlLabel": "API 地址",
   "providerKeyLabel": "API Key",
-  "providerModelsLabel": "模型",
   "providerFetchModels": "获取模型列表",
   "providerFetchedModels": "已获取 {count} 个模型",
   "@providerFetchedModels": {
@@ -825,30 +804,10 @@
       }
     }
   },
-  "providerFetchingOnSave": "正在从 API 获取模型…",
-  "providerDefaultModelValue": "默认模型：{model}",
-  "@providerDefaultModelValue": {
-    "placeholders": {
-      "model": {
-        "type": "String"
-      }
-    }
-  },
-  "providerHasKey": "已保存 Key",
-  "providerThinkingBadge": "默认思考",
-  "providerSwitched": "当前会话已切换到“{name}”。",
-  "@providerSwitched": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
   "providerErrorInvalid": "有内容没填对，请检查 API 地址（需以 http:// 或 https:// 开头）和模型。",
-  "providerErrorName": "名称需为 1–64 个字母、数字、点、横线或下划线，以字母或数字开头，且不能使用保留名称。",
+  "providerErrorName": "名称可用中文、字母、数字、点、横线或下划线（1–64 个字），以文字或数字开头，不能用保留名称。",
   "providerErrorFile": "provider-profiles.json 内容损坏，读取不了。请先手动修好这个文件。",
   "providerErrorNotFound": "这个配置已经不存在了，可能在别处被删了。请刷新后再试。",
-  "providerErrorActivate": "未能确认切换成功，请刷新并检查当前模型后再试。",
   "providerErrorUnreachable": "连不上这个 API 地址，请检查地址和网络。",
   "providerErrorUnauthorized": "API Key 不对，或者没有权限获取模型列表。",
   "providerErrorHttp": "服务器拒绝了获取模型列表的请求，请确认地址是否正确。",
@@ -864,9 +823,7 @@
       }
     }
   },
-  "providerManualModels": "每行一个模型 ID，也可用逗号分隔",
   "providerErrorExists": "这个名称已经有配置了，请换个名称，或返回列表编辑原配置。",
-  "providerErrorBusy": "当前会话正在处理消息，请等它结束后再切换配置。",
   "providerErrorKeyEndpoint": "API 地址或接口类型已更改。为避免把旧 Key 发给其他服务，请重新填写 Key，或选择「移除已存 Key」。",
   "providerErrorUnknownOutcome": "暂未确认操作结果，请先刷新配置确认，不要重复提交。",
   "providerErrorBackend": "当前运行的后端还不支持此功能。请结束任务后重新启动应用，再试一次。",
@@ -876,5 +833,84 @@
   "providerHideKey": "隐藏 Key",
   "providerSavedKey": "已存 Key",
   "providerRetainKey": "保留（输入新 Key 可替换）",
-  "providerClearKey": "移除已存 Key"
+  "providerClearKey": "移除已存 Key",
+  "providerOutdated": "已安装的 Provider 插件是旧版（{version}）。旧版会在每次打开会话时把模型换成“默认配置”的模型，更新到 {latest} 后就不会了。",
+  "@providerOutdated": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "latest": {
+        "type": "String"
+      }
+    }
+  },
+  "providerUpgradeTitle": "更新 Provider 插件",
+  "providerUpgradeWarning": "会用随应用提供的 {latest} 版替换旧版插件登记。已经打开的会话继续用旧版，新打开的会话才会加载新版。确定更新吗？",
+  "@providerUpgradeWarning": {
+    "placeholders": {
+      "latest": {
+        "type": "String"
+      }
+    }
+  },
+  "providerDiscard": "放弃更改",
+  "providerRemove": "删除配置",
+  "providerNewTitle": "新配置",
+  "providerModelsTitle": "模型",
+  "providerModelsSummary": "已显示 {enabled}/{total} 个模型",
+  "@providerModelsSummary": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "providerSync": "自动同步模型列表",
+  "providerSyncedAt": "上次获取：{time}",
+  "@providerSyncedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "providerNeverSynced": "还没获取过模型列表",
+  "providerFilterModels": "筛选模型",
+  "providerEnableAll": "全部显示",
+  "providerDisableAll": "全部隐藏",
+  "providerShowModel": "在模型选择器中显示",
+  "providerHideModel": "在模型选择器中隐藏",
+  "providerAddModelHint": "手动添加模型 ID",
+  "providerAddModel": "添加",
+  "providerRemoveModel": "移除这个手动模型",
+  "providerManualBadge": "手动",
+  "providerCustomBadge": "自定义",
+  "providerReasoningBadge": "推理",
+  "providerImageBadge": "图片",
+  "providerContextK": "{count}K",
+  "@providerContextK": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "providerContextM": "{count}M",
+  "@providerContextM": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "providerNoModels": "还没有模型",
+  "providerNoModelMatches": "没有匹配的模型。",
+  "providerSaved": "已保存",
+  "providerDiscardTitle": "放弃未保存的修改？",
+  "providerDiscardBody": "这个配置还有没保存的修改，离开后会丢失。",
+  "providerErrorNoModels": "至少要保留一个在模型选择器中显示的模型。"
 }
