@@ -738,6 +738,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSearch => 'Search settings…';
 
   @override
+  String get settingsRefresh => 'Refresh';
+
+  @override
   String get settingsNoResults => 'No matching settings';
 
   @override
@@ -796,6 +799,23 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get piCheckFailed =>
       'Could not check for updates. Check your network and try again.';
+
+  @override
+  String get piRefresh => 'Refresh data';
+
+  @override
+  String get piRefreshHint =>
+      'Re-read the installed version and changelog, then check npm for the latest release. The app also refreshes automatically in the background.';
+
+  @override
+  String get piUpcomingNotes => 'What\'s new in the update';
+
+  @override
+  String get piUpcomingLoading => 'Fetching release notes…';
+
+  @override
+  String get piUpcomingFailed =>
+      'Couldn\'t fetch the release notes. Open the npm page above to read them online.';
 
   @override
   String get piLoading => 'Reading the Pi installation…';

@@ -19,14 +19,16 @@ tags: [flutter, settings, packages, pi-backend, npm]
 
 ### pi 一键更新
 
-- 打开 **设置 → pi**。页面会自动查询 npm 上的最新版本。
-- 发现新版本时会出现提示卡片，点击 **立即更新** 即可。更新会运行 `pi update --self`，输出实时显示在 **更新输出** 折叠块里。
+- 打开 **设置 → pi**。应用启动时已在后台查好最新版本，页面直接显示结果，无需等待。
+- 发现新版本时会出现提示卡片，并直接展开**新版本更新说明**（在线获取已发布包的 CHANGELOG），点击 **立即更新** 即可。更新会运行 `pi update --self`，输出实时显示在 **更新输出** 折叠块里。
+- 平时数据每 30 分钟自动静默刷新；也可点 **刷新数据** 手动重读。详见 [Pi 设置页文档](pi_settings.md)。
 - 更新完成不需要重启本应用：正在运行的会话继续用当前版本，之后**新开的会话**自动使用新版本。
 - 更新失败时下方会显示原因；也可以展开 **手动更新命令**，复制到终端执行。
 
 ### 插件市场
 
 - 打开 **设置 → 插件 → 市场**。列表默认显示全部 `pi-package` 包；列表上方有**独立的搜索框**，输入后实时搜索 npm，顶部下拉可切换排序（**相关性 / 下载量 / 最近更新 / 名称**）。
+- 列表数据在**应用启动时就会后台预取**，之后每 15 分钟静默刷新，打开/切换页面直接显示缓存、无加载等待；同一搜索 10 分钟内不重复发请求。需要立刻拿到最新列表时点搜索框旁的 **刷新** 按钮（强制重新查询，期间保留旧列表显示）。
 - 设置页左侧的共享搜索框在本页仍然生效：它会即时过滤市场列表（包名/简介/关键词）与管理页的条目，不额外发网络请求。
 - 每个条目显示包名、简介、作者、版本、更新时间、月下载量，以及「扩展」「技能」类型标签；点 **打开 npm 页面** / **打开仓库** 跳转对应页面。
 - 点 **安装** 运行 `pi install npm:<包名>`，进度与输出显示在列表下方的 **操作输出** 卡片；完成后按钮变成 **已安装** 徽章。
@@ -34,7 +36,7 @@ tags: [flutter, settings, packages, pi-backend, npm]
 
 ### 插件管理
 
-- 打开 **设置 → 插件 → 管理**。列表上方有**独立的搜索框**，即时过滤已安装的插件与资源（匹配来源、包名、安装路径和资源名，不额外发网络请求）；设置页左侧的共享搜索框在本页同样生效。
+- 打开 **设置 → 插件 → 管理**。列表上方有**独立的搜索框**，即时过滤已安装的插件与资源（匹配来源、包名、安装路径和资源名，不额外发网络请求）；设置页左侧的共享搜索框在本页同样生效。已安装包列表同样在应用启动时后台预取、每 15 分钟静默刷新；搜索框旁的 **刷新** 按钮可立即重读。
 - 列表按范围分成两组：**全局**（用户目录 `~/.pi/agent`）与**项目**（工作区）。项目组启停开关置灰，需在对应项目目录用 `pi config -l` 管理（组标题旁有提示）。
 - 已配置的插件包逐个成卡：来源（如 `npm:pi-lens`）、安装目录、范围徽章与操作按钮（**更新** / **移除**，移除前有确认弹窗）。
 - 卡片内按资源类型（扩展 / 技能 / 提示词 / 主题）列出该包提供的每项资源，右侧下拉切换 **启用 / 停用**——写入的配置与 `pi config` 逐字节一致（顶层资源写 `settings.json` 的 `+/-` 模式条目；包资源写进包条目的筛选数组）。技能资源显示**技能目录名**（如 `find-skills`）而不是千篇一律的 `SKILL.md`；完整路径在 Tooltip 里。
@@ -51,10 +53,11 @@ tags: [flutter, settings, packages, pi-backend, npm]
 | `assets/backend/workspace_manager.mjs` | `control()` 路由 `gui_packages_*` → `this.packages()`，惰性 import 桥接模块；`packageRoot` 经 `workspace_rpc.mjs` 的 `--gui-multiplex` main 传入 |
 | `lib/core/rpc/pi_workspace_transport.dart` + `pubspec.yaml` | 解包六个后端 assets（新增 `gui_packages.mjs`） |
 | `lib/core/rpc/pi_packages_types.dart` | `PiPackageEntry` / `PiResourceItem`（含 `displayName`：技能行显示父目录名而非 SKILL.md）/ `PiPackagesState` / `PiPackagesProgress` / `PiPackagesFinished` 模型与 `PiPackagesService`（`requestGui` 封装） |
-| `lib/ui/features/settings/controllers/packages_controller.dart` | `PackagesController`：状态机（load / run / toggle / searchGallery / setGallerySort）、npm registry 搜索（`npm config get registry` 优先，失败回退官方源）、`parseRegistrySearch` 纯函数、`sortGallery` 排序纯函数 |
+| `lib/ui/features/settings/controllers/packages_controller.dart` | `PackagesController`：状态机（load / run / toggle / searchGallery / setGallerySort）、npm registry 搜索（`npm config get registry` 优先，失败回退官方源）、`parseRegistrySearch` 纯函数、`sortGallery` 排序纯函数。**共享实例**：`sharedFor(client)` 按控制通道客户端身份缓存单例（旧实例换客户端时销毁重建），实例内挂 15 分钟 `Timer.periodic` 静默刷新（`load(silent: true)` + 市场结果重拉；静默失败不覆盖已就绪的页面），市场结果 10 分钟 TTL 内同查询跳过网络 |
 | `lib/ui/features/settings/views/packages_settings_view.dart` | 插件页视图：市场/管理双 Tab、市场内搜索框＋排序下拉、管理页独立搜索框＋全局/项目分组＋共享搜索客户端过滤、条目渲染、确认弹窗、操作输出卡片 |
 | `lib/ui/features/settings/controllers/pi_update_controller.dart` | 新增 `runSelfUpdate()`：流式运行 `pi update --self`，成功后重新 `load()` 刷新版本与更新日志 |
-| `lib/ui/features/settings/views/settings_view.dart` | 设置外壳新增 `plugins` 页；`showSettings(context, control:)` 从 `HomeView` 接收首页 `WorkbenchController.control` |
+| `lib/ui/features/settings/views/settings_view.dart` | 设置外壳新增 `plugins` 页；`showSettings(context, control:)` 从 `HomeView` 接收首页 `WorkbenchController.control`。**pi / 插件控制器改为应用级共享实例，随弹窗关闭不销毁、打开不再重拉**；Provider 配置仍为每次弹窗独立创建 |
+| `lib/ui/features/home/views/home_view.dart` | 启动预热：`initState` 里 `PackagesController.sharedFor(_workbench.control).load()` + `searchGallery('')`（另见 [pi 设置页文档](pi_settings.md)的 PiUpdate 预热） |
 | `tool/check_packages_rpc.mjs` | 无模型、无网络的 Node 探针：用一次性 `PI_CODING_AGENT_DIR` 验证状态枚举、启停写入 pattern、异步任务事件与参数校验 |
 | `test/packages_controller_test.dart` | `parseRegistrySearch` 与 `sortGallery` 纯函数单测；`PiPackagesState.fromJson` 强类型映射回归（曾因 `Map.unmodifiable` 推断成 `List<dynamic>` 导致每次真实 state 都抛 TypeError、界面只显示笼统的 `PACKAGES_FAILED`） |
 

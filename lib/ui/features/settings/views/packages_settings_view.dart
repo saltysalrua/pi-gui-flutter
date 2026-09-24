@@ -227,6 +227,19 @@ class _GalleryTab extends StatelessWidget {
               ],
               onChanged: controller.setGallerySort,
             ),
+            const SizedBox(width: AppSpacing.sm),
+            // Manual refresh for the cached gallery list; the app also
+            // refreshes it silently on a timer, this forces a re-query now.
+            AppIconButton.subtle(
+              icon: Icons.refresh_rounded,
+              tooltip: l.settingsRefresh,
+              onPressed: controller.galleryStatus == GalleryStatus.loading
+                  ? null
+                  : () => controller.searchGallery(
+                      searchController.text,
+                      force: true,
+                    ),
+            ),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -238,20 +251,11 @@ class _GalleryTab extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
         switch (controller.galleryStatus) {
-          GalleryStatus.idle || GalleryStatus.loading => const AppCard(
-            child: Padding(
-              padding: EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: AppProgressIndicator(strokeWidth: 2),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Stale-while-revalidate: a background refresh keeps the previous
+          // list on screen; the spinner only appears before any data exists.
+          GalleryStatus.idle => _galleryBusyCard(),
+          GalleryStatus.loading when controller.gallery.isEmpty =>
+            _galleryBusyCard(),
           GalleryStatus.failed => AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,8 +271,10 @@ class _GalleryTab extends StatelessWidget {
                 AppActionButton.subtle(
                   label: l.appearanceRetry,
                   leading: const Icon(Icons.refresh),
-                  onPressed: () =>
-                      controller.searchGallery(searchController.text),
+                  onPressed: () => controller.searchGallery(
+                    searchController.text,
+                    force: true,
+                  ),
                 ),
               ],
             ),
@@ -279,30 +285,51 @@ class _GalleryTab extends StatelessWidget {
               child: Text(l.pluginsGalleryEmpty),
             ),
           ),
-          GalleryStatus.ready => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final item in _filtered.take(visible))
-                _GalleryItem(
-                  controller: controller,
-                  item: item,
-                  onInstall: () => controller.installFromGallery(item.name),
-                ),
-              if (visible < _filtered.length)
-                Center(
-                  child: AppActionButton.subtle(
-                    label: l.pluginsShowMore,
-                    leading: const Icon(Icons.expand_more_rounded),
-                    onPressed: onShowMore,
-                  ),
-                ),
-            ],
-          ),
+          GalleryStatus.loading ||
+          GalleryStatus.ready => _galleryList(context, visible),
         },
         if (operation != null) ...[
           const SizedBox(height: AppSpacing.xl),
           _OperationCard(controller: controller),
         ],
+      ],
+    );
+  }
+
+  static Widget _galleryBusyCard() => const AppCard(
+    child: Padding(
+      padding: EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: AppProgressIndicator(strokeWidth: 2),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _galleryList(BuildContext context, int visible) {
+    final l = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final item in _filtered.take(visible))
+          _GalleryItem(
+            controller: controller,
+            item: item,
+            onInstall: () => controller.installFromGallery(item.name),
+          ),
+        if (visible < _filtered.length)
+          Center(
+            child: AppActionButton.subtle(
+              label: l.pluginsShowMore,
+              leading: const Icon(Icons.expand_more_rounded),
+              onPressed: onShowMore,
+            ),
+          ),
       ],
     );
   }
@@ -467,22 +494,36 @@ class _ManageTabState extends State<_ManageTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppTextField(
-          controller: _search,
-          hintText: l.pluginsSearchManageHint,
-          isCompact: true,
-          leading: const Icon(Icons.search),
-          onChanged: (_) => setState(() {}),
-          trailing: _search.text.isEmpty
-              ? null
-              : AppIconButton.subtle(
-                  icon: Icons.close,
-                  tooltip: l.clearSearch,
-                  onPressed: () {
-                    _search.clear();
-                    setState(() {});
-                  },
-                ),
+        Row(
+          children: [
+            Expanded(
+              child: AppTextField(
+                controller: _search,
+                hintText: l.pluginsSearchManageHint,
+                isCompact: true,
+                leading: const Icon(Icons.search),
+                onChanged: (_) => setState(() {}),
+                trailing: _search.text.isEmpty
+                    ? null
+                    : AppIconButton.subtle(
+                        icon: Icons.close,
+                        tooltip: l.clearSearch,
+                        onPressed: () {
+                          _search.clear();
+                          setState(() {});
+                        },
+                      ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            // Manual refresh of the cached package state; the shared
+            // controller keeps it warm in the background otherwise.
+            AppIconButton.subtle(
+              icon: Icons.refresh_rounded,
+              tooltip: l.settingsRefresh,
+              onPressed: () => widget.controller.load(),
+            ),
+          ],
         ),
         const SizedBox(height: AppSpacing.xl),
         switch (widget.controller.status) {

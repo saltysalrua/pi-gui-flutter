@@ -76,4 +76,38 @@ void main() {
       );
     });
   });
+
+  group('PiUpdateController.filterUpcomingEntries', () {
+    final entries = PiUpdateController.parseChangelog(
+      '## [0.87.0] - 2026-09-20\n\n- Third.\n\n'
+      '## [0.86.0] - 2026-09-12\n\n- Second.\n\n'
+      '## [0.85.1] - 2026-09-05\n\n- First.\n',
+    );
+
+    test('keeps only versions newer than the installed one', () {
+      final upcoming = PiUpdateController.filterUpcomingEntries(
+        entries,
+        '0.85.1',
+      );
+      expect(upcoming.map((e) => e.version), ['0.87.0', '0.86.0']);
+    });
+
+    test('falls back to the top entry when nothing is newer', () {
+      // E.g. a prerelease dist-tag with a changelog that never got a newer
+      // section: still show the latest notes instead of nothing.
+      final upcoming = PiUpdateController.filterUpcomingEntries(
+        entries,
+        '0.87.0',
+      );
+      expect(upcoming, hasLength(1));
+      expect(upcoming.single.version, '0.87.0');
+    });
+
+    test('empty input stays empty', () {
+      expect(
+        PiUpdateController.filterUpcomingEntries(const [], '0.85.1'),
+        isEmpty,
+      );
+    });
+  });
 }

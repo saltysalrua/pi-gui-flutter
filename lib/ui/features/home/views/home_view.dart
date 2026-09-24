@@ -30,6 +30,8 @@ import '../widgets/workspace_document_view.dart';
 import '../widgets/worktree_create_dialog.dart';
 import '../../settings/views/settings_view.dart';
 import '../../settings/controllers/appearance_controller.dart';
+import '../../settings/controllers/packages_controller.dart';
+import '../../settings/controllers/pi_update_controller.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -70,6 +72,14 @@ class _HomeViewState extends State<HomeView> with WindowListener {
     unawaited(windowManager.setPreventClose(true).catchError((Object _) {}));
     unawaited(_workbench.initialize());
     _workbench.startIdleSweep();
+    // Warm the settings-page data once per app run (pi install info + npm
+    // update check, installed packages, plugin gallery). The shared
+    // controllers refresh silently on their own timers afterwards, so
+    // opening or switching settings pages never shows a loading state.
+    unawaited(PiUpdateController.instance.load());
+    final packages = PackagesController.sharedFor(_workbench.control);
+    unawaited(packages.load());
+    unawaited(packages.searchGallery(''));
   }
 
   Future<bool> _confirm(String title, String message, {String? action}) async =>

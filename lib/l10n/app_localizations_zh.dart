@@ -681,6 +681,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSearch => '搜索设置…';
 
   @override
+  String get settingsRefresh => '刷新';
+
+  @override
   String get settingsNoResults => '没有找到匹配的设置';
 
   @override
@@ -736,6 +739,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get piCheckFailed => '检查更新失败，请检查网络后重试。';
+
+  @override
+  String get piRefresh => '刷新数据';
+
+  @override
+  String get piRefreshHint => '重新读取本地版本与更新日志，并联网检查最新版本。后台也会定期自动刷新。';
+
+  @override
+  String get piUpcomingNotes => '新版本更新说明';
+
+  @override
+  String get piUpcomingLoading => '正在获取新版本更新说明…';
+
+  @override
+  String get piUpcomingFailed => '没能获取新版本更新说明，可以点上方“npm 页面”在线查看。';
 
   @override
   String get piLoading => '正在读取 Pi 的安装信息…';

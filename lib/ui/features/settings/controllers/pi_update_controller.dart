@@ -31,22 +31,47 @@ enum PiCheckStatus { idle, checking, upToDate, available, failed }
 
 enum PiSelfUpdateStatus { idle, running, succeeded, failed }
 
+/// Fetch states for the not-yet-installed version's online CHANGELOG.md.
+enum PiUpcomingStatus { idle, loading, ready, failed }
+
 /// Reads the npm-installed Pi backend (package version + CHANGELOG.md) and
 /// queries the npm registry for the latest published version.
 ///
-/// The controller is short-lived: one instance per open settings page. It never
+/// The app shares one instance ([instance]) for its whole lifetime: the data
+/// is warmed once at startup, refreshed silently by a periodic timer, and
+/// every settings dialog just renders the cache — switching or reopening the
+/// settings pages never re-triggers a visible reload. The controller never
 /// touches the running Pi RPC sessions; all data comes from npm CLI + files.
 class PiUpdateController extends ChangeNotifier {
   PiUpdateController();
 
+  /// App-wide shared instance with the periodic background refresh.
+  PiUpdateController._shared() {
+    _refreshTimer = Timer.periodic(
+      _refreshInterval,
+      (_) => unawaited(refresh()),
+    );
+  }
+
+  static PiUpdateController? _instance;
+
+  /// The one instance the app uses; created on first access (HomeView warms
+  /// it at startup) and never disposed.
+  static PiUpdateController get instance =>
+      _instance ??= PiUpdateController._shared();
+
+  /// Background cadence for the silent refresh: install info + update check.
+  static const _refreshInterval = Duration(minutes: 30);
+
   /// Set in [dispose]; async continuations (npm subprocess waits) must not
-  /// notify listeners after the settings page that owned this controller
+  /// notify listeners after a settings page that owned this controller
   /// has closed — otherwise ChangeNotifier throws used-after-dispose.
   bool _disposed = false;
 
   @override
   void dispose() {
     _disposed = true;
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -67,6 +92,10 @@ class PiUpdateController extends ChangeNotifier {
   PiCheckStatus _checkStatus = PiCheckStatus.idle;
   String? _latestVersion;
 
+  PiUpcomingStatus _upcomingStatus = PiUpcomingStatus.idle;
+  List<PiChangelogEntry> _upcomingEntries = const [];
+  String? _upcomingVersion;
+
   PiSelfUpdateStatus _selfUpdateStatus = PiSelfUpdateStatus.idle;
   final selfUpdateLog = <String>[];
 
@@ -76,36 +105,59 @@ class PiUpdateController extends ChangeNotifier {
   List<PiChangelogEntry> get entries => _entries;
   PiCheckStatus get checkStatus => _checkStatus;
   String? get latestVersion => _latestVersion;
+  PiUpcomingStatus get upcomingStatus => _upcomingStatus;
+  List<PiChangelogEntry> get upcomingEntries => _upcomingEntries;
   PiSelfUpdateStatus get selfUpdateStatus => _selfUpdateStatus;
   static String get registryPage => _registryPage;
 
   bool _loading = false;
+  bool _started = false;
+  Timer? _refreshTimer;
   bool get isSelfUpdating => _selfUpdateStatus == PiSelfUpdateStatus.running;
 
+  /// Loads only if nothing has ever been fetched (used when a settings
+  /// dialog opens before the startup warm-up ran, e.g. in tests).
+  void ensureLoaded() {
+    if (!_started) unawaited(load());
+  }
+
+  /// One installed-package snapshot: version, path and parsed changelog.
+  Future<({String version, String path, List<PiChangelogEntry> entries})>
+  _readInstallInfo() async {
+    final root = (await _runNpm(['root', '-g'])).trim();
+    if (root.isEmpty) throw StateError('npm root -g returned nothing');
+    final resolved = _normalize(Directory(root), packageName);
+    final packageJson = File('$resolved${Platform.pathSeparator}package.json');
+    final changelogFile = File(
+      '$resolved${Platform.pathSeparator}CHANGELOG.md',
+    );
+    final package =
+        jsonDecode(await packageJson.readAsString()) as Map<String, dynamic>;
+    final version = package['version'] as String?;
+    if (version == null || version.isEmpty) {
+      throw StateError('package.json has no version');
+    }
+    return (
+      version: version,
+      path: resolved,
+      entries: _parseChangelog(await changelogFile.readAsString()),
+    );
+  }
+
+  /// Visible load: flips the page into its loading state, then warms the
+  /// update check in the background. Used at startup and for manual retries.
   Future<void> load() async {
     if (_loading) return;
     _loading = true;
+    _started = true;
     _infoStatus = PiInfoStatus.loading;
     _notify();
     try {
-      final root = (await _runNpm(['root', '-g'])).trim();
+      final info = await _readInstallInfo();
       if (_disposed) return;
-      if (root.isEmpty) throw StateError('npm root -g returned nothing');
-      final resolved = _normalize(Directory(root), packageName);
-      final packageJson = File(
-        '$resolved${Platform.pathSeparator}package.json',
-      );
-      final changelogFile = File(
-        '$resolved${Platform.pathSeparator}CHANGELOG.md',
-      );
-      final package =
-          jsonDecode(await packageJson.readAsString()) as Map<String, dynamic>;
-      _currentVersion = package['version'] as String?;
-      if (_currentVersion == null || _currentVersion!.isEmpty) {
-        throw StateError('package.json has no version');
-      }
-      _installPath = resolved;
-      _entries = _parseChangelog(await changelogFile.readAsString());
+      _currentVersion = info.version;
+      _installPath = info.path;
+      _entries = info.entries;
       _infoStatus = PiInfoStatus.ready;
       _loading = false;
       _notify();
@@ -116,6 +168,27 @@ class PiUpdateController extends ChangeNotifier {
       _loading = false;
       _notify();
     }
+  }
+
+  /// Silent refresh (periodic timer): keeps the current data on screen and
+  /// only swaps in the fresh snapshot when it arrives. Failures are ignored
+  /// so a flaky network never destroys a good cached page. If the initial
+  /// load never succeeded, the timer retries the visible path instead so a
+  /// failed startup (e.g. offline at launch) heals on its own.
+  Future<void> refresh() async {
+    if (_loading) return;
+    if (_infoStatus != PiInfoStatus.ready) return load();
+    try {
+      final info = await _readInstallInfo();
+      if (_disposed) return;
+      _currentVersion = info.version;
+      _installPath = info.path;
+      _entries = info.entries;
+      _notify();
+    } catch (_) {
+      // Keep the cached snapshot.
+    }
+    unawaited(checkForUpdate());
   }
 
   Future<void> checkForUpdate() async {
@@ -137,6 +210,93 @@ class PiUpdateController extends ChangeNotifier {
       _checkStatus = PiCheckStatus.failed;
     }
     _notify();
+    if (_checkStatus == PiCheckStatus.available) {
+      unawaited(_fetchUpcomingNotes());
+    }
+  }
+
+  /// Fetches the CHANGELOG.md that ships with the *latest published*
+  /// version (via unpkg, then jsdelivr as fallback) so the settings page can
+  /// show release notes for the update that is about to be installed — the
+  /// locally installed changelog only covers versions up to the current one.
+  Future<void> _fetchUpcomingNotes() async {
+    final latest = _latestVersion;
+    final current = _currentVersion;
+    if (latest == null || current == null) return;
+    if (_upcomingStatus == PiUpcomingStatus.loading) return;
+    // Cached for this target version; manual refresh clears it below.
+    if (_upcomingVersion == latest &&
+        (_upcomingStatus == PiUpcomingStatus.ready ||
+            _upcomingEntries.isNotEmpty)) {
+      return;
+    }
+    _upcomingStatus = PiUpcomingStatus.loading;
+    _notify();
+    try {
+      String? text;
+      for (final uri in _upcomingNoteUris(latest)) {
+        text = await _tryFetchText(uri);
+        if (text != null && text.isNotEmpty) break;
+      }
+      if (_disposed) return;
+      final upcoming = text == null || text.isEmpty
+          ? const <PiChangelogEntry>[]
+          : filterUpcomingEntries(_parseChangelog(text), current);
+      if (upcoming.isEmpty) throw StateError('changelog has no entries');
+      _upcomingEntries = upcoming;
+      _upcomingVersion = latest;
+      _upcomingStatus = PiUpcomingStatus.ready;
+    } catch (_) {
+      _upcomingStatus = PiUpcomingStatus.failed;
+    }
+    _notify();
+  }
+
+  static List<Uri> _upcomingNoteUris(String version) => [
+    Uri.parse('https://unpkg.com/$packageName@$version/CHANGELOG.md'),
+    Uri.parse(
+      'https://cdn.jsdelivr.net/npm/$packageName@$version/CHANGELOG.md',
+    ),
+  ];
+
+  Future<String?> _tryFetchText(Uri uri) async {
+    final client = HttpClient();
+    try {
+      final request = await client
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 15));
+      request.headers.set(HttpHeaders.userAgentHeader, 'pi-gui');
+      final response = await request.close().timeout(
+        const Duration(seconds: 15),
+      );
+      if (response.statusCode != 200) return null;
+      return await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      return null;
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Picks the changelog entries newer than the installed version. If the
+  /// published changelog has no newer section (prerelease tags, lagging
+  /// changelog), falls back to its top entry so the card still shows
+  /// something useful. Pure function, unit-tested.
+  @visibleForTesting
+  static List<PiChangelogEntry> filterUpcomingEntries(
+    List<PiChangelogEntry> entries,
+    String currentVersion,
+  ) {
+    final newer = entries
+        .where((e) => compareVersions(e.version, currentVersion) > 0)
+        .toList(growable: false);
+    if (newer.isNotEmpty) return newer;
+    return entries.isEmpty
+        ? const <PiChangelogEntry>[]
+        : <PiChangelogEntry>[entries.first];
   }
 
   /// Runs `pi update --self` and streams its output. The official command
@@ -191,7 +351,13 @@ class PiUpdateController extends ChangeNotifier {
         : PiSelfUpdateStatus.failed;
     _notify();
     // The npm install replaced the package on disk; re-read version and log.
-    if (success && !_disposed) await load();
+    // The update check runs again and the upcoming-notes cache is now stale.
+    if (success && !_disposed) {
+      _upcomingVersion = null;
+      _upcomingEntries = const [];
+      _upcomingStatus = PiUpcomingStatus.idle;
+      await load();
+    }
     return success;
   }
 

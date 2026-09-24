@@ -144,6 +144,16 @@ class PiSettingsContent extends StatelessWidget {
               ),
             ),
             AppSettingRow(
+              title: l.piRefresh,
+              description: l.piRefreshHint,
+              control: AppActionButton.subtle(
+                label: l.settingsRefresh,
+                leading: const Icon(Icons.refresh_rounded),
+                isLoading: controller.infoStatus == PiInfoStatus.loading,
+                onPressed: controller.load,
+              ),
+            ),
+            AppSettingRow(
               title: l.piRegistryPage,
               description: l.piRegistryPageHint,
               control: AppIconButton.subtle(
@@ -200,6 +210,7 @@ class PiSettingsContent extends StatelessWidget {
                       ),
                     ),
                   ],
+                  ..._buildUpcomingNotes(context, controller),
                   const SizedBox(height: AppSpacing.md),
                   AppActionButton(
                     label: controller.isSelfUpdating
@@ -255,6 +266,75 @@ class PiSettingsContent extends StatelessWidget {
         _ChangelogSection(controller: controller, query: query),
       ],
     );
+  }
+
+  /// Release notes for the not-yet-installed version, fetched online from
+  /// the published package (the local CHANGELOG only covers installed
+  /// versions). Shown inside the "update available" card.
+  static List<Widget> _buildUpcomingNotes(
+    BuildContext context,
+    PiUpdateController controller,
+  ) {
+    final l = context.l10n;
+    final colors = context.colors;
+    switch (controller.upcomingStatus) {
+      case PiUpcomingStatus.idle:
+        return const [];
+      case PiUpcomingStatus.loading:
+        return [
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: AppProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  l.piUpcomingLoading,
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: colors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ];
+      case PiUpcomingStatus.failed:
+        return [
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            l.piUpcomingFailed,
+            style: context.textTheme.bodySmall?.copyWith(
+              color: colors.textSecondary,
+            ),
+          ),
+        ];
+      case PiUpcomingStatus.ready:
+        return [
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            l.piUpcomingNotes,
+            style: context.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          for (final entry in controller.upcomingEntries)
+            AppDisclosure(
+              key: ValueKey('upcoming-${entry.version}'),
+              framed: false,
+              initiallyExpanded: identical(
+                entry,
+                controller.upcomingEntries.first,
+              ),
+              title: entry.version,
+              subtitle: entry.date.isEmpty ? null : entry.date,
+              builder: (_) => AppMarkdown(data: entry.body),
+            ),
+        ];
+    }
   }
 }
 

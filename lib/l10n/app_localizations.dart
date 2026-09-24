@@ -1370,6 +1370,12 @@ abstract class AppLocalizations {
   /// **'搜索设置…'**
   String get settingsSearch;
 
+  /// No description provided for @settingsRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新'**
+  String get settingsRefresh;
+
   /// No description provided for @settingsNoResults.
   ///
   /// In zh, this message translates to:
@@ -1477,6 +1483,36 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'检查更新失败，请检查网络后重试。'**
   String get piCheckFailed;
+
+  /// No description provided for @piRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新数据'**
+  String get piRefresh;
+
+  /// No description provided for @piRefreshHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新读取本地版本与更新日志，并联网检查最新版本。后台也会定期自动刷新。'**
+  String get piRefreshHint;
+
+  /// No description provided for @piUpcomingNotes.
+  ///
+  /// In zh, this message translates to:
+  /// **'新版本更新说明'**
+  String get piUpcomingNotes;
+
+  /// No description provided for @piUpcomingLoading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在获取新版本更新说明…'**
+  String get piUpcomingLoading;
+
+  /// No description provided for @piUpcomingFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'没能获取新版本更新说明，可以点上方“npm 页面”在线查看。'**
+  String get piUpcomingFailed;
 
   /// No description provided for @piLoading.
   ///

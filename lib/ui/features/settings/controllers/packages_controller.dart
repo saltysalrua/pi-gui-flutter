@@ -54,6 +54,11 @@ class PackagesOperation {
 /// Backs the settings "packages" page. Management data and mutations go over
 /// the shared control channel (same backend as the home shell); the gallery
 /// browses the npm registry through the configured mirror like `npm` itself.
+///
+/// The app shares one instance per control client ([sharedFor]): HomeView
+/// warms the state + gallery at startup, a periodic timer refreshes them
+/// silently, and the settings dialog only renders the cache — switching or
+/// reopening the page never restarts a visible reload.
 class PackagesController extends ChangeNotifier {
   PackagesController(PiRpcClient client)
     : _service = PiPackagesService(client) {
@@ -61,8 +66,41 @@ class PackagesController extends ChangeNotifier {
   }
 
   static const officialRegistry = 'https://registry.npmjs.org/';
+
+  /// Background cadence for the silent state (+ gallery) refresh.
+  static const _refreshInterval = Duration(minutes: 15);
+
+  /// How long a gallery result stays fresh; reopening the plugins page
+  /// within this window renders the cache instead of re-querying npm.
+  static const _galleryTtl = Duration(minutes: 10);
+
+  static PackagesController? _shared;
+  static PiRpcClient? _sharedClient;
+
+  /// The app-wide instance bound to the long-lived control channel.
+  /// If the client is replaced (different object identity), the old cache
+  /// is disposed and rebuilt — a closed client must not be reused.
+  static PackagesController sharedFor(PiRpcClient client) {
+    final existing = _shared;
+    if (existing != null && identical(_sharedClient, client)) {
+      return existing;
+    }
+    existing?.dispose();
+    final controller = PackagesController(client);
+    _shared = controller;
+    _sharedClient = client;
+    controller._refreshTimer = Timer.periodic(
+      _refreshInterval,
+      (_) => unawaited(controller._refreshInBackground()),
+    );
+    return controller;
+  }
+
   final PiPackagesService _service;
   StreamSubscription<PiRpcEvent>? _events;
+  Timer? _refreshTimer;
+  bool _everLoaded = false;
+  DateTime? _galleryFetchedAt;
   final _pending = <String, Completer<PiPackagesFinished>>{};
   final _toggling = <String>{};
   String? _registry;
@@ -116,7 +154,25 @@ class PackagesController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  Future<void> load() async {
+  /// Loads only if nothing was ever fetched (covers opening the settings
+  /// dialog before the HomeView startup warm-up ran).
+  void ensureLoaded() {
+    if (!_everLoaded) unawaited(load());
+  }
+
+  /// Periodic silent refresh: keeps a previously loaded page on screen and
+  /// swaps in the fresh snapshot when it arrives. A silent failure never
+  /// clobbers good cached data.
+  Future<void> _refreshInBackground() async {
+    if (_disposed) return;
+    await load(silent: true);
+    if (!_disposed && galleryStatus == GalleryStatus.ready) {
+      await searchGallery(galleryQuery, force: true);
+    }
+  }
+
+  Future<void> load({bool silent = false}) async {
+    _everLoaded = true;
     try {
       final next = await _service.state();
       if (_disposed) return;
@@ -125,8 +181,11 @@ class PackagesController extends ChangeNotifier {
       failure = null;
     } catch (error) {
       if (_disposed) return;
-      status = PackagesStatus.failed;
-      failure = _code(error);
+      // A failed background refresh must not replace a good cached page.
+      if (!silent || status != PackagesStatus.ready) {
+        status = PackagesStatus.failed;
+        failure = _code(error);
+      }
     }
     _notify();
   }
@@ -251,7 +310,17 @@ class PackagesController extends ChangeNotifier {
 
   // ---- Gallery (npm registry search) ----
 
-  Future<void> searchGallery(String query) async {
+  Future<void> searchGallery(String query, {bool force = false}) async {
+    // Cache hit: same query, still fresh, not a manual refresh — render the
+    // cached list; the periodic timer keeps it warm in the background.
+    if (!force && query == galleryQuery) {
+      final fetchedAt = _galleryFetchedAt;
+      if (galleryStatus == GalleryStatus.ready &&
+          fetchedAt != null &&
+          DateTime.now().difference(fetchedAt) < _galleryTtl) {
+        return;
+      }
+    }
     galleryQuery = query;
     galleryStatus = GalleryStatus.loading;
     galleryFailure = null;
@@ -265,6 +334,7 @@ class PackagesController extends ChangeNotifier {
       }
       if (_disposed || sequence != _sequence) return;
       gallery = results;
+      _galleryFetchedAt = DateTime.now();
       galleryStatus = GalleryStatus.ready;
     } catch (error) {
       if (_disposed || sequence != _sequence) return;
@@ -442,6 +512,7 @@ class PackagesController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _refreshTimer?.cancel();
     _events?.cancel();
     for (final completer in _pending.values) {
       if (!completer.isCompleted) {

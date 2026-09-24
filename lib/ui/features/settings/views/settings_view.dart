@@ -59,6 +59,7 @@ class SettingsView extends StatefulWidget {
     this.initialPage = SettingsPage.appearance,
   });
   final PiRpcClient? control;
+
   /// Called after provider profiles were saved or removed, so the host can
   /// re-read model lists once the plugin has picked up the change.
   final VoidCallback? onProvidersChanged;
@@ -98,8 +99,8 @@ class _SettingsViewState extends State<SettingsView> {
       scroll.dispose();
     }
     _outgoingScrolls.clear();
-    _pi?.dispose();
-    _plugins?.dispose();
+    // Only the per-dialog controllers die with the route. The shared pi /
+    // packages instances stay alive for the whole app run.
     _profiles?.dispose();
     _quota?.dispose();
     super.dispose();
@@ -113,6 +114,21 @@ class _SettingsViewState extends State<SettingsView> {
       widget.onProvidersChanged?.call();
     });
     return controller..load();
+  }
+
+  // The pi and packages controllers are app-wide shared instances warmed at
+  // startup and refreshed by their own periodic timers. The settings route
+  // only renders their cache and must NOT dispose or reload them on open.
+  PiUpdateController _piController() {
+    final controller = PiUpdateController.instance;
+    controller.ensureLoaded();
+    return _pi ??= controller;
+  }
+
+  PackagesController _pluginsController(PiRpcClient control) {
+    final controller = PackagesController.sharedFor(control);
+    controller.ensureLoaded();
+    return _plugins ??= controller;
   }
 
   void _scrollToTop() {
@@ -136,17 +152,18 @@ class _SettingsViewState extends State<SettingsView> {
       _scrollToTop();
       return;
     }
-    // The Pi controller loads install info + changelog on first selection
-    // and is kept alive until the settings route closes. The plugins
-    // controller needs the shared control channel for package management.
-    if (page == _SettingsPage.pi) _pi ??= PiUpdateController()..load();
+    // The Pi and packages controllers are shared app-wide (warmed at
+    // startup, refreshed periodically); switching pages just renders their
+    // cache. The plugins page additionally owns a per-dialog profiles
+    // controller bound to the shared control channel.
+    if (page == _SettingsPage.pi) _piController();
     if (page == _SettingsPage.quota) {
       _quota ??= QuotaController()..load();
     }
     if (page == _SettingsPage.plugins) {
       final control = widget.control;
       if (control != null) {
-        _plugins ??= PackagesController(control)..load();
+        _pluginsController(control);
         _profiles ??= _createProfiles(control);
       }
     }
@@ -266,7 +283,7 @@ class _SettingsViewState extends State<SettingsView> {
                 query: _query,
               ),
               _SettingsPage.pi => PiSettingsContent(
-                controller: _pi ??= PiUpdateController()..load(),
+                controller: _piController(),
                 query: _query,
               ),
               _SettingsPage.plugins => () {
@@ -275,7 +292,7 @@ class _SettingsViewState extends State<SettingsView> {
                   return _PluginsUnavailable();
                 }
                 return PackagesSettingsContent(
-                  controller: _plugins ??= PackagesController(control)..load(),
+                  controller: _pluginsController(control),
                   profiles: _profiles ??= _createProfiles(control),
                   query: _query,
                 );
