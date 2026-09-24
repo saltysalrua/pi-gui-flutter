@@ -51,6 +51,12 @@ abstract final class AppRadius {
   static const double pill = 9999.0;
 }
 
+/// 平台约定色：跟随操作系统而非应用主题 (如 Windows 标题栏关闭键悬停红)。
+abstract final class AppSystemColors {
+  static const Color windowCloseHover = Color(0xFFE81123);
+  static const Color windowCloseForeground = Color(0xFFFFFFFF);
+}
+
 /// App-local material metrics; not the native desktop Acrylic blur radius.
 abstract final class AppGlass {
   static const double cardBlurSigma = 16;

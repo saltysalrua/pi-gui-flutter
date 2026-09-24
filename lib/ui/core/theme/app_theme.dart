@@ -61,6 +61,10 @@ class AppTheme {
       brightness: brightness,
       fontFamily: fontFamily,
       scaffoldBackgroundColor: colors.canvasBackground,
+      // Desktop feedback is hover/pressed tint only (VSCode-like), no ripples.
+      // Also skips InkSparkle's per-tap shader compilation and animation.
+      splashFactory: NoSplash.splashFactory,
+      splashColor: Colors.transparent,
       extensions: [
         colors,
         AppCardTheme(

@@ -42,6 +42,7 @@ class _AppDiffViewState extends State<AppDiffView> {
   late DiffDocument _document;
   late List<DiffLine> _lines;
   int _maxColumns = 0;
+  int _digits = 1;
   @override
   void initState() {
     super.initState();
@@ -68,7 +69,12 @@ class _AppDiffViewState extends State<AppDiffView> {
             : DiffDocument(widget.source, numbered: widget.numbered));
     _lines = _document.displayLines;
     _maxColumns = 0;
+    var maxLine = 1;
     for (final line in _lines) {
+      maxLine = math.max(
+        maxLine,
+        math.max(line.oldLine ?? 0, line.newLine ?? 0),
+      );
       final columns = line.text.runes.fold<int>(
         0,
         (n, rune) =>
@@ -81,6 +87,7 @@ class _AppDiffViewState extends State<AppDiffView> {
       );
       _maxColumns = math.max(_maxColumns, columns);
     }
+    _digits = maxLine.toString().length;
   }
 
   @override
@@ -90,16 +97,11 @@ class _AppDiffViewState extends State<AppDiffView> {
     final scale = MediaQuery.textScalerOf(context);
     final fontSize = scale.scale(style.fontSize!);
     final rowHeight = fontSize * (style.height ?? 1.4) + AppSpacing.xs;
-    final digits = _lines
-        .fold<int>(
-          1,
-          (n, line) =>
-              math.max(n, math.max(line.oldLine ?? 0, line.newLine ?? 0)),
-        )
-        .toString()
-        .length;
-    final gutter = math.max(2, digits) * fontSize * 0.65 + AppSpacing.sm;
+    final gutter = math.max(2, _digits) * fontSize * 0.65 + AppSpacing.sm;
     final count = math.min(widget.previewLines ?? _lines.length, _lines.length);
+    // Shared per build instead of copyWith for every visible row and cell.
+    final mutedStyle = style.copyWith(color: colors.textMuted);
+    final textStyle = style.copyWith(color: colors.textPrimary);
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -203,9 +205,7 @@ class _AppDiffViewState extends State<AppDiffView> {
                                 child: Text(
                                   line.oldLine?.toString() ?? '',
                                   textAlign: TextAlign.right,
-                                  style: style.copyWith(
-                                    color: colors.textMuted,
-                                  ),
+                                  style: mutedStyle,
                                 ),
                               ),
                             SizedBox(
@@ -213,7 +213,7 @@ class _AppDiffViewState extends State<AppDiffView> {
                               child: Text(
                                 line.newLine?.toString() ?? '',
                                 textAlign: TextAlign.right,
-                                style: style.copyWith(color: colors.textMuted),
+                                style: mutedStyle,
                               ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
@@ -226,11 +226,9 @@ class _AppDiffViewState extends State<AppDiffView> {
                                 line.text.replaceAll('\t', '    '),
                                 softWrap: false,
                                 overflow: TextOverflow.clip,
-                                style: style.copyWith(
-                                  color: line.kind == DiffLineKind.header
-                                      ? colors.textMuted
-                                      : colors.textPrimary,
-                                ),
+                                style: line.kind == DiffLineKind.header
+                                    ? mutedStyle
+                                    : textStyle,
                               ),
                             ),
                           ],

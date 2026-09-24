@@ -58,4 +58,7 @@ abstract final class AppMotionScales {
 
   /// 0.99 - 下拉关闭初值
   static const double tiny = 0.99;
+
+  /// 0.97 - 按钮按下时的统一缩放
+  static const double press = 0.97;
 }

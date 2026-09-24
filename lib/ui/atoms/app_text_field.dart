@@ -154,6 +154,8 @@ class AppTextField extends StatelessWidget {
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: radius,
+                // Childless when idle: see AppCard (no layer unless blurring).
+                clipBehavior: blur ? Clip.antiAlias : Clip.none,
                 // Grouped like AppCard: one engine pass per BackdropGroup
                 // scope; standalone (null key) outside any group.
                 child: BackdropFilter.grouped(
@@ -165,7 +167,7 @@ class AppTextField extends StatelessWidget {
                   // Replace, rather than composite a second copy of the
                   // already translucent desktop tint, matching AppCard.
                   blendMode: BlendMode.src,
-                  child: const SizedBox.expand(),
+                  child: blur ? const SizedBox.expand() : null,
                 ),
               ),
             ),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:highlight/highlight.dart' as syntax;
+
 import 'app_card.dart';
 import 'app_copy_button.dart';
 import '../core/context_l10n.dart';
 import '../core/theme/app_tokens.dart';
+import '../core/theme/app_colors_extension.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_context_extensions.dart';
 
@@ -35,6 +37,10 @@ class AppCodeBlock extends StatefulWidget {
 class _AppCodeBlockState extends State<AppCodeBlock> {
   String _text = '';
   List<syntax.Node>? _nodes;
+  // Highlighted spans are rebuilt only when the parse or palette changes, not
+  // on every parent rebuild (streaming rows, hover, tab switches).
+  TextSpan? _span;
+  Object? _spanColors;
   @override
   void initState() {
     super.initState();
@@ -59,6 +65,7 @@ class _AppCodeBlockState extends State<AppCodeBlock> {
       _text = _text.split('\n').take(count).join('\n');
     }
     _nodes = null;
+    _span = null;
     if (widget.language == null ||
         widget.language!.isEmpty ||
         _text.length > 12000) {
@@ -73,8 +80,7 @@ class _AppCodeBlockState extends State<AppCodeBlock> {
     }
   }
 
-  TextSpan _span(BuildContext context, syntax.Node node) {
-    final colors = context.colors;
+  TextSpan _nodeSpan(AppColorsExtension colors, syntax.Node node) {
     final color = switch (node.className) {
       'keyword' || 'selector-tag' || 'built_in' => colors.primary,
       'string' || 'regexp' || 'symbol' => colors.success,
@@ -86,24 +92,30 @@ class _AppCodeBlockState extends State<AppCodeBlock> {
     return TextSpan(
       text: node.value,
       style: TextStyle(color: color),
-      children: node.children?.map((child) => _span(context, child)).toList(),
+      children: node.children
+          ?.map((child) => _nodeSpan(colors, child))
+          .toList(),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final text = Text.rich(
-      TextSpan(
+    final colors = context.colors;
+    if (_span == null || !identical(_spanColors, colors)) {
+      _spanColors = colors;
+      _span = TextSpan(
         text: _nodes == null ? _text : null,
-        children: _nodes?.map((node) => _span(context, node)).toList(),
-      ),
+        children: _nodes?.map((node) => _nodeSpan(colors, node)).toList(),
+      );
+    }
+    final text = Text.rich(
+      _span!,
       softWrap: false,
       overflow: widget.previewLines == null
           ? TextOverflow.visible
           : TextOverflow.clip,
-      style: AppTheme.codeStyle(
-        Theme.of(context),
-      ).copyWith(color: widget.textColor),
+      style: AppTheme.codeStyle(Theme.of(context))
+          .copyWith(color: widget.textColor),
     );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

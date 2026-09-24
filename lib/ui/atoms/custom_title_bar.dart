@@ -107,8 +107,8 @@ class _WindowButtonState extends State<_WindowButton> {
 
     if (_isHovered) {
       if (widget.isClose) {
-        backgroundColor = const Color(0xFFE81123);
-        iconColor = Colors.white;
+        backgroundColor = AppSystemColors.windowCloseHover;
+        iconColor = AppSystemColors.windowCloseForeground;
       } else {
         backgroundColor = colors.hoverBackground;
         iconColor = colors.textPrimary;
@@ -120,7 +120,7 @@ class _WindowButtonState extends State<_WindowButton> {
     return Tooltip(
       message: widget.tooltip,
       excludeFromSemantics: true,
-      waitDuration: const Duration(milliseconds: 600),
+      waitDuration: AppDurations.verySlow,
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),

@@ -93,6 +93,10 @@ class AppCard extends StatelessWidget {
           Positioned.fill(
             child: ClipRRect(
               borderRadius: radius,
+              // RenderBackdropFilter composites whenever it has a child, even
+              // when disabled. Opaque cards (the common case) therefore keep
+              // this slot childless and unclipped: no extra layer per card.
+              clipBehavior: blur ? Clip.antiAlias : Clip.none,
               // Grouped: inside a BackdropGroup scope (chat timeline, settings
               // list) every card blur shares one engine pass; without a group
               // ancestor the key is null and this behaves standalone. Popups
@@ -106,7 +110,7 @@ class AppCard extends StatelessWidget {
                 // Replace, rather than composite a second copy of the already
                 // translucent desktop tint (also correct inside route fades).
                 blendMode: BlendMode.src,
-                child: const SizedBox.expand(),
+                child: blur ? const SizedBox.expand() : null,
               ),
             ),
           ),

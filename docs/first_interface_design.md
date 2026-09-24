@@ -56,7 +56,7 @@ tags:
 | | `lib/ui/core/theme/app_theme.dart` | `ThemeData` 构建工厂、MiSans 字体绑定、全局 `TextTheme` 标尺 |
 | | `lib/ui/core/theme/theme_context_extensions.dart` | 便捷语法糖 `context.colors`, `context.textTheme` |
 | | `lib/ui/core/context_l10n.dart` | 便捷语法糖 `context.l10n` 强类型多语言代理 |
-| **原子组件** | `lib/ui/atoms/app_action_button.dart` | 通用操作按钮（支持 primary, ghost, subtle, pill，内建 loading/hover 态） |
+| **原子组件** | `lib/ui/atoms/app_action_button.dart` | 通用操作按钮（支持 primary, secondary, subtle, pill，内建 loading/hover/focus 态） |
 | | `lib/ui/atoms/app_icon_button.dart` | 图标按钮（支持微质感 hover 反馈、点击回弹、圆形发送变体） |
 | | `lib/ui/atoms/app_card.dart` | 卡片容器（支持 elevated 阴影、语义边框与圆角） |
 | | `lib/ui/atoms/app_badge.dart` | 微型时间/状态指示徽章（中性、主色、成功色） |

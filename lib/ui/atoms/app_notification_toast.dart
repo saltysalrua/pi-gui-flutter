@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:pi_gui/ui/atoms/app_card.dart';
 import 'package:pi_gui/ui/atoms/app_icon_button.dart';
@@ -39,10 +40,7 @@ class _AppNotificationToastState extends State<AppNotificationToast>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-    );
+    _controller = AnimationController(vsync: this, duration: widget.duration);
 
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
@@ -91,7 +89,8 @@ class _AppNotificationToastState extends State<AppNotificationToast>
   }
 
   String _cleanText(BuildContext context) {
-    final raw = widget.message ??
+    final raw =
+        widget.message ??
         (widget.invalidRequest
             ? context.l10n.piExtensionInvalidRequest
             : context.l10n.extensionUnsupported);
@@ -158,10 +157,7 @@ class _AppNotificationToastState extends State<AppNotificationToast>
           curve: AppCurves.smoothOut,
           builder: (context, value, child) => Transform.translate(
             offset: Offset(0, (1.0 - value) * -8.0),
-            child: Opacity(
-              opacity: value,
-              child: child,
-            ),
+            child: Opacity(opacity: value, child: child),
           ),
           child: toastCard,
         ),
@@ -192,23 +188,20 @@ class _CountdownCloseButton extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         if (!reduceMotion)
-          AnimatedBuilder(
-            animation: animation,
-            builder: (context, _) {
-              // 倒计时剩余比例从 1.0 递减至 0.0
-              final remaining = (1.0 - animation.value).clamp(0.0, 1.0);
-              return CustomPaint(
-                size: const Size(28.0, 28.0),
-                painter: _CountdownRingPainter(
-                  progress: remaining,
-                  trackColor: colors.borderDefault.withValues(alpha: 0.35),
-                  progressColor: isHovered
-                      ? colors.primary.withValues(alpha: 0.7)
-                      : colors.primary,
-                  strokeWidth: 2.0,
-                ),
-              );
-            },
+          // Repaint only the ring on each tick: no widget rebuild, and the
+          // rest of the toast (text, card, glass) stays in its cached layer.
+          RepaintBoundary(
+            child: CustomPaint(
+              size: const Size(28.0, 28.0),
+              painter: _CountdownRingPainter(
+                animation: animation,
+                trackColor: colors.borderDefault.withValues(alpha: 0.35),
+                progressColor: isHovered
+                    ? colors.primary.withValues(alpha: 0.7)
+                    : colors.primary,
+                strokeWidth: 2.0,
+              ),
+            ),
           ),
         AppIconButton.subtle(
           icon: Icons.close_rounded,
@@ -223,20 +216,22 @@ class _CountdownCloseButton extends StatelessWidget {
 }
 
 class _CountdownRingPainter extends CustomPainter {
-  final double progress; // 1.0 down to 0.0
+  final Animation<double> animation; // elapsed 0.0 -> 1.0
   final Color trackColor;
   final Color progressColor;
   final double strokeWidth;
 
-  const _CountdownRingPainter({
-    required this.progress,
+  _CountdownRingPainter({
+    required this.animation,
     required this.trackColor,
     required this.progressColor,
     required this.strokeWidth,
-  });
+  }) : super(repaint: animation);
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 倒计时剩余比例从 1.0 递减至 0.0
+    final progress = (1.0 - animation.value).clamp(0.0, 1.0);
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (math.min(size.width, size.height) - strokeWidth) / 2;
 
@@ -271,7 +266,7 @@ class _CountdownRingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CountdownRingPainter oldDelegate) =>
-      oldDelegate.progress != progress ||
+      oldDelegate.animation != animation ||
       oldDelegate.trackColor != trackColor ||
       oldDelegate.progressColor != progressColor ||
       oldDelegate.strokeWidth != strokeWidth;

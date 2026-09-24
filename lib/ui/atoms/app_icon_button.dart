@@ -8,9 +8,6 @@ enum AppIconButtonVariant {
   /// 默认透明，悬停时出现微背景
   subtle,
 
-  /// 始终有浅灰底色
-  ghost,
-
   /// 实心强调色圆形（例如发送按钮）
   filledPrimary,
 }
@@ -94,15 +91,6 @@ class _AppIconButtonState extends State<AppIconButton> {
             : colors.textMuted;
         break;
 
-      case AppIconButtonVariant.ghost:
-        backgroundColor = _isHovered
-            ? colors.hoverBackground
-            : colors.mutedBackground;
-        iconColor = _isEnabled
-            ? (widget.color ?? colors.textPrimary)
-            : colors.textMuted;
-        break;
-
       case AppIconButtonVariant.filledPrimary:
         backgroundColor = _isEnabled
             ? (_isHovered ? colors.primaryLight : colors.primary)
@@ -152,7 +140,7 @@ class _AppIconButtonState extends State<AppIconButton> {
         onTap: widget.onPressed,
         behavior: HitTestBehavior.opaque,
         child: AnimatedScale(
-          scale: _isPressed ? 0.92 : 1.0,
+          scale: _isPressed ? AppMotionScales.press : 1.0,
           duration: scaleDuration,
           curve: AppCurves.smoothOut,
           child: AnimatedContainer(

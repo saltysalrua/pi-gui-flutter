@@ -12,9 +12,6 @@ enum AppButtonVariant {
   /// 次要边框按钮
   secondary,
 
-  /// 弱化幽灵按钮
-  ghost,
-
   /// 微妙文本按钮
   subtle,
 
@@ -130,7 +127,6 @@ class _AppActionButtonState extends State<AppActionButton> {
     Color textColor;
     Border? border;
     double borderRadius;
-    List<BoxShadow>? shadows;
 
     switch (widget.variant) {
       case AppButtonVariant.primary:
@@ -142,12 +138,6 @@ class _AppActionButtonState extends State<AppActionButton> {
             : colors.textMuted;
         border = null;
         borderRadius = AppRadius.md;
-        shadows = _isEnabled && _isHovered
-            ? AppShadows.subtle(
-                colors.primary,
-                brightness: Theme.of(context).brightness,
-              )
-            : null;
         break;
 
       case AppButtonVariant.secondary:
@@ -156,19 +146,8 @@ class _AppActionButtonState extends State<AppActionButton> {
             : Colors.transparent;
         textColor = _isEnabled ? colors.textPrimary : colors.textMuted;
         border = Border.all(
-          color: _isFocused
-              ? colors.borderFocus
-              : (_isHovered ? colors.borderHover : colors.borderDefault),
+          color: _isHovered ? colors.borderHover : colors.borderDefault,
         );
-        borderRadius = AppRadius.md;
-        break;
-
-      case AppButtonVariant.ghost:
-        backgroundColor = _isHovered
-            ? colors.primaryTint
-            : colors.mutedBackground;
-        textColor = _isEnabled ? colors.primary : colors.textMuted;
-        border = null;
         borderRadius = AppRadius.md;
         break;
 
@@ -191,7 +170,6 @@ class _AppActionButtonState extends State<AppActionButton> {
           color: _isHovered ? colors.borderHover : colors.borderDefault,
         );
         borderRadius = AppRadius.pill;
-        shadows = null;
         break;
     }
 
@@ -205,9 +183,16 @@ class _AppActionButtonState extends State<AppActionButton> {
         );
 
     final effectiveBorderRadius = widget.borderRadius ?? borderRadius;
-    if (_isFocused && _isEnabled) {
-      border = Border.all(color: colors.borderFocus);
-    }
+    // The focus ring is painted in front and never joins the layout, so
+    // borderless variants do not shift their label by 1px on keyboard focus.
+    final focusRing = BoxDecoration(
+      borderRadius: BorderRadius.circular(effectiveBorderRadius),
+      border: Border.all(
+        color: _isFocused && _isEnabled
+            ? colors.borderFocus
+            : colors.borderFocus.withValues(alpha: 0),
+      ),
+    );
 
     Widget content = Row(
       mainAxisSize: widget.isExpanded ? MainAxisSize.max : MainAxisSize.min,
@@ -217,10 +202,7 @@ class _AppActionButtonState extends State<AppActionButton> {
           SizedBox(
             width: 14,
             height: 14,
-            child: AppProgressIndicator(
-              strokeWidth: 2,
-              color: textColor,
-            ),
+            child: AppProgressIndicator(strokeWidth: 2, color: textColor),
           ),
           const SizedBox(width: AppSpacing.sm),
         ] else if (widget.leading != null) ...[
@@ -283,7 +265,7 @@ class _AppActionButtonState extends State<AppActionButton> {
       ],
     );
 
-    final duration = reduceMotion ? Duration.zero : AppDurations.fast;
+    final duration = reduceMotion ? Duration.zero : AppDurations.quick;
     final scaleDuration = reduceMotion ? Duration.zero : AppDurations.micro;
 
     return FocusableActionDetector(
@@ -312,7 +294,7 @@ class _AppActionButtonState extends State<AppActionButton> {
         onTap: _isEnabled ? widget.onPressed : null,
         behavior: HitTestBehavior.opaque,
         child: AnimatedScale(
-          scale: _isPressed ? 0.97 : 1.0,
+          scale: _isPressed ? AppMotionScales.press : 1.0,
           duration: scaleDuration,
           curve: AppCurves.smoothOut,
           child: AnimatedContainer(
@@ -326,8 +308,8 @@ class _AppActionButtonState extends State<AppActionButton> {
               color: backgroundColor,
               borderRadius: BorderRadius.circular(effectiveBorderRadius),
               border: border,
-              boxShadow: shadows,
             ),
+            foregroundDecoration: focusRing,
             child: content,
           ),
         ),
