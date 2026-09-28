@@ -35,6 +35,10 @@ import 'chat_message_view.dart';
 import 'home_starter_panel.dart';
 import 'tool_card_registry.dart';
 
+import 'package:pi_gui/ui/atoms/app_text_field.dart';
+
+import '../slash_commands.dart';
+
 class HomeChatPanel extends StatefulWidget {
   const HomeChatPanel({
     super.key,
@@ -216,6 +220,68 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
     }
   }
 
+  /// GUI 内置斜杠命令动作。返回 true 表示已处理（输入会被清空）。
+  Future<bool> _slashBuiltin(SlashBuiltinAction action, String args) async {
+    final chat = widget.chat;
+    switch (action) {
+      case SlashBuiltinAction.newSession:
+        return chat.changeSession();
+      case SlashBuiltinAction.compact:
+        return chat.compact(args.isEmpty ? null : args);
+      case SlashBuiltinAction.rename:
+        return _renameSession(args);
+      case SlashBuiltinAction.historyNavigate:
+        await _showHistory();
+        return true;
+      case SlashBuiltinAction.historyFork:
+        await _showHistory(null, PiHistoryAction.fork);
+        return true;
+      case SlashBuiltinAction.historyClone:
+        await _showHistory(null, PiHistoryAction.clone);
+        return true;
+      case SlashBuiltinAction.model:
+        // 输入面板自己持有模型按钮锚点，直接在那里处理。
+        return false;
+    }
+  }
+
+  /// /name 无参数时弹出改名对话框；带参数时直接设置。
+  Future<bool> _renameSession(String args) async {
+    final chat = widget.chat;
+    if (args.trim().isNotEmpty) return chat.rename(args.trim());
+    final controller = TextEditingController(
+      text: chat.state?.sessionName ?? '',
+    );
+    String? submitted;
+    await showAppDialog<String>(
+      context,
+      (context) => AppDialog(
+        title: context.l10n.slashRenameTitle,
+        maxWidth: 380,
+        actions: [
+          AppActionButton.subtle(
+            label: context.l10n.cancel,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          AppActionButton(
+            label: context.l10n.confirm,
+            onPressed: () => Navigator.of(context).pop(controller.text),
+          ),
+        ],
+        child: AppTextField(
+          controller: controller,
+          autofocus: true,
+          hintText: context.l10n.slashRenamePlaceholder,
+          onSubmitted: (value) => Navigator.of(context).pop(value),
+        ),
+      ),
+    ).then((value) => submitted = value);
+    controller.dispose();
+    final name = submitted?.trim() ?? '';
+    if (name.isEmpty || !mounted) return false;
+    return chat.rename(name);
+  }
+
   Future<void> _restoreQueue({bool stop = false}) async {
     final owner = widget.session;
     final input = widget.input;
@@ -390,6 +456,8 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
       ChatFailure.queue => l10n.chatQueueFailed,
       ChatFailure.cancelled => l10n.chatSessionCancelled,
       ChatFailure.invalidEvent => l10n.chatInvalidEvent,
+      ChatFailure.compact => l10n.chatCompactFailed,
+      ChatFailure.rename => l10n.chatRenameFailed,
       null => null,
     };
     final activityText = widget.hibernating
@@ -542,6 +610,8 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
           HomeStarterPanel(
             modelPicker: widget.modelPicker,
             contextGateway: widget.hibernating ? null : widget.session?.client,
+            commands: widget.hibernating ? null : widget.session?.commands,
+            onSlashBuiltin: _slashBuiltin,
             inputController: widget.input,
             attachments: widget.attachments,
             canSend: chat.canSubmit,

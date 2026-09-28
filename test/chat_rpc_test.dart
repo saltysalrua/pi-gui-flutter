@@ -37,6 +37,7 @@ class FakeChatGateway implements PiChatGateway {
   List<PiImage> sentImages = const [];
   Completer<List<PiChatMessage>>? pendingHistory;
   Completer<PiSessionState>? pendingState;
+  Object? error;
   @override
   bool hasUnsettledConversationMutation = false;
   @override
@@ -91,6 +92,24 @@ class FakeChatGateway implements PiChatGateway {
   Future<bool> switchSession(String path) async {
     commands.add('switch_session:$path');
     return !cancelled;
+  }
+
+  @override
+  Future<void> compact(String? instructions) async {
+    commands.add('compact:${instructions ?? ''}');
+  }
+
+  @override
+  Future<void> setSessionName(String name) async {
+    if (error != null) throw error!;
+    commands.add('set_session_name:$name');
+    state = PiSessionState(
+      model: state.model,
+      thinkingLevel: state.thinkingLevel,
+      sessionFile: state.sessionFile,
+      sessionId: state.sessionId,
+      sessionName: name,
+    );
   }
 }
 

@@ -37,6 +37,7 @@ class _PendingRequest {
         'clear_queue',
         'new_session',
         'switch_session',
+        'compact',
         'fork',
         'clone',
         'gui_history_navigate',
@@ -52,6 +53,7 @@ class PiRpcClient
         PiModelGateway,
         PiContextGateway,
         PiChatGateway,
+        PiCommandGateway,
         PiWorkspaceGateway,
         PiBrowserGateway {
   PiRpcClient({
@@ -70,6 +72,8 @@ class PiRpcClient
   final Duration requestTimeout;
   final _events = StreamController<PiRpcEvent>.broadcast();
   final _pending = <String, _PendingRequest>{};
+  // 正在等用户操作的扩展界面（问答对话 id / ui.custom 全屏界面 widgetKey）。
+  final _openExtensionUi = <String>{};
   final _diagnostics = <PiRpcDiagnostic>[];
   PiRpcTransport? _transport;
   StreamSubscription<Object?>? _subscription;
@@ -252,6 +256,7 @@ class PiRpcClient
       return;
     }
     if (type == 'gui_workspace_reset' || type == 'gui_history_session_reset') {
+      _openExtensionUi.clear();
       _events.add(const PiRpcWorkspaceReset());
       return;
     }
@@ -266,7 +271,9 @@ class PiRpcClient
     }
     if (type == 'extension_ui_request') {
       try {
-        _events.add(PiExtensionUiRequest.fromJson(decoded));
+        final request = PiExtensionUiRequest.fromJson(decoded);
+        _trackExtensionUi(request);
+        _events.add(request);
       } catch (_) {
         _record(
           PiRpcDiagnosticKind.invalidEvent,
@@ -297,6 +304,23 @@ class PiRpcClient
     }
   }
 
+  static const _customScreenPrefix = 'pi-gui-custom:';
+
+  void _trackExtensionUi(PiExtensionUiRequest request) {
+    switch (request.method) {
+      case 'select' || 'confirm' || 'input' || 'editor':
+        _openExtensionUi.add(request.id);
+      case 'setWidget':
+        final key = request.widgetKey;
+        if (key == null || !key.startsWith(_customScreenPrefix)) return;
+        if (request.widgetLines == null) {
+          _openExtensionUi.remove(key);
+        } else {
+          _openExtensionUi.add(key);
+        }
+    }
+  }
+
   void _disconnect(
     Object error, {
     required PiRpcTransport source,
@@ -309,6 +333,7 @@ class PiRpcClient
       pending.settled.complete();
     }
     _pending.clear();
+    _openExtensionUi.clear();
     _transport = null;
     final subscription = _subscription;
     _subscription = null;
@@ -346,6 +371,7 @@ class PiRpcClient
                       'prompt',
                       'new_session',
                       'switch_session',
+                      'compact',
                       'fork',
                       'clone',
                       'gui_history_navigate',
@@ -378,8 +404,15 @@ class PiRpcClient
     final id = 'gui-${++_nextId}';
     final pending = _PendingRequest(command);
     _pending[id] = pending;
-    final timer = Timer(requestTimeout, () {
+    late Timer timer;
+    void onTimeout() {
       if (!identical(_pending[id], pending)) return;
+      // 斜杠命令的 prompt 要等扩展处理完才回执；用户还在回答问题或操作扩展界面时
+      // 不算超时，继续等待，否则会把仍在正常进行的命令误判为结果未知。
+      if (command == 'prompt' && _openExtensionUi.isNotEmpty) {
+        timer = Timer(requestTimeout, onTimeout);
+        return;
+      }
       _record(PiRpcDiagnosticKind.requestTimeout, command: command);
       pending.result.completeError(
         PiRpcException(
@@ -398,7 +431,9 @@ class PiRpcClient
         pending.settled.complete();
       }
       // 读超时只影响本次请求；写超时保留待确认屏障，都不主动杀 Pi。
-    });
+    }
+
+    timer = Timer(requestTimeout, onTimeout);
     unawaited(
       _sendFrame(transport, {
         'id': id,
@@ -471,6 +506,23 @@ class PiRpcClient
     return List.unmodifiable(
       (data['messages'] as List).map(PiChatMessage.fromJson),
     );
+  }
+
+  @override
+  Future<List<PiSlashCommand>> getCommands() async =>
+      piSlashCommands(await _request('get_commands'));
+
+  @override
+  Future<void> compact(String? instructions) async {
+    await _request('compact', {
+      if (instructions != null && instructions.isNotEmpty)
+        'customInstructions': instructions,
+    });
+  }
+
+  @override
+  Future<void> setSessionName(String name) async {
+    await _request('set_session_name', {'name': name});
   }
 
   @override
@@ -609,6 +661,10 @@ class PiRpcClient
     bool? confirmed,
     bool cancelled = false,
   }) async {
+    // ui.custom 的按键不结束界面（由扩展 done() 关闭时发清空 setWidget）；其余回执即结束。
+    if (cancelled || !id.startsWith(_customScreenPrefix)) {
+      _openExtensionUi.remove(id);
+    }
     final transport = _transport;
     if (transport == null || _closed) return;
     try {

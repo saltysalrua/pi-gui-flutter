@@ -69,6 +69,7 @@
   "modelAndThinking": "{model} · {level}",
   "availableModelCount": "可用模型（{count}）",
   "extensionUnsupported": "暂不支持这类 Pi 扩展界面请求。",
+  "extensionScreenTitle": "扩展界面",
   "confirm": "确认",
   "cancel": "取消",
   "close": "关闭",
@@ -305,6 +306,35 @@
   "chatImageTooLarge": "图片过大。单张最多 10 MB，总共最多 20 MB，分辨率不超过 4000 万像素。",
   "chatImageTooMany": "每条消息最多添加 8 张图片。",
   "chatImageModel": "当前模型不支持图片，请切换模型或移除图片。",
+  "chatCompactFailed": "压缩上下文失败了。",
+  "chatRenameFailed": "重命名会话失败了。",
+  "slashMenuEmpty": "没有匹配的命令。",
+  "slashMenuLoading": "正在读取命令…",
+  "slashMenuFailed": "命令列表读取失败。",
+  "slashSourceBuiltin": "内置",
+  "slashSourceTerminal": "终端",
+  "slashSourceExtension": "扩展",
+  "slashSourcePrompt": "提示模板",
+  "slashSourceSkill": "技能",
+  "slashDescNew": "开一个新会话",
+  "slashDescResume": "切换到其他历史会话",
+  "slashDescTree": "浏览会话历史树",
+  "slashDescFork": "从更早的消息分叉新会话",
+  "slashDescClone": "复制当前会话",
+  "slashDescCompact": "压缩当前上下文，可附自定义说明",
+  "slashDescName": "设置会话名称",
+  "slashDescModel": "选择模型",
+  "slashDescTerminal": "仅 pi 终端内可用，已拦截",
+  "slashRenameTitle": "会话名称",
+  "slashRenamePlaceholder": "给这个会话起个名字",
+  "slashCommandUnsupported": "「/{name}」只在 pi 终端里生效，GUI 已拦截，没有发给模型。",
+  "@slashCommandUnsupported": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "chatAddAttachment": "添加附件",
   "chatAddFiles": "添加文件",
   "chatRemoveAttachment": "移除附件",

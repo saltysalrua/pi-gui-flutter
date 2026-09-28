@@ -165,6 +165,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get extensionUnsupported => '暂不支持这类 Pi 扩展界面请求。';
 
   @override
+  String get extensionScreenTitle => '扩展界面';
+
+  @override
   String get confirm => '确认';
 
   @override
@@ -634,6 +637,74 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatImageModel => '当前模型不支持图片，请切换模型或移除图片。';
+
+  @override
+  String get chatCompactFailed => '压缩上下文失败了。';
+
+  @override
+  String get chatRenameFailed => '重命名会话失败了。';
+
+  @override
+  String get slashMenuEmpty => '没有匹配的命令。';
+
+  @override
+  String get slashMenuLoading => '正在读取命令…';
+
+  @override
+  String get slashMenuFailed => '命令列表读取失败。';
+
+  @override
+  String get slashSourceBuiltin => '内置';
+
+  @override
+  String get slashSourceTerminal => '终端';
+
+  @override
+  String get slashSourceExtension => '扩展';
+
+  @override
+  String get slashSourcePrompt => '提示模板';
+
+  @override
+  String get slashSourceSkill => '技能';
+
+  @override
+  String get slashDescNew => '开一个新会话';
+
+  @override
+  String get slashDescResume => '切换到其他历史会话';
+
+  @override
+  String get slashDescTree => '浏览会话历史树';
+
+  @override
+  String get slashDescFork => '从更早的消息分叉新会话';
+
+  @override
+  String get slashDescClone => '复制当前会话';
+
+  @override
+  String get slashDescCompact => '压缩当前上下文，可附自定义说明';
+
+  @override
+  String get slashDescName => '设置会话名称';
+
+  @override
+  String get slashDescModel => '选择模型';
+
+  @override
+  String get slashDescTerminal => '仅 pi 终端内可用，已拦截';
+
+  @override
+  String get slashRenameTitle => '会话名称';
+
+  @override
+  String get slashRenamePlaceholder => '给这个会话起个名字';
+
+  @override
+  String slashCommandUnsupported(String name) {
+    return '「/$name」只在 pi 终端里生效，GUI 已拦截，没有发给模型。';
+  }
 
   @override
   String get chatAddAttachment => '添加附件';

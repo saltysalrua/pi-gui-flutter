@@ -69,6 +69,7 @@
   "modelAndThinking": "{model} · {level}",
   "availableModelCount": "Available models ({count})",
   "extensionUnsupported": "This Pi extension UI request is not supported yet.",
+  "extensionScreenTitle": "Extension screen",
   "confirm": "Confirm",
   "cancel": "Cancel",
   "close": "Close",
@@ -305,6 +306,35 @@
   "chatImageTooLarge": "Images are too large. Limit: 10 MB each, 20 MB total and 40 megapixels.",
   "chatImageTooMany": "Add up to 8 images per message.",
   "chatImageModel": "This model does not support images. Switch models or remove the images.",
+  "chatCompactFailed": "Compacting the context failed.",
+  "chatRenameFailed": "Renaming the session failed.",
+  "slashMenuEmpty": "No matching commands.",
+  "slashMenuLoading": "Loading commands…",
+  "slashMenuFailed": "Failed to load the command list.",
+  "slashSourceBuiltin": "Built-in",
+  "slashSourceTerminal": "Terminal",
+  "slashSourceExtension": "Extension",
+  "slashSourcePrompt": "Prompt template",
+  "slashSourceSkill": "Skill",
+  "slashDescNew": "Start a new session",
+  "slashDescResume": "Switch to another saved session",
+  "slashDescTree": "Navigate the session tree",
+  "slashDescFork": "Fork a new session from an earlier message",
+  "slashDescClone": "Duplicate the current session",
+  "slashDescCompact": "Compact the current context, optionally with instructions",
+  "slashDescName": "Set the session name",
+  "slashDescModel": "Select a model",
+  "slashDescTerminal": "Terminal only — blocked here",
+  "slashRenameTitle": "Session name",
+  "slashRenamePlaceholder": "Name this session",
+  "slashCommandUnsupported": "\"/{name}\" only works in the pi terminal. It was blocked here and never reached the model.",
+  "@slashCommandUnsupported": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "chatAddAttachment": "Add attachment",
   "chatAddFiles": "Add files",
   "chatRemoveAttachment": "Remove attachment",

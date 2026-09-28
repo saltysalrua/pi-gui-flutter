@@ -113,7 +113,7 @@ Pi 0.85.1 RPC 进程在进入命令循环的同一刻才发起后台目录刷新
 
 启动 Pi 会加载其现有扩展，因此接模型选择器时不能丢弃扩展 UI 请求：
 
-- `setWidget`：按 widgetKey 更新/清除 `aboveEditor` 或 `belowEditor`。
+- `setWidget`：按 widgetKey 更新/清除 `aboveEditor` 或 `belowEditor`；`pi-gui-custom:` 前缀则升级为可关闭的全屏报表浮层（见 [扩展界面插槽](extension_ui_slots.md)）。
 - `setStatus`：按 statusKey 更新/清除底部状态区，支持换行排布。
 - `notify`：进入通知槽位，支持关闭。通知槽位有明确宽度，避免无界 Column 导致布局错误。
 - `select/confirm/input/editor`：进入全局模态队列，按原始 id 发回 `extension_ui_response`；保留后端提供的超时与取消行为。

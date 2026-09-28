@@ -172,6 +172,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'This Pi extension UI request is not supported yet.';
 
   @override
+  String get extensionScreenTitle => 'Extension screen';
+
+  @override
   String get confirm => 'Confirm';
 
   @override
@@ -687,6 +690,75 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get chatImageModel =>
       'This model does not support images. Switch models or remove the images.';
+
+  @override
+  String get chatCompactFailed => 'Compacting the context failed.';
+
+  @override
+  String get chatRenameFailed => 'Renaming the session failed.';
+
+  @override
+  String get slashMenuEmpty => 'No matching commands.';
+
+  @override
+  String get slashMenuLoading => 'Loading commands…';
+
+  @override
+  String get slashMenuFailed => 'Failed to load the command list.';
+
+  @override
+  String get slashSourceBuiltin => 'Built-in';
+
+  @override
+  String get slashSourceTerminal => 'Terminal';
+
+  @override
+  String get slashSourceExtension => 'Extension';
+
+  @override
+  String get slashSourcePrompt => 'Prompt template';
+
+  @override
+  String get slashSourceSkill => 'Skill';
+
+  @override
+  String get slashDescNew => 'Start a new session';
+
+  @override
+  String get slashDescResume => 'Switch to another saved session';
+
+  @override
+  String get slashDescTree => 'Navigate the session tree';
+
+  @override
+  String get slashDescFork => 'Fork a new session from an earlier message';
+
+  @override
+  String get slashDescClone => 'Duplicate the current session';
+
+  @override
+  String get slashDescCompact =>
+      'Compact the current context, optionally with instructions';
+
+  @override
+  String get slashDescName => 'Set the session name';
+
+  @override
+  String get slashDescModel => 'Select a model';
+
+  @override
+  String get slashDescTerminal => 'Terminal only — blocked here';
+
+  @override
+  String get slashRenameTitle => 'Session name';
+
+  @override
+  String get slashRenamePlaceholder => 'Name this session';
+
+  @override
+  String slashCommandUnsupported(String name) {
+    return '\"/$name\" only works in the pi terminal. It was blocked here and never reached the model.';
+  }
 
   @override
   String get chatAddAttachment => 'Add attachment';

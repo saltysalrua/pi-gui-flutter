@@ -392,6 +392,12 @@ abstract class AppLocalizations {
   /// **'暂不支持这类 Pi 扩展界面请求。'**
   String get extensionUnsupported;
 
+  /// No description provided for @extensionScreenTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'扩展界面'**
+  String get extensionScreenTitle;
+
   /// No description provided for @confirm.
   ///
   /// In zh, this message translates to:
@@ -1285,6 +1291,138 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'当前模型不支持图片，请切换模型或移除图片。'**
   String get chatImageModel;
+
+  /// No description provided for @chatCompactFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'压缩上下文失败了。'**
+  String get chatCompactFailed;
+
+  /// No description provided for @chatRenameFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'重命名会话失败了。'**
+  String get chatRenameFailed;
+
+  /// No description provided for @slashMenuEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有匹配的命令。'**
+  String get slashMenuEmpty;
+
+  /// No description provided for @slashMenuLoading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在读取命令…'**
+  String get slashMenuLoading;
+
+  /// No description provided for @slashMenuFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'命令列表读取失败。'**
+  String get slashMenuFailed;
+
+  /// No description provided for @slashSourceBuiltin.
+  ///
+  /// In zh, this message translates to:
+  /// **'内置'**
+  String get slashSourceBuiltin;
+
+  /// No description provided for @slashSourceTerminal.
+  ///
+  /// In zh, this message translates to:
+  /// **'终端'**
+  String get slashSourceTerminal;
+
+  /// No description provided for @slashSourceExtension.
+  ///
+  /// In zh, this message translates to:
+  /// **'扩展'**
+  String get slashSourceExtension;
+
+  /// No description provided for @slashSourcePrompt.
+  ///
+  /// In zh, this message translates to:
+  /// **'提示模板'**
+  String get slashSourcePrompt;
+
+  /// No description provided for @slashSourceSkill.
+  ///
+  /// In zh, this message translates to:
+  /// **'技能'**
+  String get slashSourceSkill;
+
+  /// No description provided for @slashDescNew.
+  ///
+  /// In zh, this message translates to:
+  /// **'开一个新会话'**
+  String get slashDescNew;
+
+  /// No description provided for @slashDescResume.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换到其他历史会话'**
+  String get slashDescResume;
+
+  /// No description provided for @slashDescTree.
+  ///
+  /// In zh, this message translates to:
+  /// **'浏览会话历史树'**
+  String get slashDescTree;
+
+  /// No description provided for @slashDescFork.
+  ///
+  /// In zh, this message translates to:
+  /// **'从更早的消息分叉新会话'**
+  String get slashDescFork;
+
+  /// No description provided for @slashDescClone.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制当前会话'**
+  String get slashDescClone;
+
+  /// No description provided for @slashDescCompact.
+  ///
+  /// In zh, this message translates to:
+  /// **'压缩当前上下文，可附自定义说明'**
+  String get slashDescCompact;
+
+  /// No description provided for @slashDescName.
+  ///
+  /// In zh, this message translates to:
+  /// **'设置会话名称'**
+  String get slashDescName;
+
+  /// No description provided for @slashDescModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择模型'**
+  String get slashDescModel;
+
+  /// No description provided for @slashDescTerminal.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅 pi 终端内可用，已拦截'**
+  String get slashDescTerminal;
+
+  /// No description provided for @slashRenameTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'会话名称'**
+  String get slashRenameTitle;
+
+  /// No description provided for @slashRenamePlaceholder.
+  ///
+  /// In zh, this message translates to:
+  /// **'给这个会话起个名字'**
+  String get slashRenamePlaceholder;
+
+  /// No description provided for @slashCommandUnsupported.
+  ///
+  /// In zh, this message translates to:
+  /// **'「/{name}」只在 pi 终端里生效，GUI 已拦截，没有发给模型。'**
+  String slashCommandUnsupported(String name);
 
   /// No description provided for @chatAddAttachment.
   ///

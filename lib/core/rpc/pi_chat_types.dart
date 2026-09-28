@@ -262,6 +262,51 @@ class PiPromptQueue {
   bool get isEmpty => steering.isEmpty && followUp.isEmpty;
 }
 
+class PiSlashCommand {
+  const PiSlashCommand({
+    required this.name,
+    required this.source,
+    this.description,
+    this.path,
+  });
+  factory PiSlashCommand.fromJson(Object? value) {
+    final json = rpcObject(value);
+    final name = json['name'] as String;
+    if (name.isEmpty) {
+      throw const FormatException('Empty slash command name');
+    }
+    final info = json['sourceInfo'];
+    // 0.86 起扩展来源在 sourceInfo.path；兼容旧版顶层 path。
+    final sourcePath = info is Map ? info['path'] as String? : null;
+    return PiSlashCommand(
+      name: name,
+      source: json['source'] as String? ?? '',
+      description: json['description'] as String?,
+      path: sourcePath ?? json['path'] as String?,
+    );
+  }
+  final String name, source;
+  final String? description, path;
+}
+
+List<PiSlashCommand> piSlashCommands(Object? value) {
+  final json = rpcObject(value);
+  final result = <PiSlashCommand>[];
+  for (final entry in json['commands'] as List? ?? const []) {
+    try {
+      result.add(PiSlashCommand.fromJson(entry));
+    } on FormatException {
+      // 单条畸形命令不拖垮整个菜单。
+    }
+  }
+  return List.unmodifiable(result);
+}
+
+abstract interface class PiCommandGateway {
+  Stream<PiRpcEvent> get events;
+  Future<List<PiSlashCommand>> getCommands();
+}
+
 abstract interface class PiChatGateway {
   Stream<PiRpcEvent> get events;
   bool get hasUnsettledConversationMutation;
@@ -277,6 +322,12 @@ abstract interface class PiChatGateway {
   Future<PiPromptQueue> clearQueue();
   Future<bool> newSession();
   Future<bool> switchSession(String path);
+
+  /// RPC `compact`：压缩当前上下文，可带自定义说明。仅空闲会话可调用。
+  Future<void> compact(String? instructions);
+
+  /// RPC `set_session_name`：只改元数据，不动会话内容。
+  Future<void> setSessionName(String name);
 }
 
 /// Stable, pretty output for the generic tool renderer, never a command to execute.

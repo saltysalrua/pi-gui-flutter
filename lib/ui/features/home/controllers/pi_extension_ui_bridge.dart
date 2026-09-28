@@ -13,6 +13,7 @@ import 'package:pi_gui/ui/atoms/app_dialog.dart';
 import 'package:pi_gui/ui/atoms/app_notification_toast.dart';
 import 'package:pi_gui/ui/atoms/app_text_field.dart';
 import 'package:pi_gui/ui/core/context_l10n.dart';
+import 'package:pi_gui/ui/core/theme/app_theme.dart';
 import 'package:pi_gui/ui/core/theme/app_tokens.dart';
 import 'package:pi_gui/ui/core/theme/theme_context_extensions.dart';
 
@@ -21,6 +22,10 @@ String _plainText(String text) => text.replaceAll(
   RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'),
   '',
 );
+
+// 注入层（workspace_rpc.mjs 生成的 pi_launcher）把 ui.custom 全屏界面渲染成文本行，
+// 借 setWidget 通道加此前缀派发；这里将其升级为可关闭的查看浮层。
+const _customScreenPrefix = 'pi-gui-custom:';
 
 /// 从连接建立前开始订阅，避免扩展在启动/模型切换时请求 UI 而悬挂。
 class PiExtensionUiBridge {
@@ -73,12 +78,24 @@ class PiExtensionUiBridge {
   final _statuses = <String, Widget>{};
   final _dialogs = <PiExtensionUiRequest>[];
   final _timers = <String, Timer>{};
+  PiExtensionUiRequest? _customScreen;
 
   void _route(PiExtensionUiRequest request) {
     switch (request.method) {
       case 'setWidget':
         final key = request.widgetKey;
         if (key == null) return;
+        if (key.startsWith(_customScreenPrefix)) {
+          // 注入层在扩展 done() 后发空行清除；同一界面的重渲染沿用同一 key。
+          final lines = request.widgetLines;
+          if (lines == null || lines.isEmpty) {
+            if (_customScreen?.widgetKey == key) _customScreen = null;
+          } else {
+            _customScreen = request;
+          }
+          _showDialog();
+          return;
+        }
         _widgets.remove(key);
         if (request.widgetLines case final lines?) {
           final hasContent = lines.any((l) => _plainText(l).trim().isNotEmpty);
@@ -186,6 +203,7 @@ class PiExtensionUiBridge {
     onAttentionChanged?.call();
     if (!_foreground) return;
     final request = _dialogs.firstOrNull;
+    // 必答对话优先；空闲时才展示扩展全屏报表（与 TUI 一次一个全屏界面一致）。
     SlotManager.instance.setSlotWidgets(ExtensibleSlotId.dialogOverlay, [
       if (request != null)
         _ExtensionDialog(
@@ -199,6 +217,25 @@ class PiExtensionUiBridge {
             confirmed: confirmed,
             cancelled: cancelled,
           ),
+        )
+      else if (_customScreen case final screen?)
+        _ExtensionScreen(
+          key: ValueKey((this, screen.widgetKey)),
+          request: screen,
+          // 按键原样转成终端序列交给扩展组件的 handleInput，和 TUI 一样由扩展决定行为。
+          onInput: (data) => unawaited(
+            _client.respondToExtension(screen.widgetKey!, value: data),
+          ),
+          onClose: () {
+            final current = _customScreen;
+            if (current?.widgetKey != screen.widgetKey) return;
+            _customScreen = null;
+            // 强制关闭：注入层结束 ui.custom 并释放组件。
+            unawaited(
+              _client.respondToExtension(screen.widgetKey!, cancelled: true),
+            );
+            _showDialog();
+          },
         ),
     ]);
   }
@@ -240,6 +277,7 @@ class PiExtensionUiBridge {
     });
     _widgets.clear();
     _statuses.clear();
+    _customScreen = null;
     if (_foreground) {
       SlotManager.instance.clearSlot(ExtensibleSlotId.dialogOverlay);
       SlotManager.instance.clearSlot(ExtensibleSlotId.notificationToast);
@@ -370,6 +408,178 @@ class _ExtensionDialogState extends State<_ExtensionDialog> {
       ],
     );
   }
+}
+
+class _ExtensionScreen extends StatefulWidget {
+  const _ExtensionScreen({
+    super.key,
+    required this.request,
+    required this.onInput,
+    required this.onClose,
+  });
+  final PiExtensionUiRequest request;
+  final ValueChanged<String> onInput;
+  final VoidCallback onClose;
+
+  @override
+  State<_ExtensionScreen> createState() => _ExtensionScreenState();
+}
+
+class _ExtensionScreenState extends State<_ExtensionScreen> {
+  // 聊天输入框通常正持有焦点，autofocus 不会抢走它；必须显式夺焦并把焦点
+  // 困在浮层内，否则 Tab/方向键会先落到主界面（输入框、焦点遍历、快捷键）。
+  final _scope = FocusScopeNode(
+    debugLabel: 'extensionScreen',
+    traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
+  );
+  final _keys = FocusNode(debugLabel: 'extensionScreenKeys');
+  FocusNode? _previousFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousFocus = FocusManager.instance.primaryFocus;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _keys.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    final previous = _previousFocus;
+    _keys.dispose();
+    _scope.dispose();
+    // 关闭后把焦点还给原来的控件（通常是聊天输入框）。
+    if (previous != null && previous.context != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (previous.context != null) previous.requestFocus();
+      });
+    }
+    super.dispose();
+  }
+
+  KeyEventResult _onKey(FocusNode _, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    final data = terminalKeySequence(event, HardwareKeyboard.instance);
+    if (data == null) return KeyEventResult.ignored;
+    widget.onInput(data);
+    return KeyEventResult.handled;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final request = widget.request;
+    final onClose = widget.onClose;
+    final l10n = context.l10n;
+    // 与 TUI 一致逐行原样展示：保留空行、框线与对齐，只去掉首尾空白行。
+    final lines = (request.widgetLines ?? const <String>[])
+        .map((l) => _plainText(l).trimRight())
+        .toList();
+    while (lines.isNotEmpty && lines.first.isEmpty) {
+      lines.removeAt(0);
+    }
+    while (lines.isNotEmpty && lines.last.isEmpty) {
+      lines.removeLast();
+    }
+    // 必须用真等宽字体（Windows 不认 'monospace'，回退到 CJK 字体会把框线字符
+    // 渲染成全角而折行），并按最长一行定宽；窗口放不下时横向滚动而不折行。
+    final mono = AppTheme.codeStyle(Theme.of(context));
+    final painter = TextPainter(
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+    );
+    var contentWidth = 0.0;
+    for (final line in lines) {
+      painter.text = TextSpan(text: line, style: mono);
+      painter.layout();
+      if (painter.width > contentWidth) contentWidth = painter.width;
+    }
+    painter.dispose();
+    // AppCard 默认内边距两侧各 md，外加少量余量避免亚像素误差触发滚动。
+    final dialogWidth = contentWidth + 2 * AppSpacing.md + AppSpacing.lg;
+    final body = lines.join('\n');
+    return Stack(
+      children: [
+        ModalBarrier(
+          color: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.12),
+          dismissible: false,
+        ),
+        SafeArea(
+          // 所有按键（含 Esc）都交给扩展，由扩展自己决定关闭；“关闭”按钮兜底强制结束。
+          child: FocusScope(
+            node: _scope,
+            child: Focus(
+              focusNode: _keys,
+              autofocus: true,
+              onKeyEvent: _onKey,
+              child: AppDialog(
+                title: l10n.extensionScreenTitle,
+                maxWidth: dialogWidth < 420 ? 420 : dialogWidth,
+                maxHeight: 900,
+                actions: [
+                  AppActionButton(label: l10n.close, onPressed: onClose),
+                ],
+                child: body.isEmpty
+                    ? const SizedBox(width: double.infinity)
+                    : SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Text(
+                          body,
+                          style: mono,
+                          softWrap: false,
+                          textWidthBasis: TextWidthBasis.longestLine,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 把 Flutter 按键换算成终端输入序列（与 pi-tui 解析的传统 xterm 序列一致）。
+/// 无法表示的按键返回 null，交还给 Flutter 焦点系统。
+@visibleForTesting
+String? terminalKeySequence(KeyEvent event, HardwareKeyboard keyboard) {
+  final key = event.logicalKey;
+  final ctrl = keyboard.isControlPressed;
+  final alt = keyboard.isAltPressed;
+  final shift = keyboard.isShiftPressed;
+  const esc = '\x1b';
+  final named = <LogicalKeyboardKey, String>{
+    LogicalKeyboardKey.escape: esc,
+    LogicalKeyboardKey.enter: '\r',
+    LogicalKeyboardKey.numpadEnter: '\r',
+    LogicalKeyboardKey.tab: shift ? '$esc[Z' : '\t',
+    LogicalKeyboardKey.backspace: '\x7f',
+    LogicalKeyboardKey.delete: '$esc[3~',
+    LogicalKeyboardKey.arrowUp: '$esc[A',
+    LogicalKeyboardKey.arrowDown: '$esc[B',
+    LogicalKeyboardKey.arrowRight: '$esc[C',
+    LogicalKeyboardKey.arrowLeft: '$esc[D',
+    LogicalKeyboardKey.home: '$esc[H',
+    LogicalKeyboardKey.end: '$esc[F',
+    LogicalKeyboardKey.pageUp: '$esc[5~',
+    LogicalKeyboardKey.pageDown: '$esc[6~',
+  }[key];
+  if (named != null) return alt ? '$esc$named' : named;
+  if (ctrl) {
+    final label = key.keyLabel;
+    if (label.length == 1) {
+      final code = label.toLowerCase().codeUnitAt(0);
+      if (code >= 0x61 && code <= 0x7a) {
+        final control = String.fromCharCode(code - 0x60);
+        return alt ? '$esc$control' : control;
+      }
+    }
+    return null;
+  }
+  final character = event.character;
+  if (character == null || character.isEmpty) return null;
+  if (character.codeUnitAt(0) < 0x20) return null;
+  return alt ? '$esc$character' : character;
 }
 
 class _ExtensionWidgetView extends StatefulWidget {

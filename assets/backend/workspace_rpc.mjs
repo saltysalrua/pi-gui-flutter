@@ -455,6 +455,7 @@ function ensureLauncherScript(packageRoot) {
   );
   const code = `import { pathToFileURL } from "node:url";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 
 const root = ${JSON.stringify(packageRoot)};
 const sessionPath = pathToFileURL(path.join(root, "dist/core/agent-session.js")).href;
@@ -502,6 +503,121 @@ AgentSession.prototype.bindExtensions = async function(options) {
 
       return origSetWidget(key, content, widgetOptions);
     };
+
+    if (typeof options.uiContext.custom === "function") {
+      // pi's RPC mode leaves ui.custom as a silent no-op, so fullscreen
+      // extension screens (/bill reports, settings modals) vanish. Mirror
+      // interactive mode instead: render the component against a mock TUI,
+      // ship its lines via setWidget under the pi-gui-custom: prefix, feed
+      // GUI keystrokes to component.handleInput, and resolve only on done().
+      const DEFAULT_WIDTH = 100;
+      const ESC = String.fromCharCode(27);
+      let customSeq = 0;
+      let activeCustom = null;
+      let inputAttached = false;
+      let keybindings;
+      const getKeybindings = async () => {
+        if (keybindings !== undefined) return keybindings;
+        try {
+          const mod = await import(pathToFileURL(path.join(root, "dist/core/keybindings.js")).href);
+          keybindings = mod.KeybindingsManager.create();
+        } catch {
+          keybindings = null;
+        }
+        return keybindings ?? undefined;
+      };
+      const attachInput = () => {
+        if (inputAttached) return;
+        inputAttached = true;
+        // Pi's own JSONL reader is already attached to stdin, so this second
+        // listener sees the same frames. Pi ignores extension_ui_response ids
+        // it does not know; frames addressed to pi-gui-custom:* are ours.
+        const decoder = new StringDecoder("utf8");
+        let buffer = "";
+        process.stdin.on("data", (chunk) => {
+          buffer += typeof chunk === "string" ? chunk : decoder.write(chunk);
+          let index;
+          while ((index = buffer.indexOf("\\n")) !== -1) {
+            const line = buffer.slice(0, index);
+            buffer = buffer.slice(index + 1);
+            if (!line.includes("pi-gui-custom:")) continue;
+            let message;
+            try { message = JSON.parse(line); } catch { continue; }
+            if (message?.type !== "extension_ui_response") continue;
+            const entry = activeCustom;
+            if (!entry || message.id !== entry.key) continue;
+            if (message.cancelled === true) entry.close(undefined);
+            else if (typeof message.value === "string") entry.input(message.value);
+          }
+        });
+      };
+      options.uiContext.custom = function(factory, customOptions) {
+        return new Promise((resolve, reject) => {
+          const key = "pi-gui-custom:" + ++customSeq;
+          const overlay = customOptions?.overlayOptions;
+          const requested = typeof overlay === "function" ? undefined : overlay?.width;
+          const width = typeof requested === "number" && requested >= 20
+            ? Math.min(Math.floor(requested), 200)
+            : DEFAULT_WIDTH;
+          let component = null;
+          let closed = false;
+          let scheduled = false;
+          const render = () => {
+            scheduled = false;
+            if (closed || typeof component?.render !== "function") return;
+            let lines;
+            try { lines = component.render(width); } catch { return; } // keep last good frame
+            if (Array.isArray(lines)) origSetWidget(key, lines);
+          };
+          const requestRender = () => {
+            if (scheduled || closed) return;
+            scheduled = true;
+            setImmediate(render);
+          };
+          const entry = {
+            key,
+            close(result) {
+              if (closed) return;
+              closed = true;
+              if (activeCustom === entry) activeCustom = null;
+              origSetWidget(key, undefined);
+              resolve(result);
+              try { component?.dispose?.(); } catch {}
+            },
+            input(data) {
+              if (closed || !component) return;
+              if (typeof component.handleInput === "function") {
+                try { component.handleInput(data); } catch {}
+                requestRender();
+              } else if (data === ESC || data === "\\r" || data === "q") {
+                entry.close(undefined); // read-only report: any close key dismisses
+              }
+            },
+          };
+          activeCustom?.close(undefined);
+          activeCustom = entry;
+          attachInput();
+          const tui = { requestRender, terminal: { columns: width, rows: 40 } };
+          getKeybindings()
+            .then((kb) => factory(tui, options.uiContext.theme, kb, (result) => entry.close(result)))
+            .then((c) => {
+              if (closed) {
+                try { c?.dispose?.(); } catch {}
+                return;
+              }
+              component = c;
+              render();
+            })
+            .catch((error) => {
+              if (closed) return;
+              closed = true;
+              if (activeCustom === entry) activeCustom = null;
+              origSetWidget(key, undefined);
+              reject(error);
+            });
+        });
+      };
+    }
   }
 
   return origBind.call(this, options);

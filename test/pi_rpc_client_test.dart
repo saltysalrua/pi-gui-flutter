@@ -190,6 +190,43 @@ void main() {
     },
   );
 
+  test(
+    'slash prompt waits while an extension screen or question is open',
+    () async {
+      final transport = TestTransport();
+      final pi = PiRpcClient(
+        transportFactory: () async => transport,
+        requestTimeout: const Duration(milliseconds: 40),
+      );
+      addTearDown(pi.close);
+      await pi.connect();
+      final prompt = pi.prompt('/rtk');
+      await Future<void>.delayed(Duration.zero);
+      final request = transport.commands.single;
+      transport.emit({
+        'type': 'extension_ui_request',
+        'id': 'frame-1',
+        'method': 'setWidget',
+        'widgetKey': 'pi-gui-custom:1',
+        'widgetLines': ['Settings'],
+      });
+      // 按键回执不结束界面，远超超时时间仍在等。
+      await pi.respondToExtension('pi-gui-custom:1', value: '\x1b[B');
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      transport.emit({
+        'type': 'extension_ui_request',
+        'id': 'frame-2',
+        'method': 'setWidget',
+        'widgetKey': 'pi-gui-custom:1',
+      });
+      transport.reply(request, null);
+      await prompt;
+      // 界面关闭后恢复正常超时。
+      final next = pi.prompt('/other');
+      await expectLater(next, throwsA(isA<PiRpcException>()));
+    },
+  );
+
   test('read timeout does not kill Pi; late responses cannot change later requests', () async {
     final transport = TestTransport();
     final pi = PiRpcClient(

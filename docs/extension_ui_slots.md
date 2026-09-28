@@ -95,6 +95,23 @@ pi-gui 在 `assets/backend/workspace_rpc.mjs` 中注入轻量发射拦截器：
 - 拦截 `uiContext.setWidget`：当传入函数时，自动构造 `mockTui` 实例并执行初始渲染与注册 `requestRender()` 监听。
 - 当插件调用 `tui.requestRender()` 时，重新调用 `render(160)`，并以标准单行 JSONL `extension_ui_request` (method: `setWidget`) 派发至 Flutter 前端。每次启动 Pi 前按本机 Pi 包路径重写 `pi_launcher.mjs`（不入库），同一套注入同时服务于并行会话的每个原生子进程。
 
+### ui.custom 全屏界面桥
+
+Pi 官方 RPC 模式对 `ui.custom`（扩展全屏界面，如 pi-bill `/bill` 的用量报表）是静默空实现：不派发任何事件，select 选项选完后报表直接无声消失。同一注入层对其补一条桥：
+
+- 拦截 `uiContext.custom`，对齐交互模式 `showExtensionCustom`：用 mock TUI（`requestRender` + `terminal.columns/rows`）和真实 `KeybindingsManager` 调用组件工厂，渲染宽度取 `overlayOptions.width`（没有就 100 列）。`requestRender()` 用 setImmediate 合并为一帧。
+- 行经 `setWidget` 通道派发，`widgetKey` 带保留前缀 `pi-gui-custom:N`。**Promise 不再立即解决**：直到扩展调用 `done(result)`（或 GUI 强制关闭）才解决，此时发一条 `widgetLines` 为空的 setWidget 清除浮层。所以打开全屏界面的斜杠命令，其 `prompt` 回执会一直等到界面关闭。
+- 输入回传：GUI 把按键换算成终端序列（`terminalKeySequence`：方向键 `\x1b[A..D`、Enter `\r`、Esc `\x1b`、Tab/Shift+Tab、Backspace `\x7f`、Ctrl+字母、可打印字符），发 `extension_ui_response {id: widgetKey, value: 序列}`；强制关闭发 `{id: widgetKey, cancelled: true}`。注入层在 Pi 进程里给 stdin 挂第二个 JSONL 监听，只消费 id 是当前 `pi-gui-custom:*` 的帧（Pi 自身按未知 id 忽略），转给 `component.handleInput(data)` 后重渲染；没有 `handleInput` 的只读报表按 Esc/Enter/q 关闭。
+- 前端 `pi_extension_ui_bridge.dart` 识别该前缀，把事件升级为 `dialogOverlay` 中的 `_ExtensionScreen`（逐行原样保留空行/框线/对齐，只裁掉首尾空行；用真等宽字体 `AppTheme.codeStyle`，弹窗宽度按最长一行实测，窗口放不下时横向滚动、绝不折行）。浮层打开时显式夺焦（聊天输入框正持有焦点时 autofocus 不会生效）并用 closedLoop FocusScope 把焦点困在浮层内，关闭后把焦点还给原控件；所有按键（含 Esc）交给扩展决定；“关闭”按钮是强制关闭兜底。必答对话（select 等）优先于全屏界面展示，多个全屏界面后到先换（旧界面按取消结束）。
+- `PiRpcClient` 记录打开中的问答对话与全屏界面（`_openExtensionUi`）；有任一打开时 `prompt` 请求到达 30 秒不算超时、继续等，避免把正在操作的斜杠命令误判为“结果未知”。断连 / 会话重置时清空。回归：`test/pi_rpc_client_test.dart` “slash prompt waits while an extension screen or question is open”。
+- 回归验证：`node tool/check_custom_rpc.mjs`（真实 multiplex + 真实 Pi + 临时扩展：断言前缀与渲染行、命令在 done() 前不返回、按键送达 handleInput、done() 后清除浮层，不调用模型）。
+
+```json
+{"type":"extension_ui_request","id":"...","method":"setWidget","widgetKey":"pi-gui-custom:1","widgetLines":["Usage bill","────","today - 3 request(s)"]}
+{"type":"extension_ui_response","id":"pi-gui-custom:1","value":"\u001b[B"}
+{"type":"extension_ui_request","id":"...","method":"setWidget","widgetKey":"pi-gui-custom:1"}
+```
+
 ### 历史能力桥的保留通道
 
 [历史回溯](history_rewind.md)新增 `gui_history.mjs`，只调用 Pi 公开的 `ctx.navigateTree`、`pi.setLabel` 等能力。Pi 0.86 接管 stdout，因此该扩展用 `ctx.ui.setStatus` 的保留键 `pi-gui-history:adapter-history-N` 携带内部操作回应；Node `routePiOutput` 按待处理 ID 在进入 Flutter 前消费，不渲染成普通状态徽章。其他扩展的状态、通知和问答仍按原路径分发。

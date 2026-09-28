@@ -6,13 +6,16 @@ import 'package:pi_gui/ui/features/settings/controllers/quota_controller.dart';
 void main() {
   group('QuotaController.parseAuthEntry', () {
     test('parses the openai-codex OAuth entry from auth.json', () {
-      const json = '''
+      // 相对当前时间取未来值，避免夹具里的固定时间戳随日期推移意外过期。
+      final expires = DateTime.now().millisecondsSinceEpoch +
+          const Duration(days: 7).inMilliseconds;
+      final json = '''
       {
         "openai-codex": {
           "type": "oauth",
           "access": "token-value",
           "refresh": "refresh-value",
-          "expires": 1790305171065,
+          "expires": $expires,
           "accountId": "acc-123"
         },
         "deepseek": { "type": "api_key", "apiKey": "sk-x" }
@@ -24,7 +27,7 @@ void main() {
       expect(entry.accountId, 'acc-123');
       expect(
         entry.expiresAt,
-        DateTime.fromMillisecondsSinceEpoch(1790305171065),
+        DateTime.fromMillisecondsSinceEpoch(expires),
       );
       expect(entry.isExpired, isFalse);
     });

@@ -24,6 +24,7 @@ import 'history_controller.dart';
 import 'image_attachment_controller.dart';
 import 'model_picker_controller.dart';
 import 'pi_extension_ui_bridge.dart';
+import 'slash_command_controller.dart';
 import 'workspace_browser_controller.dart';
 import 'workspace_tabs_controller.dart';
 import '../../settings/controllers/appearance_controller.dart';
@@ -38,6 +39,7 @@ class WorkbenchSession {
   }) {
     chat = ChatController(client);
     models = ModelPickerController(client);
+    commands = SlashCommandController(client);
     extensions = PiExtensionUiBridge(
       client,
       input,
@@ -125,6 +127,7 @@ class WorkbenchSession {
   final slots = SlotManager();
   late final ChatController chat;
   late final ModelPickerController models;
+  late final SlashCommandController commands;
   late final PiExtensionUiBridge extensions;
   late final HistoryController history;
   PiHistoryResult? pendingHistoryDraft;
@@ -212,6 +215,7 @@ class WorkbenchSession {
     extensions.dispose();
     chat.dispose();
     models.dispose();
+    commands.dispose();
     await client.close();
     input.dispose();
     attachments.dispose();

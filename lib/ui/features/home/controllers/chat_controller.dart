@@ -19,6 +19,8 @@ enum ChatFailure {
   queue,
   cancelled,
   invalidEvent,
+  compact,
+  rename,
 }
 
 class ChatSessionBookmark {
@@ -379,6 +381,73 @@ class ChatController extends ChangeNotifier {
     }
     if (changed) await refresh();
     return changed;
+  }
+
+  /// RPC `compact`：仅空闲会话可压；压缩事件负责活动状态与事后回读。
+  /// 发送前已被斜杠分发层拦截，不会把 /compact 文本喂给模型。
+  Future<bool> compact(String? instructions) async {
+    if (!canSwitch) return false;
+    isSending = true;
+    failure = null;
+    _notify();
+    try {
+      await _pi.compact(instructions);
+      if (_disposed) return true;
+      // 压缩重建了上下文；压缩事件路径也会回读，这里补上同轮兜底。
+      _needsHistory = true;
+      _resync = true;
+      return true;
+    } catch (error) {
+      if (!_disposed) {
+        final uncertain = error is PiRpcException && error.outcomeUnknown;
+        if (uncertain) isReady = false;
+        failure = _lost
+            ? ChatFailure.disconnected
+            : uncertain
+            ? ChatFailure.uncertain
+            : ChatFailure.compact;
+      }
+      return false;
+    } finally {
+      isSending = false;
+      _notify();
+      _flushResync();
+    }
+  }
+
+  /// RPC `set_session_name`：只改显示名；压缩中/运行中不改投影状态。
+  Future<bool> rename(String name) async {
+    if (_disposed || name.isEmpty) return false;
+    try {
+      await _pi.setSessionName(name);
+      if (_disposed) return true;
+      final next = await _pi.getState();
+      final current = state;
+      // 只同步名称；快照身份变了说明会话已切换，不回写旧投影。
+      if (current != null &&
+          current.sessionId == next.sessionId &&
+          current.sessionFile == next.sessionFile) {
+        state = PiSessionState(
+          model: next.model ?? current.model,
+          thinkingLevel: next.thinkingLevel,
+          isStreaming: next.isStreaming,
+          isCompacting: next.isCompacting,
+          sessionFile: next.sessionFile,
+          sessionId: next.sessionId,
+          sessionName: next.sessionName,
+          pendingMessageCount: next.pendingMessageCount,
+        );
+        _remember();
+        _notify();
+      }
+      return true;
+    } catch (_) {
+      if (!_disposed) {
+        failure = ChatFailure.rename;
+        _notify();
+      }
+      return false;
+    }
   }
 
   void _onEvent(PiRpcEvent event) {
