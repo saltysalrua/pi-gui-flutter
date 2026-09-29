@@ -900,5 +900,37 @@
   "providerSaved": "Saved",
   "providerDiscardTitle": "Discard unsaved changes?",
   "providerDiscardBody": "This profile has unsaved changes that will be lost if you leave.",
-  "providerErrorNoModels": "Keep at least one model visible in the model picker."
+  "providerErrorNoModels": "Keep at least one model visible in the model picker.",
+"hooksPageTitle": "Built-in hooks",
+"hooksPageSubtitle": "Built-in extensions the GUI injects into every newly started Pi session. Changes apply to sessions started afterwards; running sessions are unaffected.",
+"hooksLoading": "Loading hook state…",
+"hooksLoadFailed": "Failed to load hook state.",
+"hooksRetry": "Retry",
+"hooksGroupTitle": "Runtime hooks",
+"hooksPersistenceWarning": "The last change could not be saved to disk; restarting the GUI reverts it.",
+"hooksRemovedGroupTitle": "Uninstalled",
+"hooksRemovedGroupDescription": "Uninstalling means permanently skipping injection, not deleting files; \"Restore\" brings it back.",
+"hooksHintTitle": "About toggles and uninstalling",
+"hooksHintBody": "Built-in hooks ship with the app, so their files cannot truly be deleted. \"Disable\" and \"Uninstall\" both stop the hook from being injected into later sessions; running sessions keep it. Uninstalled hooks move to the list below. Choices survive app updates.",
+"hooksActionFailed": "Action failed: {error}",
+"@hooksActionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+"hooksToolDiffName": "Write diff",
+"hooksToolDiffDesc": "Observes write/edit tool calls to provide real file-change diffs in the timeline. Without it, write tools show a neutral content line with no before/after comparison.",
+"hooksHistoryName": "History bridge",
+"hooksHistoryDesc": "Powers session rewind, message labels and history branch navigation. Without it those actions become unavailable.",
+"hooksStateActive": "Enabled",
+"hooksStateOff": "Disabled",
+"hooksStateRemoved": "Uninstalled",
+"hooksActionEnable": "Enable",
+"hooksActionDisable": "Disable",
+"hooksActionUninstall": "Uninstall",
+"hooksActionRestore": "Restore",
+"hooksMenuTooltip": "Change hook state",
+"hooksNoChannel": "No control channel is available; hook settings are unavailable."
 }

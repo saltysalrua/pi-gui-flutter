@@ -2301,4 +2301,88 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get providerErrorNoModels =>
       'Keep at least one model visible in the model picker.';
+
+  @override
+  String get hooksPageTitle => 'Built-in hooks';
+
+  @override
+  String get hooksPageSubtitle =>
+      'Built-in extensions the GUI injects into every newly started Pi session. Changes apply to sessions started afterwards; running sessions are unaffected.';
+
+  @override
+  String get hooksLoading => 'Loading hook state…';
+
+  @override
+  String get hooksLoadFailed => 'Failed to load hook state.';
+
+  @override
+  String get hooksRetry => 'Retry';
+
+  @override
+  String get hooksGroupTitle => 'Runtime hooks';
+
+  @override
+  String get hooksPersistenceWarning =>
+      'The last change could not be saved to disk; restarting the GUI reverts it.';
+
+  @override
+  String get hooksRemovedGroupTitle => 'Uninstalled';
+
+  @override
+  String get hooksRemovedGroupDescription =>
+      'Uninstalling means permanently skipping injection, not deleting files; \"Restore\" brings it back.';
+
+  @override
+  String get hooksHintTitle => 'About toggles and uninstalling';
+
+  @override
+  String get hooksHintBody =>
+      'Built-in hooks ship with the app, so their files cannot truly be deleted. \"Disable\" and \"Uninstall\" both stop the hook from being injected into later sessions; running sessions keep it. Uninstalled hooks move to the list below. Choices survive app updates.';
+
+  @override
+  String hooksActionFailed(String error) {
+    return 'Action failed: $error';
+  }
+
+  @override
+  String get hooksToolDiffName => 'Write diff';
+
+  @override
+  String get hooksToolDiffDesc =>
+      'Observes write/edit tool calls to provide real file-change diffs in the timeline. Without it, write tools show a neutral content line with no before/after comparison.';
+
+  @override
+  String get hooksHistoryName => 'History bridge';
+
+  @override
+  String get hooksHistoryDesc =>
+      'Powers session rewind, message labels and history branch navigation. Without it those actions become unavailable.';
+
+  @override
+  String get hooksStateActive => 'Enabled';
+
+  @override
+  String get hooksStateOff => 'Disabled';
+
+  @override
+  String get hooksStateRemoved => 'Uninstalled';
+
+  @override
+  String get hooksActionEnable => 'Enable';
+
+  @override
+  String get hooksActionDisable => 'Disable';
+
+  @override
+  String get hooksActionUninstall => 'Uninstall';
+
+  @override
+  String get hooksActionRestore => 'Restore';
+
+  @override
+  String get hooksMenuTooltip => 'Change hook state';
+
+  @override
+  String get hooksNoChannel =>
+      'No control channel is available; hook settings are unavailable.';
 }

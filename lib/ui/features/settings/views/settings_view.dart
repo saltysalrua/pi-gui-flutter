@@ -17,18 +17,20 @@ import '../../../core/window_material_scope.dart';
 import '../../../../core/rpc/pi_rpc_client.dart';
 import '../../../../core/services/window_material_service.dart';
 import '../controllers/appearance_controller.dart';
+import '../controllers/hooks_controller.dart';
 import '../controllers/packages_controller.dart';
 import '../controllers/provider_profiles_controller.dart';
 import '../controllers/pi_update_controller.dart';
 import '../controllers/quota_controller.dart';
 import 'appearance_settings_view.dart';
+import 'hooks_settings_view.dart';
 import 'packages_settings_view.dart';
 import 'pi_settings_view.dart';
 import 'quota_settings_view.dart';
 
 /// Public settings page selector so callers (e.g. the sidebar quota button)
 /// can deep-link straight to a specific page.
-enum SettingsPage { appearance, pi, plugins, quota }
+enum SettingsPage { appearance, pi, plugins, quota, hooks }
 
 typedef _SettingsPage = SettingsPage;
 
@@ -90,6 +92,7 @@ class _SettingsViewState extends State<SettingsView> {
   PackagesController? _plugins;
   ProviderProfilesController? _profiles;
   QuotaController? _quota;
+  HooksController? _hooks;
 
   @override
   void dispose() {
@@ -103,6 +106,7 @@ class _SettingsViewState extends State<SettingsView> {
     // packages instances stay alive for the whole app run.
     _profiles?.dispose();
     _quota?.dispose();
+    _hooks?.dispose();
     super.dispose();
   }
 
@@ -167,6 +171,10 @@ class _SettingsViewState extends State<SettingsView> {
         _profiles ??= _createProfiles(control);
       }
     }
+    if (page == _SettingsPage.hooks) {
+      final control = widget.control;
+      if (control != null) _hooks ??= HooksController(control)..load();
+    }
     // Outgoing and incoming pages coexist during the cross-fade. They cannot
     // share a ScrollPosition, including when quickly switching back again.
     _outgoingScrolls.add(_scroll);
@@ -229,6 +237,7 @@ class _SettingsViewState extends State<SettingsView> {
                 AppSelectOption(_SettingsPage.pi, l.piPageTitle),
                 AppSelectOption(_SettingsPage.plugins, l.pluginsPageTitle),
                 AppSelectOption(_SettingsPage.quota, l.quotaPageTitle),
+                AppSelectOption(_SettingsPage.hooks, l.hooksPageTitle),
               ],
               onChanged: (page) => _select(page),
             );
@@ -271,6 +280,11 @@ class _SettingsViewState extends State<SettingsView> {
                       l.quotaPageTitle,
                       Icons.data_usage_outlined,
                     ),
+                    navTile(
+                      _SettingsPage.hooks,
+                      l.hooksPageTitle,
+                      Icons.webhook_rounded,
+                    ),
                   ],
                 ),
               ),
@@ -301,6 +315,20 @@ class _SettingsViewState extends State<SettingsView> {
                 controller: _quota ??= QuotaController()..load(),
                 query: _query,
               ),
+              _SettingsPage.hooks => () {
+                final control = widget.control;
+                if (control == null) {
+                  return _PageUnavailable(
+                    title: l.hooksPageTitle,
+                    subtitle: l.hooksPageSubtitle,
+                    body: l.hooksNoChannel,
+                  );
+                }
+                return HooksSettingsContent(
+                  controller: _hooks ??= HooksController(control)..load(),
+                  query: _query,
+                );
+              }(),
             };
             final page = Column(
               children: [
@@ -392,20 +420,40 @@ class _PluginsUnavailable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    return _PageUnavailable(
+      title: l.pluginsPageTitle,
+      subtitle: l.pluginsPageSubtitle,
+      body: l.pluginsNoChannel,
+    );
+  }
+}
+
+/// Generic "page needs a live control channel" fallback: no partial or fake
+/// state, just the page's own title and the reason it is unavailable.
+class _PageUnavailable extends StatelessWidget {
+  const _PageUnavailable({
+    required this.title,
+    required this.subtitle,
+    required this.body,
+  });
+  final String title, subtitle, body;
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l.pluginsPageTitle, style: context.textTheme.displaySmall),
+        Text(title, style: context.textTheme.displaySmall),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          l.pluginsPageSubtitle,
+          subtitle,
           style: context.textTheme.bodyMedium?.copyWith(
             color: colors.textSecondary,
           ),
         ),
         const SizedBox(height: AppSpacing.xxxl),
-        AppCard(child: Text(l.pluginsNoChannel)),
+        AppCard(child: Text(body)),
       ],
     );
   }

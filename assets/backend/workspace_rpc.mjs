@@ -16,6 +16,7 @@ import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { WorkspaceBrowser } from "./workspace_browser.mjs";
 import { prepareImageUpload } from "./gui_image_upload.mjs";
+import { BUILTIN_HOOKS, GuiHooks } from "./gui_hooks.mjs";
 
 const exec = promisify(execFile);
 // A short-lived SDK summary, not a second session database or a polling timer.
@@ -706,12 +707,20 @@ export class PiChild {
     onExit,
     sessionPath,
     extraArguments = [],
+    hooks = null,
   ) {
     this.pending = new Map();
     this.nextId = 0;
     this.expectedExit = false;
     this.exited = false;
     const launcher = ensureLauncherScript(packageRoot);
+    const scripts = path.dirname(fileURLToPath(import.meta.url));
+    // Hook injection is decided once, at spawn time: state changes apply to
+    // Pi children started afterwards, never to sessions already running.
+    const injected = hooks?.injected?.() ?? null;
+    const extensions = BUILTIN_HOOKS.filter(
+      (hook) => !injected || injected.has(hook.file),
+    ).map((hook) => path.join(scripts, hook.file));
     this.child = spawn(
       process.execPath,
       [
@@ -719,13 +728,7 @@ export class PiChild {
         "--mode",
         "rpc",
         ...extraArguments,
-        "--extension",
-        path.join(
-          path.dirname(fileURLToPath(import.meta.url)),
-          "gui_tool_diff.mjs",
-        ),
-        "--extension",
-        path.join(path.dirname(fileURLToPath(import.meta.url)), "gui_history.mjs"),
+        ...extensions.flatMap((file) => ["--extension", file]),
         ...(sessionPath ? ["--session", sessionPath] : []),
       ],
       {
@@ -1123,6 +1126,9 @@ async function main() {
     process.cwd(),
   );
   await service.initialize();
+  // Shared by every PiChild factory below and the manager's hooks bridge.
+  const hooks = new GuiHooks();
+  await hooks.initialize();
   const emit = (line) => process.stdout.write(`${line}\n`);
   if (!process.argv.includes("--gui-multiplex")) {
     const adapter = new WorkspaceAdapter(
@@ -1136,6 +1142,8 @@ async function main() {
             if (!adapter.mutating) process.exit(1);
           },
           sessionPath,
+          [],
+          hooks,
         ),
       emit,
       () => process.exit(1),
@@ -1160,9 +1168,9 @@ async function main() {
   const manager = new WorkspaceManager(
     service,
     (cwd, output, sessionPath, onExit) =>
-      new PiChild(root, cwd, output, onExit, sessionPath),
+      new PiChild(root, cwd, output, onExit, sessionPath, [], hooks),
     emit,
-    { resizeImage, packageRoot: root },
+    { resizeImage, packageRoot: root, hooks },
   );
   await manager.initialize();
   const ready = manager.start();

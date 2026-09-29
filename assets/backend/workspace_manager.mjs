@@ -28,9 +28,15 @@ const inside = (parent, child) => {
 };
 
 export class WorkspaceManager {
-  constructor(service, createChild, emit, { resizeImage, packageRoot } = {}) {
+  constructor(
+    service,
+    createChild,
+    emit,
+    { resizeImage, packageRoot, hooks } = {},
+  ) {
     this.resizeImage = resizeImage;
     this.packageRoot = packageRoot;
+    this.hooksRegistry = hooks;
     this.service = service;
     this.createChild = createChild;
     this.emit = emit;
@@ -204,6 +210,19 @@ export class WorkspaceManager {
       this.providerProfilesBridge = new GuiProviderProfiles(this.packageRoot);
     }
     return this.providerProfilesBridge.handle(request);
+  }
+  // Built-in hook management shares the GuiHooks instance owned by main(),
+  // so state changes are honored by every PiChild spawned afterwards. The
+  // fallback (fresh registry) only exists for out-of-process imports; the
+  // production manager is always constructed with the shared instance.
+  async hooks(request) {
+    if (!this.hooksBridge) {
+      const { GuiHooks, GuiHooksBridge } = await import("./gui_hooks.mjs");
+      const hooks = this.hooksRegistry ?? new GuiHooks();
+      if (hooks !== this.hooksRegistry) await hooks.initialize();
+      this.hooksBridge = new GuiHooksBridge(hooks);
+    }
+    return this.hooksBridge.handle(request);
   }
   output(channel, message) {
     this.emit(JSON.stringify({ type: "gui_channel", channel, message }));
@@ -532,6 +551,9 @@ export class WorkspaceManager {
       case "gui_provider_profiles_remove":
       case "gui_provider_profiles_models":
         return this.providerProfiles(request);
+      case "gui_hooks_state":
+      case "gui_hooks_set":
+        return this.hooks(request);
       // Browse any registered worktree without creating an Agent.
       case "gui_list_files":
       case "gui_get_git_graph":

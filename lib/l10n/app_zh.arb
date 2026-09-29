@@ -948,5 +948,37 @@
   "providerSaved": "已保存",
   "providerDiscardTitle": "放弃未保存的修改？",
   "providerDiscardBody": "这个配置还有没保存的修改，离开后会丢失。",
-  "providerErrorNoModels": "至少要保留一个在模型选择器中显示的模型。"
+  "providerErrorNoModels": "至少要保留一个在模型选择器中显示的模型。",
+"hooksPageTitle": "内置钩子",
+"hooksPageSubtitle": "GUI 在每次启动新的 Pi 会话时注入的内置扩展钩子。修改只对新启动的会话生效，正在运行的会话不受影响。",
+"hooksLoading": "正在读取钩子状态…",
+"hooksLoadFailed": "钩子状态读取失败。",
+"hooksRetry": "重试",
+"hooksGroupTitle": "运行时钩子",
+"hooksPersistenceWarning": "上一条更改没能写入磁盘，重启 GUI 后会回到旧状态。",
+"hooksRemovedGroupTitle": "已卸载",
+"hooksRemovedGroupDescription": "卸载即永久停用注入，不会删除任何文件；点“恢复”即可还原。",
+"hooksHintTitle": "关于开关和卸载",
+"hooksHintBody": "内置钩子随应用一起打包，文件无法真正删除。“停用”和“卸载”都会让之后的会话不再注入这个钩子，正在运行的会话不受影响；“卸载”的条目会移到下方列表集中展示。这些选择在应用更新后依然生效。",
+"hooksActionFailed": "操作失败：{error}",
+"@hooksActionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+"hooksToolDiffName": "写入 Diff",
+"hooksToolDiffDesc": "观察 write/edit 工具调用，为时间线提供真实的文件改动对比。停用后写入工具只显示中性内容，不再有前后对比。",
+"hooksHistoryName": "历史桥",
+"hooksHistoryDesc": "支撑会话回溯、消息打标签和历史分支跳转。停用后这些操作会不可用。",
+"hooksStateActive": "已启用",
+"hooksStateOff": "已停用",
+"hooksStateRemoved": "已卸载",
+"hooksActionEnable": "启用",
+"hooksActionDisable": "停用",
+"hooksActionUninstall": "卸载",
+"hooksActionRestore": "恢复",
+"hooksMenuTooltip": "更改钩子状态",
+"hooksNoChannel": "没有可用的控制通道，钩子设置暂时无法使用。"
 }

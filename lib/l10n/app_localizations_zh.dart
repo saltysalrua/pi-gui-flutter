@@ -2153,4 +2153,84 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerErrorNoModels => '至少要保留一个在模型选择器中显示的模型。';
+
+  @override
+  String get hooksPageTitle => '内置钩子';
+
+  @override
+  String get hooksPageSubtitle =>
+      'GUI 在每次启动新的 Pi 会话时注入的内置扩展钩子。修改只对新启动的会话生效，正在运行的会话不受影响。';
+
+  @override
+  String get hooksLoading => '正在读取钩子状态…';
+
+  @override
+  String get hooksLoadFailed => '钩子状态读取失败。';
+
+  @override
+  String get hooksRetry => '重试';
+
+  @override
+  String get hooksGroupTitle => '运行时钩子';
+
+  @override
+  String get hooksPersistenceWarning => '上一条更改没能写入磁盘，重启 GUI 后会回到旧状态。';
+
+  @override
+  String get hooksRemovedGroupTitle => '已卸载';
+
+  @override
+  String get hooksRemovedGroupDescription => '卸载即永久停用注入，不会删除任何文件；点“恢复”即可还原。';
+
+  @override
+  String get hooksHintTitle => '关于开关和卸载';
+
+  @override
+  String get hooksHintBody =>
+      '内置钩子随应用一起打包，文件无法真正删除。“停用”和“卸载”都会让之后的会话不再注入这个钩子，正在运行的会话不受影响；“卸载”的条目会移到下方列表集中展示。这些选择在应用更新后依然生效。';
+
+  @override
+  String hooksActionFailed(String error) {
+    return '操作失败：$error';
+  }
+
+  @override
+  String get hooksToolDiffName => '写入 Diff';
+
+  @override
+  String get hooksToolDiffDesc =>
+      '观察 write/edit 工具调用，为时间线提供真实的文件改动对比。停用后写入工具只显示中性内容，不再有前后对比。';
+
+  @override
+  String get hooksHistoryName => '历史桥';
+
+  @override
+  String get hooksHistoryDesc => '支撑会话回溯、消息打标签和历史分支跳转。停用后这些操作会不可用。';
+
+  @override
+  String get hooksStateActive => '已启用';
+
+  @override
+  String get hooksStateOff => '已停用';
+
+  @override
+  String get hooksStateRemoved => '已卸载';
+
+  @override
+  String get hooksActionEnable => '启用';
+
+  @override
+  String get hooksActionDisable => '停用';
+
+  @override
+  String get hooksActionUninstall => '卸载';
+
+  @override
+  String get hooksActionRestore => '恢复';
+
+  @override
+  String get hooksMenuTooltip => '更改钩子状态';
+
+  @override
+  String get hooksNoChannel => '没有可用的控制通道，钩子设置暂时无法使用。';
 }

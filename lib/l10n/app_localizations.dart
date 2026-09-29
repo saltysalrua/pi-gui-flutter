@@ -4147,6 +4147,156 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'至少要保留一个在模型选择器中显示的模型。'**
   String get providerErrorNoModels;
+
+  /// No description provided for @hooksPageTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'内置钩子'**
+  String get hooksPageTitle;
+
+  /// No description provided for @hooksPageSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'GUI 在每次启动新的 Pi 会话时注入的内置扩展钩子。修改只对新启动的会话生效，正在运行的会话不受影响。'**
+  String get hooksPageSubtitle;
+
+  /// No description provided for @hooksLoading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在读取钩子状态…'**
+  String get hooksLoading;
+
+  /// No description provided for @hooksLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'钩子状态读取失败。'**
+  String get hooksLoadFailed;
+
+  /// No description provided for @hooksRetry.
+  ///
+  /// In zh, this message translates to:
+  /// **'重试'**
+  String get hooksRetry;
+
+  /// No description provided for @hooksGroupTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行时钩子'**
+  String get hooksGroupTitle;
+
+  /// No description provided for @hooksPersistenceWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'上一条更改没能写入磁盘，重启 GUI 后会回到旧状态。'**
+  String get hooksPersistenceWarning;
+
+  /// No description provided for @hooksRemovedGroupTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'已卸载'**
+  String get hooksRemovedGroupTitle;
+
+  /// No description provided for @hooksRemovedGroupDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'卸载即永久停用注入，不会删除任何文件；点“恢复”即可还原。'**
+  String get hooksRemovedGroupDescription;
+
+  /// No description provided for @hooksHintTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'关于开关和卸载'**
+  String get hooksHintTitle;
+
+  /// No description provided for @hooksHintBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'内置钩子随应用一起打包，文件无法真正删除。“停用”和“卸载”都会让之后的会话不再注入这个钩子，正在运行的会话不受影响；“卸载”的条目会移到下方列表集中展示。这些选择在应用更新后依然生效。'**
+  String get hooksHintBody;
+
+  /// No description provided for @hooksActionFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'操作失败：{error}'**
+  String hooksActionFailed(String error);
+
+  /// No description provided for @hooksToolDiffName.
+  ///
+  /// In zh, this message translates to:
+  /// **'写入 Diff'**
+  String get hooksToolDiffName;
+
+  /// No description provided for @hooksToolDiffDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'观察 write/edit 工具调用，为时间线提供真实的文件改动对比。停用后写入工具只显示中性内容，不再有前后对比。'**
+  String get hooksToolDiffDesc;
+
+  /// No description provided for @hooksHistoryName.
+  ///
+  /// In zh, this message translates to:
+  /// **'历史桥'**
+  String get hooksHistoryName;
+
+  /// No description provided for @hooksHistoryDesc.
+  ///
+  /// In zh, this message translates to:
+  /// **'支撑会话回溯、消息打标签和历史分支跳转。停用后这些操作会不可用。'**
+  String get hooksHistoryDesc;
+
+  /// No description provided for @hooksStateActive.
+  ///
+  /// In zh, this message translates to:
+  /// **'已启用'**
+  String get hooksStateActive;
+
+  /// No description provided for @hooksStateOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'已停用'**
+  String get hooksStateOff;
+
+  /// No description provided for @hooksStateRemoved.
+  ///
+  /// In zh, this message translates to:
+  /// **'已卸载'**
+  String get hooksStateRemoved;
+
+  /// No description provided for @hooksActionEnable.
+  ///
+  /// In zh, this message translates to:
+  /// **'启用'**
+  String get hooksActionEnable;
+
+  /// No description provided for @hooksActionDisable.
+  ///
+  /// In zh, this message translates to:
+  /// **'停用'**
+  String get hooksActionDisable;
+
+  /// No description provided for @hooksActionUninstall.
+  ///
+  /// In zh, this message translates to:
+  /// **'卸载'**
+  String get hooksActionUninstall;
+
+  /// No description provided for @hooksActionRestore.
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复'**
+  String get hooksActionRestore;
+
+  /// No description provided for @hooksMenuTooltip.
+  ///
+  /// In zh, this message translates to:
+  /// **'更改钩子状态'**
+  String get hooksMenuTooltip;
+
+  /// No description provided for @hooksNoChannel.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有可用的控制通道，钩子设置暂时无法使用。'**
+  String get hooksNoChannel;
 }
 
 class _AppLocalizationsDelegate

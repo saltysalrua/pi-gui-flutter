@@ -53,6 +53,7 @@ for (const name of [
   "gui_tool_diff.mjs",
   "gui_image_upload.mjs",
   "gui_history.mjs",
+  "gui_hooks.mjs",
 ]) {
   await cp(
     fileURLToPath(new URL(`../assets/backend/${name}`, import.meta.url)),
@@ -68,6 +69,7 @@ const child = spawn(
     env: {
       ...process.env,
       PI_GUI_WORKSPACE_STORE: path.join(root, "gui.json"),
+      PI_GUI_HOOKS_STORE: path.join(root, "hooks.json"),
     },
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,

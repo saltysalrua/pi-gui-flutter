@@ -48,13 +48,14 @@ try {
   await writeFile(path.join(process.env.PI_CODING_AGENT_DIR, "settings.json"), JSON.stringify({ defaultProvider: "anthropic", defaultModel: "claude-sonnet-4-5", compaction: { enabled: false }, extensions: [hook] }));
   const scripts = path.join(root, "backend");
   await mkdir(scripts);
-  for (const name of ["workspace_rpc.mjs", "workspace_manager.mjs", "workspace_browser.mjs", "gui_tool_diff.mjs", "gui_history.mjs", "gui_image_upload.mjs", "gui_packages.mjs"]) {
+  for (const name of ["workspace_rpc.mjs", "workspace_manager.mjs", "workspace_browser.mjs", "gui_tool_diff.mjs", "gui_history.mjs", "gui_hooks.mjs", "gui_image_upload.mjs", "gui_packages.mjs"]) {
     await cp(fileURLToPath(new URL(`../assets/backend/${name}`, import.meta.url)), path.join(scripts, name));
   }
   const events = [];
   child = spawn(process.execPath, [path.join(scripts, "workspace_rpc.mjs"), "--gui-multiplex"], {
     cwd: root,
-    env: { ...process.env, HOME: root, USERPROFILE: root, PI_GUI_WORKSPACE_STORE: path.join(root, "gui.json"), PI_GUI_PI_PACKAGE_DIR: packageRoot },
+    env: { ...process.env, HOME: root, USERPROFILE: root, PI_GUI_WORKSPACE_STORE: path.join(root, "gui.json"),
+      PI_GUI_HOOKS_STORE: path.join(root, "hooks.json"), PI_GUI_PI_PACKAGE_DIR: packageRoot },
     stdio: ["pipe", "pipe", "pipe"], windowsHide: true,
   });
   child.stderr.resume();

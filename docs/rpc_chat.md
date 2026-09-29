@@ -77,7 +77,7 @@ tags: [flutter, pi-rpc, chat, markdown, diff]
 | 时间线投影 | `lib/core/models/chat_timeline.dart` | 按内容索引拼接、最终消息替换、toolCallId 关联、历史重建；`assistantNumbers` 按正序生成与消息列表对齐的编号 |
 | Diff 解析 | `lib/core/models/diff_document.dart` | patch/带行号 Diff、中性写入后视图；隐藏重复文件头但保留真实内容，无文件 I/O、无补丁执行 |
 | write Diff 后端 | `assets/backend/gui_tool_diff.mjs` | 公共 `tool_call/tool_result` 中间件，有限快照、冲突降级、补充结果 details，不接管工具执行 |
-| 扩展装载 | `lib/core/rpc/pi_workspace_transport.dart`、`assets/backend/workspace_rpc.mjs` | 发布七个 backend assets（完整清单见工作区文档）；`PiChild` 以 `--extension` 装载 Diff 观察扩展与历史能力桥 |
+| 扩展装载 | `lib/core/rpc/pi_workspace_transport.dart`、`assets/backend/workspace_rpc.mjs` | 发布九个 backend assets（完整清单见工作区文档）；`PiChild` 以 `--extension` 装载 Diff 观察扩展与历史能力桥，注入与否由内置钩子注册表（`assets/backend/gui_hooks.mjs`，见 `docs/builtin_hooks.md`）在启动时决定 |
 | 交互状态 | `lib/ui/features/home/controllers/chat_controller.dart` | 发送互斥、停止、恢复、会话书签与成功文件记录投影 |
 | 主工作区 | `lib/ui/features/home/widgets/home_chat_panel.dart` | 两态布局、时间线、草稿、回到最新、响应式文件 / Git 右栏 |
 | 输入组件 | `lib/ui/features/home/widgets/home_starter_panel.dart` | 共用输入卡片、键盘/IME、紧凑模型入口 |

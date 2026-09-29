@@ -229,6 +229,7 @@ try {
         ...process.env,
         PI_CODING_AGENT_DIR: agentDir,
         PI_GUI_WORKSPACE_STORE: path.join(root, "gui.json"),
+        PI_GUI_HOOKS_STORE: path.join(root, "hooks.json"),
       },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
