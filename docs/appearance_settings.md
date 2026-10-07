@@ -3,7 +3,7 @@ title: "外观设置：动态配色、分区毛玻璃与缩放"
 version: "1.9.1"
 status: "implemented"
 type: "feature-and-architecture"
-tags: [flutter, settings, material3, windows, theme]
+tags: [flutter, settings, material3, windows, linux, wayland, theme]
 ---
 
 # 外观设置
@@ -64,9 +64,9 @@ tags: [flutter, settings, material3, windows, theme]
 3. 关闭某一区域只恢复该区纯色，保留它的滑块数值；重新开启继续使用原值。标题栏和文件 / Git 右栏始终跟随侧边栏，聊天和设置页的主背景使用同一项主界面设置。
 4. 不透明度以外的底色仍在“分区颜色”修改。两区的开关和不透明度在明暗模式间共用，颜色覆盖仍按明暗模式分别保存。
 
-这是 **Windows 原生桌面 Acrylic**，模糊窗口背后的桌面或其他窗口，不是给文字加模糊，也不是应用内的渐变仿制。Windows 控制模糊半径，本设置只独立控制每区的底色覆盖程度；不提供无法兑现的分区原生模糊半径。文字和按钮不会随背景一起降低透明度。输入卡片、其他卡片、带框代码块与 Diff 的底色由下方的“卡片毛玻璃”独立控制，主界面开关不会替用户开启卡片效果。
+桌面毛玻璃使用 **Windows 原生 Acrylic** 或 **Wayland 标准背景效果协议**，由桌面合成器模糊窗口背后的内容，文字保持清晰。系统控制模糊半径，本设置只独立控制每区的底色覆盖程度；不提供无法兑现的分区原生模糊半径。文字和按钮不会随背景一起降低透明度。输入卡片、其他卡片、带框代码块与 Diff 的底色由下方的“卡片毛玻璃”独立控制，主界面开关不会替用户开启卡片效果。
 
-**需要 Windows 11 22H2 或更新版本，并重新构建、启动新版本。** 仅热重载不能注册新增的原生通道。旧 Windows、非 Windows、旧 Runner 缺少通道、调用失败时保留纯色并显示原因；不会把窗口降级成未经模糊的全透明窗口。关闭 Windows“透明效果”、启用对比度主题或节电模式时也会回退纯色，不改写保存的选项。系统设置/主题/强调色/DWM 合成/电源广播及窗口激活会触发回读，系统本身也可能在窗口失焦时调整材质。未修改用户的 Windows 设置。
+**需要 Windows 11 22H2 或更新版本，或提供 `ext-background-effect-v1` 且允许模糊的 Wayland 桌面，并重新构建、启动新版本。** 仅热重载不能注册新增的原生通道。旧 Windows、X11、Wayland 缺少协议、旧 Runner 缺少通道或调用失败时保留纯色并显示原因；不会把窗口降级成未经模糊的全透明窗口。关闭 Windows“透明效果”、启用对比度主题或节电模式时也会回退纯色，不改写保存的选项。系统设置/主题/强调色/DWM 合成/电源广播及窗口激活会触发回读，系统本身也可能在窗口失焦时调整材质。未修改用户的 Windows 设置。
 
 背景按两个互不覆盖的路径分别绘制，主内容圆角外的部分属于侧栏区，避免在主背景下面铺满侧栏颜色而造成透明度串联。原有空会话居中输入、发送后底部输入、共享侧栏宽度、设置路由与 Pi 会话生命周期均不改变。
 
@@ -158,6 +158,7 @@ Windows 设置中开启“从背景自动选取强调色”后，应用可间接
 | `lib/ui/atoms/app_split_panel.dart` | 首页主区 / 文件与 Git 右栏的独立 tint、透明拖拽条与窄窗覆盖裁切 |
 | `lib/ui/atoms/app_card.dart` | 有底色卡片的统一背景模糊、圆角范围、嵌套复用和无状态丢失的开关 |
 | `lib/ui/core/theme/app_card_theme.dart` | 卡片目标不透明度与模糊 sigma 的主题插值；不改变语义颜色 |
+| `linux/runner/window_material.h/.cc` | 标准 Wayland 模糊能力、窗口 surface 生命周期、逻辑坐标区域及状态回传 |
 | `windows/runner/window_material.h/.cpp` | DWM Acrylic、系统透明/高对比度/节电检查，原生状态回传 |
 | `windows/runner/flutter_window.cpp` | 原生生命周期/消息路由；补全隐藏标题栏的 NC 激活默认处理，避免 DWM 卡在未激活灰底 |
 | `lib/core/services/appearance_store.dart` | GUI 自有 JSON 文件读写，临时文件 flush 后 rename 替换 |
@@ -195,7 +196,27 @@ Windows 设置中开启“从背景自动选取强调色”后，应用可间接
 
 原生请求串行执行，中间的过时配置可合并；迟到响应不能把刚关闭的透明背景重新开启。系统策略事件若与请求并发，确认回读后才接受结果。拖动不透明度只更新 Flutter 的分区底色和本地偏好，不重复设置 DWM，不经过 Pi。
 
-### 启动后第一次开玻璃自动补一轮“关 → 开”
+### Linux 标准 Wayland 毛玻璃
+
+Linux 使用同一 `pi_gui/window_material` 通道，方法为 `setBlur`，必填布尔参数仍为 `enabled` 与 `dark`；后者用于保持跨平台接口一致，底色由 Flutter 绘制。返回状态和 `statusChanged` 事件沿用上述枚举。X11 返回 `unsupported`；协议存在但没有 `blur` 能力时返回 `systemDisabled`。用户选项保留，只有 `active` 允许透明。
+
+Runner 在窗口实现前选择 RGBA visual，并把 Flutter 原生背景设为透明；两区和卡片的底色、不透明度、高对比度门控仍由公共 Flutter 组件控制。没有全窗口降低文字透明度，也不读取桌面截图或修改合成器配置。
+
+原生桥接复用 GDK 的 Wayland 连接与 GLib 默认事件队列，异步读取 registry 和 capabilities。初始化最多等待 3 秒，超时通过 `capability_timeout` 平台错误报告，日志保留具体原因与请求参数；不会阻塞 GTK 主循环。每个 GTK surface 只创建一个效果对象，尺寸变化按 GTK 逻辑坐标更新覆盖区域，由 GTK 下一次提交应用；关闭清除区域，surface 重建或窗口销毁释放对象。能力移除/恢复即时回传状态。Linux 不执行 DWM 的关开补偿。
+
+构建使用随仓库保存的上游 v1 XML，通过 `wayland-scanner` 在构建目录生成 C 代码，链接 `wayland-client`；Ubuntu 构建依赖增加 `libwayland-dev`、`libwayland-bin`。XML 的完整许可同时保留在第三方声明中，随发布包分发。支持范围由实际协议与能力决定，不按桌面名称推测；首版不实现旧 KDE 专有协议或 X11 模糊。
+
+`active` 表示模糊请求已设置，不证明最终像素；实际模糊算法、半径与合成策略由桌面控制。Niri 的 `xray` 策略可以只模糊壁纸而透过其他窗口，应用不会覆盖用户策略。
+
+### Linux 验证范围
+
+- Flutter 3.47.4 / Dart 3.13.3 下静态分析无问题，全套 173 项 Flutter 测试通过；覆盖 Linux 请求、能力状态和现有 Windows 关开补偿，生产入口 Linux Release 构建成功。
+- 同版本 Niri 26.04 的独立嵌套会话使用 llvmpipe 软件渲染，生产 Runner 和公共 Flutter 组件配合临时偏好完成 11 组运行检查。受控红蓝条纹经过合成器后呈连续模糊过渡，文字和输入控件保持清晰；两区及卡片独立开关、20% / 100%、浅深色、焦点和光标保持均已检查。
+- 正式外观控件通过稳定 ID 调用开关与滑块回调，确认三项的端点和独立保存；窄窗口下 18 字号、150% UI，以及最大化/还原已走查。X11 重新打开同一临时偏好后返回 `unsupported`，两区为不透明背景、设置仍保留，设置页显示对应提示。
+- 当前桌面的硬件渲染验证已确认标准协议和模糊请求，但像素验收随系统重启中断；最终像素证据来自隔离软件渲染，不能代替完整硬件渲染验收，也不代表其他桌面已实机测试。Niri 全屏背景策略可与普通窗口不同，本次软件 QA 中全屏透出黑色底层；透明度和协议状态仍正常。
+- 临时 QA 入口和数据位于忽略的构建缓存；预览包使用生产 `lib/main.dart`，不包含 QA 入口。原运行目录与用户桌面配置未替换。
+
+### Windows 启动后第一次开玻璃自动补一轮“关 → 开”
 
 现象：重启应用后毛玻璃不生效，到设置里手动关一次再开一次就恢复。原因是 **DWM 对已经等于目标值的 backdrop 属性不会再重绘**：启动时窗口先由 `window_manager` 提前 `show()`，玻璃的首次 `setAcrylic` 紧跟着第一次帧应用，此时 DWM 可能已把 backdrop 置为“已设置但未绘制”的状态；后续任何同值重设（包括窗口激活时的重应用）都不会触发重绘，只有先设回 `DWMSBT_NONE` / 空 margins 再重新启用才会重画——这正是手动开关有效的原理。且启动时唯一的 `WM_ACTIVATE` 发生在 `AppearanceController.initialize()` 之前的提前 `show()` 阶段，`enabled_` 尚未置位，激活路径不会补救。
 

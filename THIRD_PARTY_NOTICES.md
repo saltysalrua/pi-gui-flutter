@@ -25,6 +25,38 @@ Windows ZIP 与 Linux tar.gz 均保留：
 
 请完整分发应用目录，不能只复制 EXE、主程序或动态库而丢弃许可与资源。下列 Pub 链接是源码查阅入口，不能代替随包保留的版权及许可文本。平台相关内容以对应版本的实际构建产物为准。
 
+## Wayland 背景效果协议
+
+Linux Runner 使用 wayland-protocols 的 `staging/ext-background-effect/ext-background-effect-v1.xml`（v1），源码副本位于 `linux/runner/protocols/`，构建生成的 C 接口仅用于请求合成器模糊。本协议采用下列 MIT 许可；完整原文保留在 XML 和本声明中，后者随 Linux 发布包分发。
+
+来源：<https://gitlab.freedesktop.org/wayland/wayland-protocols/-/blob/main/staging/ext-background-effect/ext-background-effect-v1.xml>。
+
+```text
+Copyright (C) 2015 Martin Gräßlin
+Copyright (C) 2015 Marco Martin
+Copyright (C) 2020 Vlad Zahorodnii
+Copyright (C) 2024 Xaver Hugl
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice (including the next
+paragraph) shall be included in all copies or substantial portions of the
+Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
 ## 2. 字体与图标
 
 ### MiSans

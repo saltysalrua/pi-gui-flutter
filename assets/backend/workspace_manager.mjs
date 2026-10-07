@@ -43,19 +43,49 @@ export class WorkspaceManager {
     this.channels = new Map();
     this.scopes = new Map();
     this.workspaceProjects = new Map();
+    this.workspaceRoots = new Map();
     this.projects = [];
+    this.sections = [];
+    this.unassignedHidden = false;
     this.names = {};
     this.jobs = [];
     this.locks = new Set();
     this.saving = Promise.resolve();
+    this.organizing = Promise.resolve();
     this.closing = false;
   }
   async initialize() {
     const saved = this.service.catalog;
-    if (saved?.version === 1 && Array.isArray(saved.projects)) {
+    this.unassignedHidden = saved?.unassignedHidden === true;
+    if ([1, 2].includes(saved?.version) && Array.isArray(saved.projects)) {
       this.projects = saved.projects.filter(
         (p) => typeof p.path === "string" && typeof p.name === "string",
       );
+      const ids = new Set();
+      this.sections = (Array.isArray(saved.sections) ? saved.sections : [])
+        .filter((section) => {
+          if (
+            !section ||
+            typeof section.id !== "string" ||
+            !/^[a-zA-Z0-9_-]{1,100}$/.test(section.id) ||
+            ids.has(section.id) ||
+            typeof section.name !== "string" ||
+            !section.name.trim() ||
+            section.name.length > 160
+          )
+            return false;
+          ids.add(section.id);
+          return true;
+        })
+        .map((section) => ({
+          id: section.id,
+          name: section.name.trim(),
+          collapsed: section.collapsed === true,
+        }));
+      this.projects = this.projects.map((project) => ({
+        ...project,
+        sectionId: ids.has(project.sectionId) ? project.sectionId : null,
+      }));
       this.names =
         saved.names && typeof saved.names === "object" ? saved.names : {};
     } else {
@@ -67,10 +97,12 @@ export class WorkspaceManager {
         }
       }
     }
-    if (!saved || saved.version !== 1)
+    if (!saved || ![1, 2].includes(saved.version))
       await this.register(this.service.current, false);
     const catalog = await this.catalog();
-    if (!this.workspaceProjects.has(key(this.service.current))) {
+    try {
+      await this.knownWorkspace(this.service.current);
+    } catch {
       const first = catalog.projects
         .flatMap((p) => p.worktrees)
         .find((w) => !w.prunable);
@@ -81,7 +113,9 @@ export class WorkspaceManager {
   save() {
     this.saving = this.saving.then(async () => {
       this.service.catalog = {
-        version: 1,
+        version: 2,
+        sections: this.sections,
+        unassignedHidden: this.unassignedHidden,
         projects: this.projects,
         names: this.names,
       };
@@ -118,6 +152,7 @@ export class WorkspaceManager {
         path: root,
         name: path.basename(root),
         folders: [],
+        sectionId: null,
       });
     const project = existing ?? this.projects.at(-1);
     if (!info || !info.worktrees.some((w) => key(w.path) === key(cwd))) {
@@ -130,6 +165,7 @@ export class WorkspaceManager {
   }
   async catalog() {
     const projects = [];
+    const roots = new Map();
     for (const project of this.projects) {
       let info,
         unavailable = false,
@@ -161,7 +197,7 @@ export class WorkspaceManager {
           });
       }
       for (const worktree of worktrees)
-        this.workspaceProjects.set(key(worktree.path), key(project.path));
+        roots.set(key(worktree.path), key(project.path));
       projects.push({
         ...project,
         git: !!info,
@@ -173,8 +209,23 @@ export class WorkspaceManager {
         worktrees,
       });
     }
+    for (const [cwd, owner] of roots) {
+      if (!this.projects.some((project) => key(project.path) === owner))
+        roots.delete(cwd);
+    }
+    this.workspaceRoots = roots;
+    this.workspaceProjects = new Map(roots);
+    for (const cwd of [
+      this.service.current,
+      ...[...this.channels.values()].map((c) => c.cwd),
+    ]) {
+      const owner = this.workspaceOwner(cwd);
+      if (owner) this.workspaceProjects.set(key(cwd), owner);
+    }
     return {
-      version: 1,
+      version: 2,
+      sections: this.sections,
+      unassignedHidden: this.unassignedHidden,
       projects,
       channels: [...this.channels.values()].map((c) => this.describe(c)),
       jobs: this.jobs,
@@ -206,7 +257,8 @@ export class WorkspaceManager {
   }
   async providerProfiles(request) {
     if (!this.providerProfilesBridge) {
-      const { GuiProviderProfiles } = await import("./gui_provider_profiles.mjs");
+      const { GuiProviderProfiles } =
+        await import("./gui_provider_profiles.mjs");
       this.providerProfilesBridge = new GuiProviderProfiles(this.packageRoot);
     }
     return this.providerProfilesBridge.handle(request);
@@ -347,11 +399,19 @@ export class WorkspaceManager {
     this.output(entry.id, { type: "gui_channel_exited" });
     this.changed();
   }
+  workspaceOwner(cwd) {
+    return [...this.workspaceRoots.entries()]
+      .filter(([root]) => inside(root, cwd))
+      .sort((a, b) => b[0].length - a[0].length)[0]?.[1];
+  }
   async knownWorkspace(value) {
     const cwd = await directory(value);
-    // Fast path uses only validated catalog membership, never arbitrary cwd.
-    if (!this.workspaceProjects.has(key(cwd))) await this.catalog();
-    if (!this.workspaceProjects.has(key(cwd))) fail("WORKTREE_UNAVAILABLE");
+    // Resolve symlinks before containment. Only explicit roots confer access;
+    // previously visited children cannot retain a removed project's authority.
+    if (!this.workspaceOwner(cwd)) await this.catalog();
+    const owner = this.workspaceOwner(cwd);
+    if (!owner) fail("WORKTREE_UNAVAILABLE");
+    this.workspaceProjects.set(key(cwd), owner);
     return cwd;
   }
   async openChannel(request) {
@@ -364,8 +424,7 @@ export class WorkspaceManager {
     const known = this.channels.get(request.channelId);
     if (known) return this.describe(known); // Stable operation identity after timeout.
     const cwd = await this.knownWorkspace(request.workspace);
-    if (this.locks.has(this.workspaceProjects.get(key(cwd))))
-      fail("WORKSPACE_BUSY");
+    if (this.locks.has(this.workspaceOwner(cwd))) fail("WORKSPACE_BUSY");
     let sessionFile;
     if (request.sessionPath != null) {
       const history = await this.scope(cwd).listSessions({ force: true });
@@ -378,6 +437,10 @@ export class WorkspaceManager {
       );
       if (existing) return this.describe(existing);
     }
+    // Recheck after SDK I/O: the project may have been removed, or a sibling
+    // worktree may have begun deleting while its history was being read.
+    await this.knownWorkspace(cwd);
+    if (this.locks.has(this.workspaceOwner(cwd))) fail("WORKSPACE_BUSY");
     // Reserving synchronously after the awaits prevents duplicate ownership.
     const existing =
       sessionFile &&
@@ -387,10 +450,15 @@ export class WorkspaceManager {
     if (existing) return this.describe(existing);
     if (this.channels.has(request.channelId))
       return this.describe(this.channels.get(request.channelId));
-    // Recheck after SDK I/O: a sibling worktree may have begun deleting meanwhile.
-    if (this.locks.has(this.workspaceProjects.get(key(cwd))))
-      fail("WORKSPACE_BUSY");
     const entry = this.launch(request.channelId, cwd, sessionFile);
+    const project = this.projects.find(
+      (p) => key(p.path) === this.workspaceOwner(cwd),
+    );
+    if (project && !this.workspaceRoots.has(key(cwd))) {
+      project.folders ??= [];
+      if (!project.folders.some((folder) => key(folder) === key(cwd)))
+        project.folders.push(cwd);
+    }
     this.service.current = cwd;
     await this.save();
     this.changed();
@@ -468,6 +536,9 @@ export class WorkspaceManager {
           for (const cwd of this.workspaceProjects.keys()) {
             if (inside(result.path, cwd)) this.workspaceProjects.delete(cwd);
           }
+          for (const cwd of this.workspaceRoots.keys()) {
+            if (inside(result.path, cwd)) this.workspaceRoots.delete(cwd);
+          }
           project.folders = (project.folders ?? []).filter(
             (cwd) => !inside(result.path, cwd),
           );
@@ -492,12 +563,147 @@ export class WorkspaceManager {
     this.changed();
     return job;
   }
-  async control(request) {
+  control(request) {
+    if (
+      [
+        "gui_hide_unassigned",
+        "gui_create_project",
+        "gui_create_section",
+        "gui_update_section",
+        "gui_delete_section",
+        "gui_move_project",
+        "gui_add_project",
+        "gui_forget_project",
+      ].includes(request.type)
+    ) {
+      const result = this.organizing.then(() => this.controlRequest(request));
+      // Metadata commands are serialized across filesystem/Git awaits. A failed
+      // request must not poison the queue or permit a later add to revive a group.
+      this.organizing = result.catch(() => {});
+      return result;
+    }
+    return this.controlRequest(request);
+  }
+  async controlRequest(request) {
     switch (request.type) {
       case "gui_get_catalog":
         return this.catalog();
+      case "gui_hide_unassigned": {
+        this.unassignedHidden = true;
+        await this.save();
+        this.changed();
+        return {};
+      }
+      case "gui_create_project": {
+        if (
+          request.sectionId != null &&
+          !this.sections.some((s) => s.id === request.sectionId)
+        )
+          fail("SECTION_UNAVAILABLE");
+        const result = await this.scope(request.parent).createWorkspace(
+          request.parent,
+          request.name,
+        );
+        const cwd = await this.register(result.path, false);
+        if (request.sectionId != null) {
+          await this.catalog();
+          this.projects.find(
+            (p) => key(p.path) === this.workspaceOwner(cwd),
+          ).sectionId = request.sectionId;
+        }
+        await this.save();
+        this.changed();
+        return { path: cwd };
+      }
+      case "gui_create_section": {
+        if (
+          typeof request.sectionId !== "string" ||
+          !/^[a-zA-Z0-9_-]{1,100}$/.test(request.sectionId)
+        )
+          fail("INVALID_NAME");
+        if (
+          typeof request.name !== "string" ||
+          !request.name.trim() ||
+          request.name.length > 160
+        )
+          fail("INVALID_NAME");
+        if (!this.sections.some((s) => s.id === request.sectionId)) {
+          this.sections.push({
+            id: request.sectionId,
+            name: request.name.trim(),
+            collapsed: false,
+          });
+        }
+        await this.save();
+        this.changed();
+        return {};
+      }
+      case "gui_update_section": {
+        const section = this.sections.find((s) => s.id === request.sectionId);
+        if (!section) fail("SECTION_UNAVAILABLE");
+        if (request.name !== undefined) {
+          if (
+            typeof request.name !== "string" ||
+            !request.name.trim() ||
+            request.name.length > 160
+          )
+            fail("INVALID_NAME");
+          section.name = request.name.trim();
+        }
+        if (typeof request.collapsed === "boolean")
+          section.collapsed = request.collapsed;
+        if (request.direction === "up" || request.direction === "down") {
+          const index = this.sections.indexOf(section);
+          const next = index + (request.direction === "up" ? -1 : 1);
+          if (next >= 0 && next < this.sections.length) {
+            [this.sections[index], this.sections[next]] = [
+              this.sections[next],
+              section,
+            ];
+          }
+        }
+        await this.save();
+        this.changed();
+        return {};
+      }
+      case "gui_delete_section": {
+        this.sections = this.sections.filter((s) => s.id !== request.sectionId);
+        for (const project of this.projects) {
+          if (project.sectionId === request.sectionId) project.sectionId = null;
+        }
+        await this.save();
+        this.changed();
+        return {};
+      }
+      case "gui_move_project": {
+        const project = this.projects.find(
+          (p) => key(p.path) === key(request.path),
+        );
+        if (!project) fail("WORKTREE_UNAVAILABLE");
+        if (
+          request.sectionId != null &&
+          !this.sections.some((s) => s.id === request.sectionId)
+        )
+          fail("SECTION_UNAVAILABLE");
+        project.sectionId = request.sectionId ?? null;
+        await this.save();
+        this.changed();
+        return {};
+      }
       case "gui_add_project": {
-        const cwd = await this.register(request.path);
+        if (
+          request.sectionId != null &&
+          !this.sections.some((s) => s.id === request.sectionId)
+        )
+          fail("SECTION_UNAVAILABLE");
+        const cwd = await this.register(request.path, false);
+        if (request.sectionId != null) {
+          await this.catalog();
+          const owner = this.workspaceProjects.get(key(cwd));
+          this.projects.find((p) => key(p.path) === owner).sectionId =
+            request.sectionId;
+        }
+        await this.save();
         this.changed();
         return { path: cwd };
       }
@@ -520,6 +726,9 @@ export class WorkspaceManager {
         this.projects = this.projects.filter((p) => p !== project);
         for (const [cwd, root] of this.workspaceProjects) {
           if (root === key(project.path)) this.workspaceProjects.delete(cwd);
+        }
+        for (const [cwd, root] of this.workspaceRoots) {
+          if (root === key(project.path)) this.workspaceRoots.delete(cwd);
         }
         if (folders.some((w) => inside(w.path, this.service.current))) {
           this.service.current = this.projects[0]?.path ?? process.cwd();
@@ -635,6 +844,7 @@ export class WorkspaceManager {
       }),
     );
     await Promise.all(this.work ?? []);
+    await this.organizing;
     await this.saving;
   }
 }

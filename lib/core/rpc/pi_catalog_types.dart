@@ -17,11 +17,22 @@ class PiCatalogWorktree {
   final bool main, folder, locked, unavailable;
 }
 
+class PiCatalogSection {
+  PiCatalogSection.fromJson(Object? value) : this._(rpcObject(value));
+  PiCatalogSection._(Map<String, dynamic> json)
+    : id = json['id'] as String,
+      name = json['name'] as String,
+      collapsed = json['collapsed'] == true;
+  final String id, name;
+  final bool collapsed;
+}
+
 class PiCatalogProject {
   PiCatalogProject.fromJson(Object? value) : this._(rpcObject(value));
   PiCatalogProject._(Map<String, dynamic> json)
     : path = json['path'] as String,
       name = json['name'] as String,
+      sectionId = json['sectionId'] as String?,
       git = json['git'] == true,
       baseRef = json['baseRef'] as String? ?? 'HEAD',
       worktreeParent = json['worktreeParent'] as String?,
@@ -31,6 +42,7 @@ class PiCatalogProject {
         (json['worktrees'] as List).map(PiCatalogWorktree.fromJson),
       );
   final String path, name;
+  final String? sectionId;
   final bool git, hasHead;
   final String baseRef;
   final String? worktreeParent;
@@ -65,7 +77,10 @@ class PiWorkspaceJob {
 class PiCatalog {
   PiCatalog.fromJson(Object? value) : this._(rpcObject(value));
   PiCatalog._(Map<String, dynamic> json)
-    : projects = List.unmodifiable(
+    : sections = List.unmodifiable(
+        ((json['sections'] as List?) ?? []).map(PiCatalogSection.fromJson),
+      ),
+      projects = List.unmodifiable(
         (json['projects'] as List).map(PiCatalogProject.fromJson),
       ),
       channels = List.unmodifiable(
@@ -74,11 +89,13 @@ class PiCatalog {
       jobs = List.unmodifiable(
         (json['jobs'] as List).map(PiWorkspaceJob.fromJson),
       ),
+      unassignedHidden = json['unassignedHidden'] == true,
       persistenceWarning = json['persistenceWarning'] == true;
+  final List<PiCatalogSection> sections;
   final List<PiCatalogProject> projects;
   final List<PiChannelInfo> channels;
   final List<PiWorkspaceJob> jobs;
-  final bool persistenceWarning;
+  final bool persistenceWarning, unassignedHidden;
 }
 
 /// Strongly typed GUI management API; no raw JSON in widgets/controllers.
@@ -87,11 +104,64 @@ class PiCatalogService {
   final PiRpcClient client;
   Future<PiCatalog> catalog() async =>
       PiCatalog.fromJson(await client.requestGui('gui_get_catalog', {}));
-  Future<String> addProject(String path) async =>
+  Future<String> addProject(String path, {String? sectionId}) async =>
       rpcObject(
-            await client.requestGui('gui_add_project', {'path': path}),
+            await client.requestGui('gui_add_project', {
+              'path': path,
+              'sectionId': ?sectionId,
+            }),
           )['path']
           as String;
+  Future<void> hideUnassigned() async {
+    await client.requestGui('gui_hide_unassigned', {});
+  }
+
+  Future<String> createProject(
+    String parent,
+    String name, {
+    String? sectionId,
+  }) async =>
+      rpcObject(
+            await client.requestGui('gui_create_project', {
+              'parent': parent,
+              'name': name,
+              'sectionId': ?sectionId,
+            }),
+          )['path']
+          as String;
+
+  Future<void> createSection(String id, String name) async {
+    await client.requestGui('gui_create_section', {
+      'sectionId': id,
+      'name': name,
+    });
+  }
+
+  Future<void> updateSection(
+    String id, {
+    String? name,
+    bool? collapsed,
+    String? direction,
+  }) async {
+    await client.requestGui('gui_update_section', {
+      'sectionId': id,
+      'name': ?name,
+      'collapsed': ?collapsed,
+      'direction': ?direction,
+    });
+  }
+
+  Future<void> deleteSection(String id) async {
+    await client.requestGui('gui_delete_section', {'sectionId': id});
+  }
+
+  Future<void> moveProject(String path, String? sectionId) async {
+    await client.requestGui('gui_move_project', {
+      'path': path,
+      'sectionId': sectionId,
+    });
+  }
+
   Future<void> forgetProject(String path) async {
     await client.requestGui('gui_forget_project', {'path': path});
   }

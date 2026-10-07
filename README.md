@@ -20,13 +20,13 @@ Pi 是一个命令行 AI 编程助手。这个项目给它套了一层图形界�
 ## 它能做什么
 
 - **像聊天一样用 Pi**：流式回复、Markdown 渲染、代码高亮和一键复制，AI 的修改以 Diff 形式贴在对话里。个别情况（并发写入、很早的历史）拿不到旧内容时，只显示写入的内容本身，不硬造对比。
-- **同时开好几个会话**：左边按项目分组，一个项目里可以开多个会话，每个会话有自己的草稿、附件和模型设置，切走一个不影响它继续干活。
+- **同时开好几个会话**：左边用虚拟分区归类项目，项目下只显示会话，一个目录里可以开多个会话，每个会话有自己的草稿、附件和模型设置，切走一个不影响它继续干活。
 - **隔离试验不弄乱主线**：在一个项目下可以新建 Git Worktree，把 AI 关在里面改代码，主线目录不受影响。不想要了可以整棵删掉，删除前会做安全检查（还有会话在用、或有未提交改动时会拦下来），删掉的分支仍保留在仓库里，后悔了能找回。
 - **改了什么一目了然**：右上角的文件与 Git 面板显示当前目录的真实改动，不提供提交或回滚，只看不动手。
 - **历史会话可回退**：从历史记录里恢复旧对话，可以从任意一条消息往回退、另开分支继续。
 - **图片与链接**：往输入框里拖图、粘贴图都行，对话里的图片可以直接预览。
 - **换模型很方便**：不用记模型名，下拉列表里选就行，搜索、思考档位一起配好。
-- **长得也行**：跟随 Windows 主题色，明暗模式分开调，支持基准字号和界面缩放。桌面毛玻璃需要 Windows 11 22H2+，系统不支持时自动退回普通背景。
+- **长得也行**：跟随 Windows 主题色，明暗模式分开调，支持基准字号和界面缩放。桌面毛玻璃支持 Windows 11 22H2+ 和提供标准背景效果协议的 Wayland 桌面；系统不支持时显示纯色并提示原因。
 
 ## 界面预览
 
@@ -56,11 +56,13 @@ Pi 是一个命令行 AI 编程助手。这个项目给它套了一层图形界�
 
 ## 从源码运行
 
-需要 Windows 桌面 Flutter 开发环境（固定 Flutter **3.47.4 / stable**，Dart **3.13.3**）。
+需要对应桌面平台的 Flutter 开发环境（固定 Flutter **3.47.4 / stable**，Dart **3.13.3**）。
 
 ```bash
 flutter pub get --enforce-lockfile
 flutter run -d windows
+# Linux native build dependencies are listed in docs/appearance_settings.md.
+# On Linux, use: flutter run -d linux
 ```
 
 两点提醒：
@@ -103,6 +105,6 @@ dart run tool/check_chat_rpc.dart --with-model
 ## 更多文档
 
 - 使用相关：[便携版使用说明](docs/release_usage.md) · [外观设置](docs/appearance_settings.md) · [对话与文件改动](docs/rpc_chat.md) · [图片与链接](docs/images_and_links.md)
-- 功能细节：[工作区与会话](docs/workspaces_sessions.md) · [文档标签页](docs/document_tabs.md) · [文件与 Git 面板](docs/workspace_browser.md) · [历史回退与分支](docs/history_rewind.md) · [模型选择器](docs/model_picker_rpc.md) · [扩展槽位](docs/extension_ui_slots.md)
+- 功能细节：[工作区与会话](docs/workspaces_sessions.md) · [分区与项目会话](docs/project_sections.md) · [文档标签页](docs/document_tabs.md) · [文件与 Git 面板](docs/workspace_browser.md) · [历史回退与分支](docs/history_rewind.md) · [模型选择器](docs/model_picker_rpc.md) · [扩展槽位](docs/extension_ui_slots.md)
 - 构建相关：[Windows 构建检查](docs/windows_build.md) · [Flutter 版本与渲染器](docs/flutter_renderer.md) · [GitHub 自动发布](docs/github_release.md) · [第三方声明](THIRD_PARTY_NOTICES.md)
 - 给协作者：[项目规范](AGENTS.md)

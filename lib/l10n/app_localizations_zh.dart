@@ -1345,7 +1345,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get appearanceGlassHint =>
-      '顶部与侧栏、主界面和卡片分别设置。桌面模糊由 Windows 控制，卡片模糊应用内背景，文字保持清晰。明暗模式共用设置，需要 Windows 11 22H2 或更新版本。';
+      '顶部与侧栏、主界面和卡片分别设置。桌面模糊由系统控制，卡片模糊应用内背景，文字保持清晰。明暗模式共用设置，需要 Windows 11 22H2 或更新版本，或支持标准背景效果协议的 Wayland 桌面。';
 
   @override
   String get appearanceGlassSidebar => '顶部与侧边栏毛玻璃';
@@ -1387,11 +1387,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get appearanceGlassSystemDisabled =>
-      '系统暂未允许透明效果，正在显示纯色。请检查 Windows 的“透明效果”、对比度主题和节电模式。';
+      '系统暂未允许模糊或透明效果，正在显示纯色。请检查桌面效果；Windows 下还需检查“透明效果”、对比度主题和节电模式。';
 
   @override
   String get appearanceGlassUnsupported =>
-      '当前系统不支持此材质，正在显示纯色。需要 Windows 11 22H2 或更新版本。';
+      '当前桌面不支持此材质，正在显示纯色。需要 Windows 11 22H2 或更新版本，或提供标准背景效果协议的 Wayland 桌面；暂不支持 X11 和旧桌面专用模糊协议。';
 
   @override
   String get appearanceGlassUnavailable =>
@@ -1562,7 +1562,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '同一目录还有其他会话正在运行，可能修改同一份文件。需要隔离时请新建 Worktree。';
 
   @override
-  String get workbenchSearch => '搜索项目、Worktree 和会话…';
+  String get workbenchSearch => '搜索分区、项目和会话…';
 
   @override
   String get workbenchAddProject => '添加项目';
@@ -2233,4 +2233,61 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hooksNoChannel => '没有可用的控制通道，钩子设置暂时无法使用。';
+
+  @override
+  String get sectionCreate => '新建分区';
+
+  @override
+  String get sectionRename => '重命名分区';
+
+  @override
+  String get sectionDelete => '删除分区';
+
+  @override
+  String get sectionDeleteDescription => '分区内的项目将移到“未分区”，项目文件和会话会保留。';
+
+  @override
+  String get sectionMoveProject => '移动到分区';
+
+  @override
+  String get sectionUnassigned => '未分区';
+
+  @override
+  String get sectionManage => '管理分区';
+
+  @override
+  String get sectionMoveUp => '上移';
+
+  @override
+  String get sectionMoveDown => '下移';
+
+  @override
+  String get sectionEmpty => '添加项目到此分区';
+
+  @override
+  String get sectionName => '分区名称';
+
+  @override
+  String get sectionUnavailable => '分区已变更，请刷新列表后重试。';
+
+  @override
+  String sectionWorktree(String name) {
+    return 'Worktree · $name';
+  }
+
+  @override
+  String get sectionRemoveUnassignedHint =>
+      '移除“未分区”标题后，其中的项目会直接显示在列表中。文件和会话会保留。';
+
+  @override
+  String get projectQuickChoose => '选择项目文件夹';
+
+  @override
+  String get projectQuickHint => '选择项目会打开该目录的会话，当前对话和草稿会保留。';
+
+  @override
+  String get projectQuickSearch => '搜索项目名称或路径…';
+
+  @override
+  String get projectCreateFolder => '新建项目文件夹';
 }

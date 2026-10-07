@@ -58,6 +58,7 @@ class HomeChatPanel extends StatefulWidget {
     this.hibernating = false,
     this.waking = false,
     this.onWake,
+    this.onChooseProject,
     this.session,
   });
   final ChatController chat;
@@ -75,7 +76,7 @@ class HomeChatPanel extends StatefulWidget {
   /// The session's Pi process was hibernated to free memory; the editor shows
   /// a wake card instead of the stale connection failure.
   final bool hibernating, waking;
-  final VoidCallback? onWake;
+  final VoidCallback? onWake, onChooseProject;
   @override
   State<HomeChatPanel> createState() => _HomeChatPanelState();
 }
@@ -310,10 +311,25 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
     super.dispose();
   }
 
+  Widget _projectButton(BuildContext context) => Align(
+    alignment: AlignmentDirectional.centerStart,
+    child: Tooltip(
+      message: widget.session?.workspace ?? widget.project,
+      child: AppActionButton.subtle(
+        label: widget.project,
+        leading: const Icon(Icons.folder_outlined),
+        trailing: widget.onChooseProject == null
+            ? null
+            : const Icon(Icons.expand_more),
+        labelStyle: context.textTheme.labelMedium,
+        onPressed: widget.onChooseProject,
+      ),
+    ),
+  );
+
   Widget _header(BuildContext context) {
     final chat = widget.chat;
     final l10n = context.l10n;
-    final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xl,
@@ -321,19 +337,7 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
       ),
       child: Row(
         children: [
-          Icon(Icons.folder_outlined, color: colors.textSecondary, size: 16),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Tooltip(
-              message: chat.title.isEmpty ? widget.project : chat.title,
-              child: Text(
-                chat.title.isEmpty ? widget.project : chat.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.textTheme.titleSmall,
-              ),
-            ),
-          ),
+          Expanded(child: _projectButton(context)),
           const SizedBox(width: AppSpacing.sm),
           if (widget.session != null) _historyButton(context),
           AppIconButton.subtle(
@@ -495,20 +499,7 @@ class _HomeChatPanelState extends State<HomeChatPanel> {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.folder_outlined,
-                    size: 15,
-                    color: context.colors.textSecondary,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      widget.project,
-                      style: context.textTheme.labelMedium?.copyWith(
-                        color: context.colors.textPrimary,
-                      ),
-                    ),
-                  ),
+                  Expanded(child: _projectButton(context)),
                   if (widget.session != null) _historyButton(context),
                 ],
               ),

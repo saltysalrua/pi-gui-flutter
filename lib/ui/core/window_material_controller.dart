@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 
@@ -39,7 +40,8 @@ class WindowMaterialController extends ChangeNotifier {
       WindowMaterialStatus result;
       try {
         result = await _backend.apply(enabled: request.$1, dark: request.$2);
-      } catch (_) {
+      } catch (error, stackTrace) {
+        _logFailure(error, stackTrace, request);
         result = WindowMaterialStatus.unavailable;
       }
       if (_disposed) break;
@@ -48,7 +50,9 @@ class WindowMaterialController extends ChangeNotifier {
       // the window without its blur even though the call returned active.
       // Repeating the off-to-on cycle once is the recovery that repaints;
       // later re-applies keep the previous same-value behavior.
-      if (request.$1 &&
+      if (!kIsWeb &&
+          defaultTargetPlatform == TargetPlatform.windows &&
+          request.$1 &&
           !wasEnabled &&
           result == WindowMaterialStatus.active &&
           !_refreshAfterApply &&
@@ -56,7 +60,8 @@ class WindowMaterialController extends ChangeNotifier {
         try {
           await _backend.apply(enabled: false, dark: request.$2);
           result = await _backend.apply(enabled: true, dark: request.$2);
-        } catch (_) {
+        } catch (error, stackTrace) {
+          _logFailure(error, stackTrace, request);
           result = WindowMaterialStatus.unavailable;
         }
       }
@@ -73,6 +78,21 @@ class WindowMaterialController extends ChangeNotifier {
     status = value;
     notifyListeners();
   }
+
+  static void _logFailure(
+    Object error,
+    StackTrace stackTrace,
+    (bool, bool) request,
+  ) => developer.log(
+    'Window material transition failed',
+    name: 'pi_gui.window_material',
+    error: <String, Object>{
+      'enabled': request.$1,
+      'dark': request.$2,
+      'cause': error,
+    },
+    stackTrace: stackTrace,
+  );
 
   @override
   void dispose() {

@@ -1,6 +1,6 @@
 ---
 title: "项目、Worktree 与并行会话"
-version: "2.4.1"
+version: "2.5.1"
 status: "implemented"
 type: "feature-and-architecture"
 tags: [flutter, pi-rpc, session, workspace, git-worktree, parallel]
@@ -8,18 +8,19 @@ tags: [flutter, pi-rpc, session, workspace, git-worktree, parallel]
 
 # 项目、Worktree 与并行会话
 
-参考 [Orca Worktrees](https://www.onorca.dev/docs/model/worktrees)，采用 **项目 → Worktree / 主目录 → 会话** 的侧栏结构，而不是在弹窗里反复替换一个执行目录。用户已确认：**后台真并行；新会话默认留在当前 Worktree**。
+侧栏采用 **虚拟分区 → 项目 → 会话**。分区只负责归类，不对应磁盘路径；项目根目录只出现一次，子目录与 Worktree 会话归入所属项目。文件树由右侧文件面板负责。Git Worktree 的并行隔离沿用 [Orca Worktrees](https://www.onorca.dev/docs/model/worktrees) 的参考方案。后台真并行、新会话默认留在当前目录的规则不变。详细入口见 [分区与项目会话](project_sections.md)。
 
 ## 入口与操作
 
-- 项目列表右侧的文件夹加号：添加已有仓库或普通文件夹。主目录、Git 已登记的外部 Worktree 会一起显示；同一仓库不会因添加另一个 Worktree 重复成为项目。
-- 点击项目 / Worktree 行：展开、收起其内容。点击会话：打开对应标签，不停止其他任务。
-- 项目旁 `＋`：新建 Worktree。目录旁 `＋` 或标签栏 `＋`：在该目录 / 当前文档所属目录新建会话，不自动建分支。
+- 项目列表右侧的新建分区按钮：创建虚拟分区。分区右侧的文件夹加号添加已有仓库或普通文件夹；没有分区的旧项目归入“未分区”。同一仓库不会因添加另一个 Worktree 重复成为项目。
+- 点击项目行展开会话列表；点击会话打开对应标签，不停止其他任务。文件浏览与预览保留在右侧面板。
+- 项目旁 `＋`：在项目主目录新建会话。标签栏 `＋` 沿用当前文档所属目录；项目菜单保留“新建 Worktree”和“管理 Worktree”。聊天中的目录名可打开项目选择与创建弹窗。
 - 同一个目录可以运行多个会话；输入区会提示其他会话正在共享这份文件。**会话隔离不等于文件隔离**，需要互不影响代码时显式创建 Worktree。
 - 每个目录下面区分已打开会话和历史。运行图标、等待回答图标、未读图标用于快速定位；悬停查看完整标题、目录和状态。历史通过 Pi 官方 SDK 读取，未落盘的空会话不会伪装成历史。
-- 搜索项目、Worktree、会话标题。开始搜索后按目录读取历史摘要，最多两个目录同时读取；不读取正文做全文搜索，不遍历用户整个磁盘。
+- 搜索分区、项目和会话标题。按已登记目录读取历史摘要，搜索最多两个目录同时读取；不读取正文做全文搜索，不扫描文件系统。
 - 列表靠近底部「账号额度」入口时使用 [24px 渐变淡出](scroll_edge_fade.md)，滚到最底部恢复清晰；固定入口不参与淡出，不叠加毛玻璃底色。
-- 刷新重新读取目录树与已展开的历史。失败保留已确认数据并提示，不发送 Prompt。
+- 左侧刷新只读取项目快照和已展开项目的历史；文件刷新由右侧负责。失败保留已确认数据并提示，不发送 Prompt。
+- “未分区”为空时不显示；有项目时可移除其标题，让项目直接显示在列表根部。隐藏选择跨重启保存，不移除项目、文件或会话。
 - 项目菜单“从列表移除项目”仅移除注册，不删除目录、分支或会话；须先关闭该项目所有会话。最后一个项目被移除后，重启不会从旧最近列表重新导入它。
 
 聊天与文件共用原有标签栏，可以拖动、并排、合并。每个会话独立保留文本草稿、图片 / 文件附件、模型与思考档位、消息、滚动状态和扩展组件。切页不调用 `switch_session`，不改变已运行进程的 cwd，也不重新发送 Prompt。详见 [文档标签页](document_tabs.md)。
@@ -101,7 +102,7 @@ tags: [flutter, pi-rpc, session, workspace, git-worktree, parallel]
 - 创建成功后不会因 UI 或后续启动失败自动删除目录。普通 Worktree 移除保留分支和 Pi 历史。
 - 无法检测其他 GUI 实例 / 外部终端占用；仍遵守 Git worktree 锁，移除前应确认外部使用情况。
 
-本轮不包含远程主机、PR 平台、自动化、目录共享 / 秘密复制、父子 Worktree 编排、拖动排序及归档。
+本轮不包含远程主机、PR 平台、自动化、目录共享 / 秘密复制、父子 Worktree 编排、拖动排序及归档；分区通过菜单上移 / 下移排序。
 
 ## 后端结构
 
@@ -130,7 +131,7 @@ workspace_rpc.mjs --gui-multiplex
 
 `WorkspaceService.listSessions` 的 5 秒短缓存按目录分别持有；同目录并发扫描合并。会话结束、消息落盘与写确认使摘要失效；前端同目录读合并，读取期间发生强制刷新时补读一次。缓存只有摘要，不保存 SDK 的 `allMessagesText`。
 
-注册项目、显示名称、起点保存在 **GUI 自有** `workspaces.json` 的 `catalog` 字段，旧 `recent` 仅用于首次迁移。位置仍为 Windows `%APPDATA%/pi-gui/workspaces.json`，其他系统 `$XDG_CONFIG_HOME/pi-gui/workspaces.json` 或 `~/.config/pi-gui/workspaces.json`；`PI_GUI_WORKSPACE_STORE` 可覆盖。只有管理器串行保存，各通道不争写配置；保存失败有提示。
+注册项目、虚拟分区、显示名称、起点保存在 **GUI 自有** `workspaces.json` 的 `catalog` 字段（版本 2），旧 `recent` 仅用于首次迁移。版本 1 的项目迁移到“未分区”，已清空的目录列表不会重新导入。位置仍为 Windows `%APPDATA%/pi-gui/workspaces.json`，其他系统 `$XDG_CONFIG_HOME/pi-gui/workspaces.json` 或 `~/.config/pi-gui/workspaces.json`；`PI_GUI_WORKSPACE_STORE` 可覆盖。只有管理器串行保存，各通道不争写配置；保存失败有提示。
 
 需要 PATH 中的 Node.js、npm 安装的 Pi；Git 功能需要 Git。`PiWorkspaceTransport` 携带九个脚本：`workspace_rpc.mjs`、`workspace_manager.mjs`、`workspace_browser.mjs`、`gui_tool_diff.mjs`、`gui_image_upload.mjs`、`gui_packages.mjs`、`gui_history.mjs`、`gui_provider_profiles.mjs`、`gui_hooks.mjs`（内置钩子注册表，见 `docs/builtin_hooks.md`），解包到同一临时目录。上传图片由适配层复用 Pi 公开缩放函数预处理，见 [图片与附件](images_and_links.md)；插件市场 / 插件管理见 [插件页文档](plugin_packages.md)。关闭应用只清理它自己的进程树和脚本。
 
@@ -161,7 +162,13 @@ A、B 可以同时使用 `gui-1` 或 `q1`，不会交叉确认。坏的单行在
 | 命令 | 字段 | 用途 |
 | --- | --- | --- |
 | `gui_get_catalog` | 无 | 项目 / Worktree、通道和后台任务快照 |
-| `gui_add_project` | `path` | 注册目录，Git 按主 checkout 去重 |
+| `gui_hide_unassigned` | 无 | 持久化移除默认分组标题 |
+| `gui_create_project` | `parent`, `name`, `sectionId?` | 创建空目录并注册，不覆盖已有目录 |
+| `gui_add_project` | `path`, `sectionId?` | 注册目录，Git 按主 checkout 去重 |
+| `gui_create_section` | `sectionId`, `name` | 创建虚拟分区 |
+| `gui_update_section` | `sectionId`, `name?`, `collapsed?`, `direction?` | 重命名、折叠、上移或下移 |
+| `gui_delete_section` | `sectionId` | 删除分区，项目移至未分区 |
+| `gui_move_project` | `path`, `sectionId`（可为 null） | 更换项目的分区 |
 | `gui_forget_project` | `path` | 仅移除注册 |
 | `gui_workspace_history` | `workspace`, `force?` | 官方会话摘要 |
 | `gui_open_channel` | `channelId`, `workspace`, `sessionPath?` | 新会话或独占恢复历史；返回已有身份时聚焦已有会话 |
@@ -181,7 +188,7 @@ A、B 可以同时使用 `gui-1` 或 `q1`，不会交叉确认。坏的单行在
 | 强类型目录与管理 API | `lib/core/rpc/pi_catalog_types.dart` |
 | 会话所有权、历史、浏览与选择 | `lib/ui/features/home/controllers/workbench_controller.dart` |
 | 全局标签、作用域与窗口关闭 | `lib/ui/features/home/views/home_view.dart` |
-| 三级侧栏 | `lib/ui/features/home/widgets/workbench_sidebar.dart` |
+| 分区与会话侧栏 | `lib/ui/features/home/widgets/workbench_sidebar.dart` |
 | Worktree 表单 | `lib/ui/features/home/widgets/worktree_create_dialog.dart` |
 | 扩展隔离 | `lib/core/slots/slot_manager.dart`、`pi_extension_ui_bridge.dart` |
 

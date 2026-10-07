@@ -532,3 +532,257 @@ test("worktree bases accept only verified local/remote refs or full commit hashe
         code: "INVALID_BASE",
     });
 });
+
+test("virtual sections migrate v1, persist ordering/collapse and delete without touching projects or channels", async (t) => {
+    const { repo, service, manager, children } = await fixture(t);
+    const original = await readFile(path.join(repo, "file.txt"), "utf8");
+    service.catalog = { version: 1, projects: manager.projects, names: {} };
+    await manager.initialize();
+    assert.equal((await manager.catalog()).sections.length, 0);
+    assert.equal(manager.projects[0].sectionId, null);
+    const control = (type, data) => manager.control({ type, ...data });
+    await control("gui_create_section", { sectionId: "work", name: " 工作 " });
+    await control("gui_create_section", {
+        sectionId: "personal",
+        name: "个人",
+    });
+    // Same request identity is idempotent after an uncertain reply.
+    await control("gui_create_section", { sectionId: "work", name: "工作" });
+    await control("gui_move_project", { path: repo, sectionId: "work" });
+    await control("gui_update_section", {
+        sectionId: "personal",
+        direction: "up",
+        collapsed: true,
+        name: "个人项目",
+    });
+    const saved = JSON.parse(await readFile(service.storePath, "utf8")).catalog;
+    assert.equal(saved.version, 2);
+    assert.deepEqual(
+        saved.sections.map((s) => s.id),
+        ["personal", "work"],
+    );
+    assert.equal(saved.sections[0].collapsed, true);
+    assert.equal(saved.projects[0].sectionId, "work");
+    await manager.initialize();
+    assert.equal((await manager.catalog()).sections[0].name, "个人项目");
+    await assert.rejects(
+        control("gui_move_project", { path: repo, sectionId: "missing" }),
+        { code: "SECTION_UNAVAILABLE" },
+    );
+    await assert.rejects(
+        control("gui_update_section", { sectionId: "work", name: "  " }),
+        { code: "INVALID_NAME" },
+    );
+    await control("gui_delete_section", { sectionId: "work" });
+    assert.equal(manager.projects[0].sectionId, null);
+    assert.equal(manager.channels.size, 1);
+    assert.equal(children[0].stopped, false);
+    assert.equal(await readFile(path.join(repo, "file.txt"), "utf8"), original);
+    assert.equal(
+        JSON.parse(await readFile(service.storePath, "utf8")).catalog
+            .projects[0].sectionId,
+        null,
+    );
+});
+
+test("real subdirectories browse and open with their own cwd; removed projects revoke descendant access", async (t) => {
+    const { repo, root, manager } = await fixture(t);
+    const nested = path.join(repo, "src", "nested");
+    await mkdir(nested, { recursive: true });
+    await writeFile(path.join(nested, "code.txt"), "contents");
+    const listing = await manager.control({
+        type: "gui_list_files",
+        workspace: repo,
+        path: "src/nested",
+    });
+    assert.equal(listing.entries[0].name, "code.txt");
+    const opened = await manager.openChannel({
+        channelId: "nested",
+        workspace: nested,
+    });
+    assert.equal(opened.workspace, nested);
+    await manager.catalog();
+    assert.equal(manager.workspaceProjects.get(nested), repo);
+    await assert.rejects(
+        manager.control({ type: "gui_forget_project", path: repo }),
+        { code: "WORKTREE_IN_USE" },
+    );
+    manager.locks.add(repo);
+    await assert.rejects(
+        manager.openChannel({ channelId: "locked", workspace: nested }),
+        { code: "WORKSPACE_BUSY" },
+    );
+    manager.locks.clear();
+    await assert.rejects(manager.knownWorkspace(root), {
+        code: "WORKTREE_UNAVAILABLE",
+    });
+    const { symlink } = await import("node:fs/promises");
+    await symlink(
+        root,
+        path.join(repo, "outside"),
+        process.platform === "win32" ? "junction" : "dir",
+    );
+    await assert.rejects(manager.knownWorkspace(path.join(repo, "outside")), {
+        code: "WORKTREE_UNAVAILABLE",
+    });
+    await manager.closeChannel({ channelId: "primary" });
+    await manager.closeChannel({ channelId: "nested" });
+    await manager.control({ type: "gui_forget_project", path: repo });
+    await assert.rejects(manager.knownWorkspace(nested), {
+        code: "WORKTREE_UNAVAILABLE",
+    });
+    assert.equal(existsSync(path.join(nested, "code.txt")), true);
+});
+
+test("sections attach to added projects atomically and stale section references migrate to unassigned", async (t) => {
+    const { repo, root, manager, service } = await fixture(t);
+    const folder = path.join(root, "another");
+    await mkdir(folder);
+    await assert.rejects(
+        manager.control({
+            type: "gui_add_project",
+            path: folder,
+            sectionId: "missing",
+        }),
+        { code: "SECTION_UNAVAILABLE" },
+    );
+    assert.equal(manager.projects.length, 1);
+    await manager.control({
+        type: "gui_create_section",
+        sectionId: "group",
+        name: "分区",
+    });
+    await manager.control({
+        type: "gui_add_project",
+        path: folder,
+        sectionId: "group",
+    });
+    assert.equal(
+        manager.projects.find((p) => p.path === folder).sectionId,
+        "group",
+    );
+    const nested = path.join(repo, "nested");
+    await mkdir(nested);
+    await manager.openChannel({ channelId: "sub", workspace: nested });
+    await manager.save();
+    service.catalog = { ...service.catalog, sections: [] };
+    await manager.initialize();
+    assert.equal(service.current, nested);
+    assert.equal(manager.workspaceProjects.get(nested), repo);
+    assert.equal(
+        manager.projects.find((p) => p.path === folder).sectionId,
+        null,
+    );
+});
+
+test("removing a project during a descendant history read cannot launch a late channel", async (t) => {
+    const { repo, manager } = await fixture(t);
+    const nested = path.join(repo, "src");
+    await mkdir(nested);
+    await manager.closeChannel({ channelId: "primary" });
+    let release, started;
+    const waiting = new Promise((resolve) => {
+        started = resolve;
+    });
+    manager.scope(nested).listSessions = () => {
+        started();
+        return new Promise((resolve) => {
+            release = resolve;
+        });
+    };
+    const opening = manager.openChannel({
+        channelId: "late",
+        workspace: nested,
+        sessionPath: path.join(nested, "saved.jsonl"),
+    });
+    const rejected = assert.rejects(opening, { code: "WORKTREE_UNAVAILABLE" });
+    await waiting;
+    await manager.control({ type: "gui_forget_project", path: repo });
+    release({ sessions: [{ path: path.join(nested, "saved.jsonl") }] });
+    await rejected;
+    assert.equal(manager.channels.size, 0);
+});
+
+test("removing the Unassigned heading persists without changing projects or conversations", async (t) => {
+    const { repo, manager, service, children } = await fixture(t);
+    await manager.control({ type: "gui_hide_unassigned" });
+    const catalog = await manager.catalog();
+    assert.equal(catalog.unassignedHidden, true);
+    assert.equal(catalog.projects[0].path, repo);
+    assert.equal(catalog.channels.length, 1);
+    assert.equal(children[0].stopped, false);
+    assert.equal(
+        JSON.parse(await readFile(service.storePath, "utf8")).catalog
+            .unassignedHidden,
+        true,
+    );
+    await manager.initialize();
+    assert.equal((await manager.catalog()).unassignedHidden, true);
+});
+
+test("quick project creation validates names and duplicates and preserves active conversations", async (t) => {
+    const { root, manager, children } = await fixture(t);
+    await manager.control({
+        type: "gui_create_section",
+        sectionId: "work",
+        name: "工作",
+    });
+    const result = await manager.control({
+        type: "gui_create_project",
+        parent: root,
+        name: "new project",
+        sectionId: "work",
+    });
+    assert.equal(result.path, path.join(root, "new project"));
+    assert.equal(existsSync(result.path), true);
+    assert.equal(
+        (await manager.catalog()).projects.find((p) => p.path === result.path)
+            .sectionId,
+        "work",
+    );
+    assert.equal(manager.channels.size, 1);
+    assert.equal(children[0].stopped, false);
+    await assert.rejects(
+        manager.control({
+            type: "gui_create_project",
+            parent: root,
+            name: "new project",
+        }),
+        { code: "PATH_EXISTS" },
+    );
+    await assert.rejects(
+        manager.control({
+            type: "gui_create_project",
+            parent: root,
+            name: "../escape",
+        }),
+        { code: "INVALID_NAME" },
+    );
+    await assert.rejects(
+        manager.control({
+            type: "gui_create_project",
+            parent: root,
+            name: "no-group",
+            sectionId: "missing",
+        }),
+        { code: "SECTION_UNAVAILABLE" },
+    );
+    assert.equal(existsSync(path.join(root, "no-group")), false);
+});
+
+test("child conversation directories stay discoverable after closing channels and reloading catalog", async (t) => {
+    const { repo, manager, service } = await fixture(t);
+    const nested = path.join(repo, "nested");
+    await mkdir(nested);
+    await manager.openChannel({ channelId: "child", workspace: nested });
+    await manager.closeChannel({ channelId: "child" });
+    assert.ok(manager.projects[0].folders.includes(nested));
+    const saved = JSON.parse(await readFile(service.storePath, "utf8")).catalog;
+    assert.ok(saved.projects[0].folders.includes(nested));
+    await manager.initialize();
+    assert.ok(
+        (await manager.catalog()).projects[0].worktrees.some(
+            (w) => w.path === nested,
+        ),
+    );
+});

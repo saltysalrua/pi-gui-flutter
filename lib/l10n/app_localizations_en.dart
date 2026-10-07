@@ -1436,7 +1436,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appearanceGlassHint =>
-      'Separate settings for the title bar and sidebar, main area and cards. Windows blurs the desktop; cards blur in-app backgrounds while text stays clear. Shared by light and dark modes. Requires Windows 11 22H2 or newer.';
+      'Separate settings for the title bar and sidebar, main area and cards. The system blurs the desktop; cards blur in-app backgrounds while text stays clear. Shared by light and dark modes. Requires Windows 11 22H2 or newer, or a Wayland desktop supporting the standard background-effect protocol.';
 
   @override
   String get appearanceGlassSidebar => 'Title bar and sidebar glass';
@@ -1481,11 +1481,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appearanceGlassSystemDisabled =>
-      'Windows is not allowing transparency. Showing solid colors. Check Transparency effects, contrast themes and battery saver.';
+      'The system is not allowing blur or transparency. Showing solid colors. Check desktop effects; on Windows, also check Transparency effects, contrast themes and battery saver.';
 
   @override
   String get appearanceGlassUnsupported =>
-      'This system does not support the material. Showing solid colors. Windows 11 22H2 or newer is required.';
+      'This desktop does not support the material. Showing solid colors. Requires Windows 11 22H2 or newer, or Wayland with the standard background-effect protocol. X11 and older desktop-specific blur protocols are not supported.';
 
   @override
   String get appearanceGlassUnavailable =>
@@ -1670,7 +1670,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Another session is running in this directory and may edit the same files. Create a worktree to isolate changes.';
 
   @override
-  String get workbenchSearch => 'Search projects, worktrees and sessions…';
+  String get workbenchSearch => 'Search sections, projects and sessions…';
 
   @override
   String get workbenchAddProject => 'Add project';
@@ -2385,4 +2385,64 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hooksNoChannel =>
       'No control channel is available; hook settings are unavailable.';
+
+  @override
+  String get sectionCreate => 'New section';
+
+  @override
+  String get sectionRename => 'Rename section';
+
+  @override
+  String get sectionDelete => 'Delete section';
+
+  @override
+  String get sectionDeleteDescription =>
+      'Projects will move to Unassigned. Their files and conversations will be kept.';
+
+  @override
+  String get sectionMoveProject => 'Move to section';
+
+  @override
+  String get sectionUnassigned => 'Unassigned';
+
+  @override
+  String get sectionManage => 'Manage section';
+
+  @override
+  String get sectionMoveUp => 'Move up';
+
+  @override
+  String get sectionMoveDown => 'Move down';
+
+  @override
+  String get sectionEmpty => 'Add a project to this section';
+
+  @override
+  String get sectionName => 'Section name';
+
+  @override
+  String get sectionUnavailable =>
+      'This section has changed. Refresh the list and try again.';
+
+  @override
+  String sectionWorktree(String name) {
+    return 'Worktree · $name';
+  }
+
+  @override
+  String get sectionRemoveUnassignedHint =>
+      'Remove the Unassigned heading and show its projects directly in the list. Files and conversations will be kept.';
+
+  @override
+  String get projectQuickChoose => 'Choose project folder';
+
+  @override
+  String get projectQuickHint =>
+      'Selecting a project opens a conversation in that folder. Your current conversation and draft are kept.';
+
+  @override
+  String get projectQuickSearch => 'Search project name or path…';
+
+  @override
+  String get projectCreateFolder => 'Create project folder';
 }

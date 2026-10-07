@@ -4,6 +4,7 @@ String workspaceFailureLabel(AppLocalizations l10n, String code) =>
     switch (code) {
       'WORKSPACE_BUSY' => l10n.workspaceBusy,
       'INVALID_PATH' || 'DIRECTORY_UNAVAILABLE' => l10n.workspacePathFailed,
+      'SECTION_UNAVAILABLE' => l10n.sectionUnavailable,
       'INVALID_NAME' => l10n.workspaceNameInvalid,
       'PATH_EXISTS' => l10n.workspacePathExists,
       'CREATE_FAILED' => l10n.workspaceCreateFailed,

@@ -297,6 +297,7 @@ class WorkbenchController extends ChangeNotifier {
   String? failure, catalogFailure, selectedWorkspace, _foreground;
   bool loading = false, opening = false, _disposed = false, _again = false;
   bool _expandedInitial = false, _searchingHistory = false;
+  bool organizing = false;
   final _historyAgain = <String>{};
   final _historyReads = <String, Object>{};
   int _sequence = 0;
@@ -369,6 +370,11 @@ class WorkbenchController extends ChangeNotifier {
         if (!_expandedInitial && next.projects.isNotEmpty) {
           expandedProjects.add(next.projects.first.path);
           _expandedInitial = true;
+        }
+        for (final project in next.projects) {
+          if (expandedProjects.contains(project.path)) {
+            loadProjectHistory(project);
+          }
         }
         if (selectedWorkspace == null && next.projects.isNotEmpty) {
           selectedWorkspace = next.projects.first.worktrees.firstOrNull?.path;
@@ -448,8 +454,12 @@ class WorkbenchController extends ChangeNotifier {
       expandedWorktrees.add(session.workspace);
       unawaited(loadHistory(session.workspace));
       for (final project in catalog?.projects ?? <PiCatalogProject>[]) {
-        if (project.worktrees.any((w) => p.equals(w.path, session.workspace))) {
-          expandedProjects.add(project.path);
+        for (final tree in project.worktrees) {
+          if (p.equals(tree.path, session.workspace) ||
+              p.isWithin(tree.path, session.workspace)) {
+            expandedProjects.add(project.path);
+            unawaited(loadHistory(session.workspace));
+          }
         }
       }
     }
@@ -471,6 +481,17 @@ class WorkbenchController extends ChangeNotifier {
       )
       ..addAll(sessions.values.map((session) => session.workspace))
       ..addAll(tabs.tabs.map((tab) => tab.workspace).whereType<String>());
+    // Subdirectories are now navigable workspaces, not separate catalog rows.
+    final roots = retained.toList();
+    for (final path in {
+      ...history.keys,
+      ...loadingHistory,
+      ...expandedWorktrees,
+      ..._browsers.keys,
+      ..._documentTabs.keys,
+    }) {
+      if (roots.any((root) => p.isWithin(root, path))) retained.add(path);
+    }
     if (selectedWorkspace != null && !retained.contains(selectedWorkspace)) {
       selectedWorkspace = snapshot.projects
           .expand((project) => project.worktrees)
@@ -661,13 +682,14 @@ class WorkbenchController extends ChangeNotifier {
     if (_searchingHistory || _disposed) return;
     _searchingHistory = true;
     try {
-      final paths =
-          catalog?.projects
-              .expand((p) => p.worktrees)
-              .where((w) => !w.unavailable)
-              .map((w) => w.path)
-              .toList() ??
-          <String>[];
+      final paths = <String>{
+        ...?catalog?.projects
+            .expand((p) => p.worktrees)
+            .where((w) => !w.unavailable)
+            .map((w) => w.path),
+        ...history.keys,
+        ...expandedWorktrees,
+      }.toList();
       for (var i = 0; i < paths.length && !_disposed; i += 2) {
         await Future.wait(
           paths.skip(i).take(2).map((path) => loadHistory(path)),
@@ -678,8 +700,61 @@ class WorkbenchController extends ChangeNotifier {
     }
   }
 
+  PiCatalogProject? projectForWorkspace(String workspace) {
+    PiCatalogProject? match;
+    var length = -1;
+    for (final project in catalog?.projects ?? <PiCatalogProject>[]) {
+      for (final root in {
+        project.path,
+        ...project.worktrees.map((w) => w.path),
+      }) {
+        if ((p.equals(root, workspace) || p.isWithin(root, workspace)) &&
+            root.length > length) {
+          match = project;
+          length = root.length;
+        }
+      }
+    }
+    return match;
+  }
+
+  Iterable<String> workspacesForProject(PiCatalogProject project) =>
+      LinkedHashSet<String>(equals: p.equals, hashCode: p.hash)..addAll({
+        project.path,
+        ...project.worktrees.where((w) => !w.unavailable).map((w) => w.path),
+        ...sessions.values
+            .map((s) => s.workspace)
+            .where((path) => projectForWorkspace(path)?.path == project.path),
+        ...history.keys.where(
+          (path) => projectForWorkspace(path)?.path == project.path,
+        ),
+      });
+
+  void loadProjectHistory(PiCatalogProject project) {
+    for (final path in workspacesForProject(project)) {
+      unawaited(loadHistory(path));
+    }
+  }
+
+  Future<void> refreshTree() async {
+    await refresh();
+    for (final project in catalog?.projects ?? <PiCatalogProject>[]) {
+      if (expandedProjects.contains(project.path)) {
+        for (final path in workspacesForProject(project)) {
+          await loadHistory(path, force: true);
+        }
+      }
+    }
+  }
+
   void toggleProject(String path) {
-    if (!expandedProjects.remove(path)) expandedProjects.add(path);
+    if (!expandedProjects.remove(path)) {
+      expandedProjects.add(path);
+      final project = catalog?.projects
+          .where((project) => p.equals(project.path, path))
+          .firstOrNull;
+      if (project != null) loadProjectHistory(project);
+    }
     _notify();
   }
 
@@ -793,17 +868,79 @@ class WorkbenchController extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> addProject(String path) async {
+  Future<bool> addProject(String path, {String? sectionId}) async {
     failure = null;
     try {
-      final workspace = await api.addProject(path);
+      final workspace = await api.addProject(path, sectionId: sectionId);
       await refresh();
       await selectWorktree(workspace);
+      return failure == null;
     } catch (error) {
       failure = errorCode(error);
       _notify();
+      return false;
     }
   }
+
+  Future<bool> createProject(
+    String parent,
+    String name, {
+    String? sectionId,
+  }) async {
+    failure = null;
+    try {
+      final workspace = await api.createProject(
+        parent,
+        name,
+        sectionId: sectionId,
+      );
+      await refresh();
+      await selectWorktree(workspace);
+      return failure == null;
+    } catch (error) {
+      failure = errorCode(error);
+      _notify();
+      return false;
+    }
+  }
+
+  Future<void> hideUnassigned() => _organize(api.hideUnassigned);
+
+  Future<void> _organize(Future<void> Function() change) async {
+    if (organizing || hasWorkspaceOperation) return;
+    organizing = true;
+    failure = null;
+    _notify();
+    try {
+      await change();
+      await refresh();
+    } catch (error) {
+      failure = errorCode(error);
+    } finally {
+      organizing = false;
+      _notify();
+    }
+  }
+
+  Future<void> createSection(String name) =>
+      _organize(() => api.createSection(operationId(), name));
+  Future<void> updateSection(
+    String id, {
+    String? name,
+    bool? collapsed,
+    String? direction,
+  }) => _organize(
+    () => api.updateSection(
+      id,
+      name: name,
+      collapsed: collapsed,
+      direction: direction,
+    ),
+  );
+  Future<void> deleteSection(String id) =>
+      _organize(() => api.deleteSection(id));
+  Future<void> moveProject(String path, String? sectionId) =>
+      _organize(() => api.moveProject(path, sectionId));
 
   Future<void> forgetProject(String path) async {
     failure = null;

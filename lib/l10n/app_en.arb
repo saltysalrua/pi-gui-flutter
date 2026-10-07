@@ -585,7 +585,7 @@
     }
   },
   "appearanceGlass": "Desktop glass",
-  "appearanceGlassHint": "Separate settings for the title bar and sidebar, main area and cards. Windows blurs the desktop; cards blur in-app backgrounds while text stays clear. Shared by light and dark modes. Requires Windows 11 22H2 or newer.",
+  "appearanceGlassHint": "Separate settings for the title bar and sidebar, main area and cards. The system blurs the desktop; cards blur in-app backgrounds while text stays clear. Shared by light and dark modes. Requires Windows 11 22H2 or newer, or a Wayland desktop supporting the standard background-effect protocol.",
   "appearanceGlassSidebar": "Title bar and sidebar glass",
   "appearanceGlassSidebarHint": "Applies to the title bar, both sidebars and resize strips together.",
   "appearanceGlassCanvas": "Main area glass",
@@ -598,8 +598,8 @@
   "appearanceGlassOpacityHint": "Lower is more transparent; 100% is solid. Increase if text is hard to read. Change the tint under Surface colors.",
   "appearanceGlassOn": "On",
   "appearanceGlassOff": "Off",
-  "appearanceGlassSystemDisabled": "Windows is not allowing transparency. Showing solid colors. Check Transparency effects, contrast themes and battery saver.",
-  "appearanceGlassUnsupported": "This system does not support the material. Showing solid colors. Windows 11 22H2 or newer is required.",
+  "appearanceGlassSystemDisabled": "The system is not allowing blur or transparency. Showing solid colors. Check desktop effects; on Windows, also check Transparency effects, contrast themes and battery saver.",
+  "appearanceGlassUnsupported": "This desktop does not support the material. Showing solid colors. Requires Windows 11 22H2 or newer, or Wayland with the standard background-effect protocol. X11 and older desktop-specific blur protocols are not supported.",
   "appearanceGlassUnavailable": "Native glass is unavailable. Showing solid colors. Update and reopen the app to retry; hot reload cannot load native changes.",
   "browserTitle": "Files and Git",
   "browserFiles": "Files",
@@ -668,7 +668,7 @@
   "tabsReadOnly": "Read-only",
   "tabsRefresh": "Reload this preview",
   "workbenchSharedDirectory": "Another session is running in this directory and may edit the same files. Create a worktree to isolate changes.",
-  "workbenchSearch": "Search projects, worktrees and sessions…",
+  "workbenchSearch": "Search sections, projects and sessions…",
   "workbenchAddProject": "Add project",
   "workbenchMain": "Main",
   "workbenchWaiting": "Waiting for you",
@@ -932,5 +932,30 @@
 "hooksActionUninstall": "Uninstall",
 "hooksActionRestore": "Restore",
 "hooksMenuTooltip": "Change hook state",
-"hooksNoChannel": "No control channel is available; hook settings are unavailable."
+"hooksNoChannel": "No control channel is available; hook settings are unavailable.",
+  "sectionCreate": "New section",
+  "sectionRename": "Rename section",
+  "sectionDelete": "Delete section",
+  "sectionDeleteDescription": "Projects will move to Unassigned. Their files and conversations will be kept.",
+  "sectionMoveProject": "Move to section",
+  "sectionUnassigned": "Unassigned",
+  "sectionManage": "Manage section",
+  "sectionMoveUp": "Move up",
+  "sectionMoveDown": "Move down",
+  "sectionEmpty": "Add a project to this section",
+  "sectionName": "Section name",
+  "sectionUnavailable": "This section has changed. Refresh the list and try again.",
+  "sectionWorktree": "Worktree · {name}",
+  "@sectionWorktree": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "sectionRemoveUnassignedHint": "Remove the Unassigned heading and show its projects directly in the list. Files and conversations will be kept.",
+  "projectQuickChoose": "Choose project folder",
+  "projectQuickHint": "Selecting a project opens a conversation in that folder. Your current conversation and draft are kept.",
+  "projectQuickSearch": "Search project name or path…",
+  "projectCreateFolder": "Create project folder"
 }

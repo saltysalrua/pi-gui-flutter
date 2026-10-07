@@ -158,6 +158,8 @@ void main() {
   test(
     'first enable repeats the off-on cycle that repaints the DWM backdrop',
     () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
       final backend = _Backend();
       final controller = WindowMaterialController(backend);
       addTearDown(controller.dispose);
@@ -205,6 +207,72 @@ void main() {
       backend.results[7].complete(WindowMaterialStatus.active);
       await controller.settled;
       expect(controller.status, WindowMaterialStatus.active);
+    },
+  );
+
+  test(
+    'Linux enables once and keeps tint-only configuration idempotent',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final backend = _Backend();
+      final controller = WindowMaterialController(backend);
+      addTearDown(controller.dispose);
+      controller.configure(enabled: true, dark: false);
+      backend.results.single.complete(WindowMaterialStatus.active);
+      await controller.settled;
+      controller.configure(enabled: true, dark: false);
+      expect(backend.requests, [(true, false)]);
+      expect(controller.status, WindowMaterialStatus.active);
+      backend.events.add(WindowMaterialStatus.systemDisabled);
+      expect(controller.status, WindowMaterialStatus.systemDisabled);
+      backend.events.add(WindowMaterialStatus.active);
+      expect(controller.status, WindowMaterialStatus.active);
+      controller.configure(enabled: false, dark: false);
+      backend.results[1].complete(WindowMaterialStatus.disabled);
+      await controller.settled;
+      backend.events.add(WindowMaterialStatus.active);
+      expect(controller.status, WindowMaterialStatus.disabled);
+    },
+  );
+
+  test(
+    'Linux channel uses setBlur and preserves native capability statuses',
+    () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      const channel = MethodChannel('pi_gui/window_material');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final service = WindowMaterialService();
+      addTearDown(() {
+        service.dispose();
+        messenger.setMockMethodCallHandler(channel, null);
+        debugDefaultTargetPlatformOverride = null;
+      });
+      for (final status in [
+        WindowMaterialStatus.active,
+        WindowMaterialStatus.unsupported,
+        WindowMaterialStatus.systemDisabled,
+      ]) {
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'setBlur');
+          expect(call.arguments, {'enabled': true, 'dark': true});
+          return status.name;
+        });
+        expect(await service.apply(enabled: true, dark: true), status);
+      }
+      messenger.setMockMethodCallHandler(channel, (_) async {
+        throw PlatformException(
+          code: 'surface_unavailable',
+          message: 'The GTK window has no realized Wayland surface.',
+          details: {'backend': 'wayland', 'enabled': true, 'dark': true},
+        );
+      });
+      expect(
+        await service.apply(enabled: true, dark: true),
+        WindowMaterialStatus.unavailable,
+      );
     },
   );
 

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -22,15 +24,26 @@ abstract interface class WindowMaterialBackend {
 
 class WindowMaterialService implements WindowMaterialBackend {
   WindowMaterialService() {
-    if (_isWindows) _channel.setMethodCallHandler(_onMethod);
+    if (_hasNativeMaterial) _channel.setMethodCallHandler(_onMethod);
   }
   static const _channel = MethodChannel('pi_gui/window_material');
-  bool get _isWindows =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+  bool get _hasNativeMaterial =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux);
   final _changes = StreamController<WindowMaterialStatus>.broadcast();
-  static WindowMaterialStatus _parse(Object? value) =>
-      WindowMaterialStatus.values.where((s) => s.name == value).firstOrNull ??
-      WindowMaterialStatus.unavailable;
+  static WindowMaterialStatus _parse(Object? value) {
+    final status = WindowMaterialStatus.values
+        .where((s) => s.name == value)
+        .firstOrNull;
+    if (status != null) return status;
+    developer.log(
+      'Unrecognized native window material status',
+      name: 'pi_gui.window_material',
+      error: <String, Object?>{'status': value},
+    );
+    return WindowMaterialStatus.unavailable;
+  }
 
   Future<void> _onMethod(MethodCall call) async {
     if (call.method == 'statusChanged' && !_changes.isClosed) {
@@ -46,25 +59,52 @@ class WindowMaterialService implements WindowMaterialBackend {
     required bool enabled,
     required bool dark,
   }) async {
-    if (!_isWindows) return WindowMaterialStatus.unsupported;
+    if (!_hasNativeMaterial) return WindowMaterialStatus.unsupported;
+    final method = defaultTargetPlatform == TargetPlatform.linux
+        ? 'setBlur'
+        : 'setAcrylic';
     try {
       return _parse(
-        await _channel.invokeMethod<String>('setAcrylic', {
+        await _channel.invokeMethod<String>(method, {
           'enabled': enabled,
           'dark': dark,
         }),
       );
-    } on MissingPluginException {
+    } on MissingPluginException catch (error, stackTrace) {
       // Hot reload cannot register a new native channel in an older runner.
+      developer.log(
+        'Native window material channel is missing',
+        name: 'pi_gui.window_material',
+        error: <String, Object?>{
+          'method': method,
+          'enabled': enabled,
+          'dark': dark,
+          'message': error.message,
+        },
+        stackTrace: stackTrace,
+      );
       return WindowMaterialStatus.unavailable;
-    } on PlatformException {
+    } on PlatformException catch (error, stackTrace) {
+      developer.log(
+        'Native window material request failed',
+        name: 'pi_gui.window_material',
+        error: <String, Object?>{
+          'method': method,
+          'enabled': enabled,
+          'dark': dark,
+          'code': error.code,
+          'message': error.message,
+          'details': error.details,
+        },
+        stackTrace: stackTrace,
+      );
       return WindowMaterialStatus.unavailable;
     }
   }
 
   @override
   void dispose() {
-    if (_isWindows) _channel.setMethodCallHandler(null);
+    if (_hasNativeMaterial) _channel.setMethodCallHandler(null);
     unawaited(_changes.close());
   }
 }

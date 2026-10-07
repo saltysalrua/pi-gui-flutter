@@ -397,6 +397,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
               _ => null,
             };
       List<AppSettingRow> glassRows({
+        required String id,
         required String title,
         required String hint,
         required String opacityTitle,
@@ -407,6 +408,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
           title: title,
           description: hint,
           control: AppSelect<bool>(
+            key: ValueKey('appearance-$id-glass'),
             value: glass.enabled,
             label: title,
             options: [
@@ -426,6 +428,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
                 children: [
                   Expanded(
                     child: AppSteppedSlider(
+                      key: ValueKey('appearance-$id-opacity'),
                       steps: 17,
                       value:
                           ((glass.opacity - GlassPreferences.minOpacity) / 0.05)
@@ -460,6 +463,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
         [l.appearanceGlassHint, ?glassNotice].join('\n'),
         [
           ...glassRows(
+            id: 'sidebar',
             title: l.appearanceGlassSidebar,
             hint: l.appearanceGlassSidebarHint,
             opacityTitle: l.appearanceGlassSidebarOpacity,
@@ -469,6 +473,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
             ),
           ),
           ...glassRows(
+            id: 'canvas',
             title: l.appearanceGlassCanvas,
             hint: l.appearanceGlassCanvasHint,
             opacityTitle: l.appearanceGlassCanvasOpacity,
@@ -479,6 +484,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
           ),
           // The shared card material never changes either desktop region.
           ...glassRows(
+            id: 'card',
             title: l.appearanceGlassCards,
             hint: l.appearanceGlassCardsHint,
             opacityTitle: l.appearanceGlassCardsOpacity,

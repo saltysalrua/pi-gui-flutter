@@ -49,6 +49,8 @@ void main() {
               (project) => project['path'] == command['path'],
             );
             reply(transport, packet, null);
+          case 'gui_list_files':
+            reply(transport, packet, listing(command['workspace'] as String));
           case 'gui_workspace_history':
             historyRequests.add(packet);
           default:
